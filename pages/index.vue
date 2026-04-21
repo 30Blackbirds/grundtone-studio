@@ -1,6 +1,11 @@
+<script setup lang="ts">
+definePageMeta({ layout: false })
+
+onMounted(() => {
+  navigateTo('/dashboard')
+})
+</script>
+
 <template>
-  <main>
-    <h1>Grundtone Studio</h1>
-    <p>Pre-alpha. Fase 0 fundament.</p>
-  </main>
+  <p class="muted" style="padding: 2rem">Loading…</p>
 </template>
