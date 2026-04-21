@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { signIn } from '~~/lib/auth-client'
+  import { signIn } from '~~/lib/auth-client'
 
-definePageMeta({ layout: 'auth' })
+  definePageMeta({ layout: 'auth' })
 
-const email = ref('')
-const password = ref('')
-const error = ref<string | null>(null)
-const pending = ref(false)
+  const email = ref('')
+  const password = ref('')
+  const error = ref<string | null>(null)
+  const pending = ref(false)
 
-async function submit() {
-  pending.value = true
-  error.value = null
-  const res = await signIn.email({
-    email: email.value,
-    password: password.value,
-  })
-  pending.value = false
-  if (res.error) {
-    error.value = res.error.message ?? 'Login failed'
-    return
+  async function submit() {
+    pending.value = true
+    error.value = null
+    const res = await signIn.email({
+      email: email.value,
+      password: password.value,
+    })
+    pending.value = false
+    if (res.error) {
+      error.value = res.error.message ?? 'Login failed'
+      return
+    }
+    await navigateTo('/dashboard')
   }
-  await navigateTo('/dashboard')
-}
 </script>
 
 <template>

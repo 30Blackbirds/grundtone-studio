@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import { signUp } from '~~/lib/auth-client'
+  import { signUp } from '~~/lib/auth-client'
 
-definePageMeta({ layout: 'auth' })
+  definePageMeta({ layout: 'auth' })
 
-const name = ref('')
-const email = ref('')
-const password = ref('')
-const error = ref<string | null>(null)
-const pending = ref(false)
+  const name = ref('')
+  const email = ref('')
+  const password = ref('')
+  const error = ref<string | null>(null)
+  const pending = ref(false)
 
-async function submit() {
-  pending.value = true
-  error.value = null
-  const res = await signUp.email({
-    email: email.value,
-    password: password.value,
-    name: name.value,
-  })
-  pending.value = false
-  if (res.error) {
-    error.value = res.error.message ?? 'Sign-up failed'
-    return
+  async function submit() {
+    pending.value = true
+    error.value = null
+    const res = await signUp.email({
+      email: email.value,
+      password: password.value,
+      name: name.value,
+    })
+    pending.value = false
+    if (res.error) {
+      error.value = res.error.message ?? 'Sign-up failed'
+      return
+    }
+    await navigateTo('/dashboard')
   }
-  await navigateTo('/dashboard')
-}
 </script>
 
 <template>
@@ -40,9 +40,17 @@ async function submit() {
       </label>
       <label>
         Password
-        <input v-model="password" type="password" required autocomplete="new-password" minlength="8" />
+        <input
+          v-model="password"
+          type="password"
+          required
+          autocomplete="new-password"
+          minlength="8"
+        />
       </label>
-      <button type="submit" :disabled="pending">{{ pending ? 'Creating…' : 'Create account' }}</button>
+      <button type="submit" :disabled="pending">
+        {{ pending ? 'Creating…' : 'Create account' }}
+      </button>
       <p v-if="error" class="error">{{ error }}</p>
     </form>
     <p class="muted">Already have an account? <NuxtLink to="/login">Sign in</NuxtLink></p>

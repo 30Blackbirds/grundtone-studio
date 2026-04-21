@@ -1,60 +1,57 @@
 <script setup lang="ts">
-import { organization } from '~~/lib/auth-client'
+  import { organization } from '~~/lib/auth-client'
 
-definePageMeta({ layout: 'app' })
+  definePageMeta({ layout: 'app' })
 
-const route = useRoute()
-const slug = computed(() => route.params.slug as string)
+  const route = useRoute()
+  const slug = computed(() => route.params.slug as string)
 
-const { data: org } = await useAsyncData(`org-${slug.value}`, async () => {
-  const res = await organization.getFullOrganization({
-    query: { organizationSlug: slug.value },
-    fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+  const { data: org } = await useAsyncData(`org-${slug.value}`, async () => {
+    const res = await organization.getFullOrganization({
+      query: { organizationSlug: slug.value },
+      fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+    })
+    return res.data
   })
-  return res.data
-})
 
-// Set as active org on load
-watchEffect(async () => {
-  if (org.value?.id) {
-    await organization.setActive({ organizationId: org.value.id })
-  }
-})
+  // Set as active org on load
+  watchEffect(async () => {
+    if (org.value?.id) {
+      await organization.setActive({ organizationId: org.value.id })
+    }
+  })
 
-const { data: projects, refresh } = await useAsyncData(
-  `projects-${slug.value}`,
-  async () => {
+  const { data: projects, refresh } = await useAsyncData(`projects-${slug.value}`, async () => {
     return await $fetch('/api/projects', {
       headers: useRequestHeaders(['cookie']),
       query: { organizationSlug: slug.value },
     })
-  },
-)
+  })
 
-const showCreate = ref(false)
-const projName = ref('')
-const projSlug = ref('')
-const creating = ref(false)
-const error = ref<string | null>(null)
+  const showCreate = ref(false)
+  const projName = ref('')
+  const projSlug = ref('')
+  const creating = ref(false)
+  const error = ref<string | null>(null)
 
-async function create() {
-  creating.value = true
-  error.value = null
-  try {
-    await $fetch('/api/projects', {
-      method: 'POST',
-      body: { name: projName.value, slug: projSlug.value, organizationSlug: slug.value },
-    })
-    showCreate.value = false
-    projName.value = ''
-    projSlug.value = ''
-    await refresh()
-  } catch (err) {
-    error.value = (err as Error).message
-  } finally {
-    creating.value = false
+  async function create() {
+    creating.value = true
+    error.value = null
+    try {
+      await $fetch('/api/projects', {
+        method: 'POST',
+        body: { name: projName.value, slug: projSlug.value, organizationSlug: slug.value },
+      })
+      showCreate.value = false
+      projName.value = ''
+      projSlug.value = ''
+      await refresh()
+    } catch (err) {
+      error.value = (err as Error).message
+    } finally {
+      creating.value = false
+    }
   }
-}
 </script>
 
 <template>

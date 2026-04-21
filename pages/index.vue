@@ -1,9 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ layout: false })
+  definePageMeta({ layout: false })
 
-onMounted(() => {
-  navigateTo('/dashboard')
-})
+  onMounted(() => {
+    navigateTo('/dashboard')
+  })
 </script>
 
 <template>

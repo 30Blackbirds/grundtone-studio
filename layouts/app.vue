@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { signOut, useSession } from '~~/lib/auth-client'
+  import { signOut, useSession } from '~~/lib/auth-client'
 
-const session = useSession()
+  const session = useSession()
 
-async function handleSignOut() {
-  await signOut()
-  await navigateTo('/login')
-}
+  async function handleSignOut() {
+    await signOut()
+    await navigateTo('/login')
+  }
 </script>
 
 <template>

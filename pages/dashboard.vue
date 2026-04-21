@@ -1,40 +1,40 @@
 <script setup lang="ts">
-import { organization } from '~~/lib/auth-client'
+  import { organization } from '~~/lib/auth-client'
 
-definePageMeta({ layout: 'app' })
+  definePageMeta({ layout: 'app' })
 
-const { data: orgs, refresh } = await useAsyncData('orgs', async () => {
-  const res = await organization.list({
-    fetchOptions: {
-      headers: useRequestHeaders(['cookie']) as HeadersInit,
-    },
+  const { data: orgs, refresh } = await useAsyncData('orgs', async () => {
+    const res = await organization.list({
+      fetchOptions: {
+        headers: useRequestHeaders(['cookie']) as HeadersInit,
+      },
+    })
+    return res.data ?? []
   })
-  return res.data ?? []
-})
 
-const showCreate = ref(false)
-const orgName = ref('')
-const orgSlug = ref('')
-const creating = ref(false)
-const error = ref<string | null>(null)
+  const showCreate = ref(false)
+  const orgName = ref('')
+  const orgSlug = ref('')
+  const creating = ref(false)
+  const error = ref<string | null>(null)
 
-async function create() {
-  creating.value = true
-  error.value = null
-  const res = await organization.create({
-    name: orgName.value,
-    slug: orgSlug.value,
-  })
-  creating.value = false
-  if (res.error) {
-    error.value = res.error.message ?? 'Failed to create organization'
-    return
+  async function create() {
+    creating.value = true
+    error.value = null
+    const res = await organization.create({
+      name: orgName.value,
+      slug: orgSlug.value,
+    })
+    creating.value = false
+    if (res.error) {
+      error.value = res.error.message ?? 'Failed to create organization'
+      return
+    }
+    showCreate.value = false
+    orgName.value = ''
+    orgSlug.value = ''
+    await refresh()
   }
-  showCreate.value = false
-  orgName.value = ''
-  orgSlug.value = ''
-  await refresh()
-}
 </script>
 
 <template>

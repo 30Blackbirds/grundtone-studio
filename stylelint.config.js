@@ -1,0 +1,10 @@
+export default {
+  extends: ['stylelint-config-standard'],
+  rules: {
+    'selector-class-pattern': null,
+    'selector-id-pattern': null,
+    'custom-property-pattern': null,
+    'no-descending-specificity': null,
+  },
+  ignoreFiles: ['node_modules/**', '.nuxt/**', '.nitro/**', '.output/**', 'dist/**'],
+}

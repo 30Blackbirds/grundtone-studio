@@ -29,7 +29,8 @@ export default defineEventHandler(async (event) => {
   if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
 
   const member = org.members?.find((m) => m.userId === session.user.id)
-  if (!member) throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
+  if (!member)
+    throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
 
   const [inserted] = await db
     .insert(project)

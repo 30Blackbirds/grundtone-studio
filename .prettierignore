@@ -1,0 +1,8 @@
+node_modules
+.nuxt
+.nitro
+.output
+dist
+coverage
+pnpm-lock.yaml
+server/db/migrations
