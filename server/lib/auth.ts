@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { magicLink, organization } from 'better-auth/plugins'
 import { db } from '../db'
+import { email } from './email'
 
 const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) {
@@ -23,9 +24,13 @@ export const auth = betterAuth({
   },
   plugins: [
     magicLink({
-      sendMagicLink: async ({ email, url }) => {
-        // TODO: swap for Postmark/Scaleway in Fase 0 — decision pending
-        console.info(`[magic-link] to=${email} url=${url}`)
+      sendMagicLink: async ({ email: to, url }) => {
+        await email.send({
+          to,
+          subject: 'Sign in to Grundtone Studio',
+          text: `Click the link below to sign in:\n\n${url}\n\nIf you didn't request this, ignore this email.`,
+          html: `<p>Click the link below to sign in:</p><p><a href="${url}">${url}</a></p><p>If you didn't request this, ignore this email.</p>`,
+        })
       },
     }),
     organization({
