@@ -12,7 +12,7 @@
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx server/db/migrate.ts",
+    "db:migrate": "tsx --env-file=.env server/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
@@ -31,6 +31,7 @@
   },
   "packageManager": "pnpm@10.14.0",
   "dependencies": {
+    "better-auth": "^1.6.6",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9"
   }
