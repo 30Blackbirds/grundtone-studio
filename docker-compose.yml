@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: grundtone_dev
       POSTGRES_DB: grundtone_studio
     ports:
-      - '5432:5432'
+      - '54320:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

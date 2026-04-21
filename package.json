@@ -10,11 +10,17 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "devDependencies": {
     "@types/node": "^22.15.17",
+    "drizzle-kit": "^0.31.10",
     "nuxt": "^3.19.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.3",
     "vue": "^3.5.26",
     "vue-router": "^4.5.1",
@@ -23,5 +29,9 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "pnpm@10.14.0"
+  "packageManager": "pnpm@10.14.0",
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
+  }
 }
