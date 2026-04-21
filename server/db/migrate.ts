@@ -8,8 +8,8 @@ if (!url) {
 }
 
 const client = postgres(url, { max: 1, prepare: false })
-const db = drizzle(client)
+const migrationsDb = drizzle(client)
 
-await migrate(db, { migrationsFolder: './server/db/migrations' })
+await migrate(migrationsDb, { migrationsFolder: './server/db/migrations' })
 console.log('Migrations applied')
 await client.end()
