@@ -27,32 +27,24 @@
 </script>
 
 <template>
-  <div class="auth-card">
-    <h1>Create account</h1>
-    <form @submit.prevent="submit">
-      <label>
-        Name
-        <input v-model="name" type="text" required autocomplete="name" />
-      </label>
-      <label>
-        Email
-        <input v-model="email" type="email" required autocomplete="email" />
-      </label>
-      <label>
-        Password
-        <input
-          v-model="password"
-          type="password"
-          required
-          autocomplete="new-password"
-          minlength="8"
-        />
-      </label>
-      <button type="submit" :disabled="pending">
-        {{ pending ? 'Creating…' : 'Create account' }}
-      </button>
-      <p v-if="error" class="error">{{ error }}</p>
+  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
+    <h1 class="mt-0">Create account</h1>
+    <form class="flex flex-col gap-4" @submit.prevent="submit">
+      <GTInput v-model="name" label="Name" required autocomplete="name" />
+      <GTInput v-model="email" type="email" label="Email" required autocomplete="email" />
+      <GTPasswordInput
+        v-model="password"
+        label="Password"
+        required
+        autocomplete="new-password"
+        help-text="Minimum 8 characters"
+      />
+      <GTAlert v-if="error" variant="error" :heading="error" aria-label="Sign-up error" />
+      <GTButton type="submit" :loading="pending" block>Create account</GTButton>
     </form>
-    <p class="muted">Already have an account? <NuxtLink to="/login">Sign in</NuxtLink></p>
+    <p class="mt-6 text-tertiary">
+      Already have an account?
+      <NuxtLink to="/login">Sign in</NuxtLink>
+    </p>
   </div>
 </template>

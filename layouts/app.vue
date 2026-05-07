@@ -10,12 +10,14 @@
 </script>
 
 <template>
-  <div class="app-layout">
-    <header class="top-bar">
-      <NuxtLink to="/dashboard" class="brand">Grundtone Studio</NuxtLink>
-      <div class="user">
-        <span v-if="session.data?.user" class="muted">{{ session.data.user.email }}</span>
-        <button @click="handleSignOut">Sign out</button>
+  <div>
+    <header class="flex justify-between items-center p-4 px-6 border-b bg-surface-raised">
+      <NuxtLink to="/dashboard" class="brand-link">Grundtone Studio</NuxtLink>
+      <div class="flex items-center gap-4">
+        <span v-if="session.data?.user" class="text-tertiary text-sm">
+          {{ session.data.user.email }}
+        </span>
+        <GTButton variant="tertiary" size="sm" @click="handleSignOut">Sign out</GTButton>
       </div>
     </header>
     <main>

@@ -45,9 +45,9 @@
     "lint-staged": "^16.4.0",
     "nuxt": "^3.19.2",
     "prettier": "^3.8.3",
+    "sass": "^1.99.0",
     "stylelint": "^17.8.0",
     "stylelint-config-standard": "^40.0.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.8.3",
     "vue": "^3.5.26",
     "vue-router": "^4.5.1",
@@ -58,10 +58,14 @@
   },
   "packageManager": "pnpm@10.14.0",
   "dependencies": {
+    "@grundtone/core": "^2.22.0",
+    "@grundtone/nuxt": "^2.23.3",
+    "@grundtone/vue": "^2.23.3",
     "better-auth": "^1.6.6",
     "drizzle-orm": "^0.45.2",
     "nodemailer": "^8.0.5",
     "postgres": "^3.4.9",
+    "tsx": "^4.21.0",
     "zod": "^4.3.6"
   }
 }

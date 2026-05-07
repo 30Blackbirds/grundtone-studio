@@ -1,7 +1,7 @@
 <template>
-  <div class="auth-layout">
-    <header class="brand">
-      <NuxtLink to="/">Grundtone Studio</NuxtLink>
+  <div>
+    <header class="p-6 text-lg">
+      <NuxtLink to="/" class="brand-link">Grundtone Studio</NuxtLink>
     </header>
     <main>
       <slot />

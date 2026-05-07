@@ -14,7 +14,6 @@
     return res.data
   })
 
-  // Set as active org on load
   watchEffect(async () => {
     if (org.value?.id) {
       await organization.setActive({ organizationId: org.value.id })
@@ -56,37 +55,43 @@
 
 <template>
   <section>
-    <nav class="crumbs">
+    <nav class="flex gap-2 text-tertiary text-sm mb-4">
       <NuxtLink to="/dashboard">Organizations</NuxtLink>
       <span>/</span>
       <span>{{ org?.name ?? slug }}</span>
     </nav>
 
-    <header class="page-header">
-      <h1>Projects</h1>
-      <button v-if="!showCreate" @click="showCreate = true">New project</button>
+    <header class="flex justify-between items-center mb-6">
+      <h1 class="m-0">Projects</h1>
+      <GTButton v-if="!showCreate" @click="showCreate = true">New project</GTButton>
     </header>
 
-    <form v-if="showCreate" class="inline-form" @submit.prevent="create">
-      <label>
-        Name
-        <input v-model="projName" type="text" required />
-      </label>
-      <label>
-        Slug
-        <input v-model="projSlug" type="text" required pattern="[a-z0-9-]+" />
-      </label>
-      <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create' }}</button>
-      <button type="button" @click="showCreate = false">Cancel</button>
-      <p v-if="error" class="error">{{ error }}</p>
+    <form
+      v-if="showCreate"
+      class="flex flex-col gap-4 p-4 mb-6 bg-surface-raised border rounded-lg"
+      @submit.prevent="create"
+    >
+      <div class="grid grid-cols-2 gap-3">
+        <GTInput v-model="projName" label="Name" required />
+        <GTInput v-model="projSlug" label="Slug" required pattern="[a-z0-9-]+" />
+      </div>
+      <GTAlert v-if="error" variant="error" :heading="error" />
+      <div class="flex gap-3 justify-end">
+        <GTButton type="button" variant="secondary" @click="showCreate = false">Cancel</GTButton>
+        <GTButton type="submit" :loading="creating">Create</GTButton>
+      </div>
     </form>
 
-    <ul v-if="projects && projects.length" class="org-list">
-      <li v-for="p in projects" :key="p.id">
+    <ul v-if="projects && projects.length" class="list-reset grid gap-2">
+      <li
+        v-for="p in projects"
+        :key="p.id"
+        class="flex items-baseline gap-3 p-4 bg-surface-raised border rounded-lg"
+      >
         <strong>{{ p.name }}</strong>
-        <span class="muted">{{ p.slug }}</span>
+        <span class="text-tertiary text-sm">{{ p.slug }}</span>
       </li>
     </ul>
-    <p v-else class="muted">No projects yet.</p>
+    <p v-else class="text-tertiary">No projects yet.</p>
   </section>
 </template>
