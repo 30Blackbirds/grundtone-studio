@@ -3,6 +3,7 @@
 
   const session = useSession()
   const { t } = useI18n()
+  const { activeOrg } = useOrgContext()
 
   async function handleSignOut() {
     await signOut()
@@ -14,7 +15,10 @@
   <div>
     <GTSkipLink href="#main">{{ t('skip.toContent') }}</GTSkipLink>
     <header class="flex justify-between items-center p-4 px-6 border-b bg-surface-raised">
-      <NuxtLink to="/dashboard" class="brand-link">{{ t('app.name') }}</NuxtLink>
+      <div class="flex items-center gap-6">
+        <NuxtLink to="/dashboard" class="brand-link">{{ t('app.name') }}</NuxtLink>
+        <OrgSwitcher />
+      </div>
       <div class="flex items-center gap-4">
         <LanguageSwitch />
         <span v-if="session.data?.user" class="text-tertiary text-sm">
@@ -25,8 +29,11 @@
         </GTButton>
       </div>
     </header>
-    <main id="main">
-      <slot />
-    </main>
+    <div class="flex">
+      <AppSidebar v-if="activeOrg" />
+      <main id="main" class="flex-1">
+        <slot />
+      </main>
+    </div>
   </div>
 </template>

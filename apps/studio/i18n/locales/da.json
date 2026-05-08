@@ -50,6 +50,11 @@
     "nameLabel": "Navn",
     "slugLabel": "Slug"
   },
+  "project": {
+    "placeholder": "Projekt-detaljer og token-editor kommer her.",
+    "comingSoon": "Token-editor er på vej",
+    "comingSoonBody": "Næste fase tilføjer en visuel editor for farver, typografi, spacing og radius — plus API-nøgle og publish-flow."
+  },
   "skip": {
     "toContent": "Spring til hovedindhold"
   }

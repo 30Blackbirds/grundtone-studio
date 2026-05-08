@@ -50,6 +50,11 @@
     "nameLabel": "Name",
     "slugLabel": "Slug"
   },
+  "project": {
+    "placeholder": "Project details and token editor will live here.",
+    "comingSoon": "Token editor coming soon",
+    "comingSoonBody": "The next phase adds a visual editor for colors, typography, spacing, and radius — plus API key generation and the publish flow."
+  },
   "skip": {
     "toContent": "Skip to main content"
   }
