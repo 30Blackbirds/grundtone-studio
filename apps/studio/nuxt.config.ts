@@ -2,8 +2,21 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
   devtools: { enabled: true },
-  modules: ['@nuxt/eslint', '@grundtone/nuxt'],
+  modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
+  i18n: {
+    defaultLocale: 'da',
+    strategy: 'no_prefix',
+    locales: [
+      { code: 'da', name: 'Dansk', file: 'da.json' },
+      { code: 'en', name: 'English', file: 'en.json' },
+    ],
+    detectBrowserLanguage: {
+      useCookie: true,
+      cookieKey: 'i18n_locale',
+      redirectOn: 'root',
+    },
+  },
   typescript: {
     strict: true,
     typeCheck: false,

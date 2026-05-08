@@ -3,6 +3,8 @@
 
   definePageMeta({ layout: 'app' })
 
+  const { t } = useI18n()
+
   const { data: orgs, refresh } = await useAsyncData('orgs', async () => {
     const res = await organization.list({
       fetchOptions: {
@@ -24,7 +26,7 @@
     const res = await organization.create({ name: orgName.value, slug: orgSlug.value })
     creating.value = false
     if (res.error) {
-      error.value = res.error.message ?? 'Failed to create organization'
+      error.value = res.error.message ?? t('orgs.createError')
       return
     }
     showCreate.value = false
@@ -35,10 +37,10 @@
 </script>
 
 <template>
-  <section>
+  <section class="p-6">
     <header class="flex justify-between items-center mb-6">
-      <h1 class="m-0">Organizations</h1>
-      <GTButton v-if="!showCreate" @click="showCreate = true">New organization</GTButton>
+      <h1 class="m-0">{{ t('orgs.title') }}</h1>
+      <GTButton v-if="!showCreate" @click="showCreate = true">{{ t('orgs.new') }}</GTButton>
     </header>
 
     <form
@@ -47,13 +49,15 @@
       @submit.prevent="create"
     >
       <div class="grid grid-cols-2 gap-3">
-        <GTInput v-model="orgName" label="Name" required />
-        <GTInput v-model="orgSlug" label="Slug" required pattern="[a-z0-9-]+" />
+        <GTInput v-model="orgName" :label="t('orgs.nameLabel')" required />
+        <GTInput v-model="orgSlug" :label="t('orgs.slugLabel')" required pattern="[a-z0-9-]+" />
       </div>
       <GTAlert v-if="error" variant="error" :heading="error" />
       <div class="flex gap-3 justify-end">
-        <GTButton type="button" variant="secondary" @click="showCreate = false">Cancel</GTButton>
-        <GTButton type="submit" :loading="creating">Create</GTButton>
+        <GTButton type="button" variant="secondary" @click="showCreate = false">
+          {{ t('app.cancel') }}
+        </GTButton>
+        <GTButton type="submit" :loading="creating">{{ t('app.create') }}</GTButton>
       </div>
     </form>
 
@@ -68,6 +72,6 @@
         </NuxtLink>
       </li>
     </ul>
-    <p v-else class="text-tertiary">No organizations yet.</p>
+    <p v-else class="text-tertiary">{{ t('orgs.empty') }}</p>
   </section>
 </template>

@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "Grundtone Studio",
+    "signOut": "Sign out",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "create": "Create",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading …",
+    "language": "Language"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "noAccount": "No account?",
+      "createAccount": "Sign up",
+      "error": "Sign in failed"
+    },
+    "signup": {
+      "title": "Sign up",
+      "submit": "Sign up",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "error": "Could not create account"
+    },
+    "magicLink": {
+      "subject": "Sign in to Grundtone Studio",
+      "body": "Click the link below to sign in:",
+      "ignore": "If you didn't request this, ignore this email."
+    }
+  },
+  "orgs": {
+    "title": "Organizations",
+    "new": "New organization",
+    "empty": "No organizations yet.",
+    "nameLabel": "Name",
+    "slugLabel": "Slug",
+    "createError": "Could not create organization"
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "empty": "No projects yet.",
+    "nameLabel": "Name",
+    "slugLabel": "Slug"
+  },
+  "skip": {
+    "toContent": "Skip to main content"
+  }
+}

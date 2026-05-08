@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "Grundtone Studio",
+    "signOut": "Log ud",
+    "signIn": "Log ind",
+    "signUp": "Opret konto",
+    "create": "Opret",
+    "cancel": "Annullér",
+    "save": "Gem",
+    "delete": "Slet",
+    "loading": "Indlæser …",
+    "language": "Sprog"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Adgangskode",
+    "name": "Navn",
+    "login": {
+      "title": "Log ind",
+      "submit": "Log ind",
+      "noAccount": "Ingen konto?",
+      "createAccount": "Opret en",
+      "error": "Login mislykkedes"
+    },
+    "signup": {
+      "title": "Opret konto",
+      "submit": "Opret konto",
+      "haveAccount": "Har du allerede en konto?",
+      "loginLink": "Log ind",
+      "error": "Kunne ikke oprette konto"
+    },
+    "magicLink": {
+      "subject": "Log ind på Grundtone Studio",
+      "body": "Klik på linket nedenfor for at logge ind:",
+      "ignore": "Hvis du ikke har anmodet om dette, kan du ignorere e-mailen."
+    }
+  },
+  "orgs": {
+    "title": "Organisationer",
+    "new": "Ny organisation",
+    "empty": "Ingen organisationer endnu.",
+    "nameLabel": "Navn",
+    "slugLabel": "Slug",
+    "createError": "Kunne ikke oprette organisation"
+  },
+  "projects": {
+    "title": "Projekter",
+    "new": "Nyt projekt",
+    "empty": "Ingen projekter endnu.",
+    "nameLabel": "Navn",
+    "slugLabel": "Slug"
+  },
+  "skip": {
+    "toContent": "Spring til hovedindhold"
+  }
+}

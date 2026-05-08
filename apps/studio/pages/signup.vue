@@ -3,6 +3,7 @@
 
   definePageMeta({ layout: 'auth' })
 
+  const { t } = useI18n()
   const name = ref('')
   const email = ref('')
   const password = ref('')
@@ -19,7 +20,7 @@
     })
     pending.value = false
     if (res.error) {
-      error.value = res.error.message ?? 'Sign-up failed'
+      error.value = res.error.message ?? t('auth.signup.error')
       return
     }
     await navigateTo('/dashboard')
@@ -28,23 +29,28 @@
 
 <template>
   <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">Create account</h1>
+    <h1 class="mt-0">{{ t('auth.signup.title') }}</h1>
     <form class="flex flex-col gap-4" @submit.prevent="submit">
-      <GTInput v-model="name" label="Name" required autocomplete="name" />
-      <GTInput v-model="email" type="email" label="Email" required autocomplete="email" />
+      <GTInput v-model="name" :label="t('auth.name')" required autocomplete="name" />
+      <GTInput
+        v-model="email"
+        type="email"
+        :label="t('auth.email')"
+        required
+        autocomplete="email"
+      />
       <GTPasswordInput
         v-model="password"
-        label="Password"
+        :label="t('auth.password')"
         required
         autocomplete="new-password"
-        help-text="Minimum 8 characters"
       />
-      <GTAlert v-if="error" variant="error" :heading="error" aria-label="Sign-up error" />
-      <GTButton type="submit" :loading="pending" block>Create account</GTButton>
+      <GTAlert v-if="error" variant="error" :heading="error" :aria-label="t('auth.signup.error')" />
+      <GTButton type="submit" :loading="pending" block>{{ t('auth.signup.submit') }}</GTButton>
     </form>
     <p class="mt-6 text-tertiary">
-      Already have an account?
-      <NuxtLink to="/login">Sign in</NuxtLink>
+      {{ t('auth.signup.haveAccount') }}
+      <NuxtLink to="/login">{{ t('auth.signup.loginLink') }}</NuxtLink>
     </p>
   </div>
 </template>
