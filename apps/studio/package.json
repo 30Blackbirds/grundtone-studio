@@ -20,6 +20,7 @@
     "db:seed": "tsx --env-file=.env server/db/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
     "@grundtone/core": "^2.22.0",
     "@grundtone/nuxt": "^2.23.3",
     "@grundtone/vue": "^2.23.3",

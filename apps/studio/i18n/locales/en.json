@@ -55,7 +55,20 @@
     "active": "Active version: v{version}",
     "notPublished": "Not published yet",
     "saveDraft": "Save draft",
+    "publish": "Publish",
     "discard": "Discard changes"
+  },
+  "versions": {
+    "title": "Versions",
+    "draft": "Draft",
+    "draftLabel": "Unpublished draft",
+    "published": "Published versions",
+    "active": "Active",
+    "activate": "Activate",
+    "empty": "No versions published yet.",
+    "publishedOn": "Published {date}",
+    "editedOn": "Last edited {date}",
+    "confirmActivate": "Switch the active version to this one? Customers using the CDN will switch within ~1 minute."
   },
   "tokens": {
     "colors": "Colors",

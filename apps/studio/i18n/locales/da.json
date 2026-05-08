@@ -55,7 +55,20 @@
     "active": "Aktiv version: v{version}",
     "notPublished": "Endnu ikke publiceret",
     "saveDraft": "Gem kladde",
+    "publish": "Publicér",
     "discard": "Kassér ændringer"
+  },
+  "versions": {
+    "title": "Versioner",
+    "draft": "Kladde",
+    "draftLabel": "Ikke-publiceret kladde",
+    "published": "Publicerede versioner",
+    "active": "Aktiv",
+    "activate": "Aktivér",
+    "empty": "Ingen versioner publiceret endnu.",
+    "publishedOn": "Publiceret {date}",
+    "editedOn": "Senest redigeret {date}",
+    "confirmActivate": "Skift den aktive version til denne? Kunder der bruger CDN'et skifter inden for ~1 minut."
   },
   "tokens": {
     "colors": "Farver",

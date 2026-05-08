@@ -49,12 +49,13 @@
   const initialTokens = ref(JSON.stringify(tokens.value))
   const isDirty = computed(() => JSON.stringify(tokens.value) !== initialTokens.value)
   const saving = ref(false)
-  const saveError = ref<string | null>(null)
+  const publishing = ref(false)
+  const error = ref<string | null>(null)
 
   async function saveDraft() {
     if (!project.value?.id) return
     saving.value = true
-    saveError.value = null
+    error.value = null
     try {
       await $fetch(`/api/projects/${project.value.id}/config`, {
         method: 'POST',
@@ -63,9 +64,24 @@
       initialTokens.value = JSON.stringify(tokens.value)
       await refreshConfig()
     } catch (err) {
-      saveError.value = (err as Error).message
+      error.value = (err as Error).message
     } finally {
       saving.value = false
+    }
+  }
+
+  async function publish() {
+    if (!project.value?.id) return
+    publishing.value = true
+    error.value = null
+    try {
+      if (isDirty.value) await saveDraft()
+      await $fetch(`/api/projects/${project.value.id}/publish`, { method: 'POST' })
+      await refreshConfig()
+    } catch (err) {
+      error.value = (err as Error).message
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -74,6 +90,8 @@
       config.value?.draft?.tokens ?? config.value?.active?.tokens ?? config.value?.defaults ?? {}
     initialTokens.value = JSON.stringify(tokens.value)
   }
+
+  const hasDraft = computed(() => Boolean(config.value?.draft))
 </script>
 
 <template>
@@ -94,21 +112,43 @@
         </p>
         <p v-else class="text-tertiary mt-1 text-sm">{{ t('project.notPublished') }}</p>
       </div>
-      <div v-if="isDirty" class="flex gap-3">
-        <GTButton variant="secondary" :disabled="saving" @click="discardChanges">
+      <div class="flex gap-3">
+        <GTButton
+          v-if="isDirty"
+          variant="secondary"
+          :disabled="saving || publishing"
+          @click="discardChanges"
+        >
           {{ t('project.discard') }}
         </GTButton>
-        <GTButton :loading="saving" @click="saveDraft">{{ t('project.saveDraft') }}</GTButton>
+        <GTButton
+          v-if="isDirty"
+          variant="secondary"
+          :loading="saving"
+          :disabled="publishing"
+          @click="saveDraft"
+        >
+          {{ t('project.saveDraft') }}
+        </GTButton>
+        <GTButton
+          v-if="isAdmin && (isDirty || hasDraft)"
+          :loading="publishing"
+          :disabled="saving"
+          @click="publish"
+        >
+          {{ t('project.publish') }}
+        </GTButton>
       </div>
     </header>
 
-    <GTAlert v-if="saveError" variant="error" :heading="saveError" class="mb-4" />
+    <GTAlert v-if="error" variant="error" :heading="error" class="mb-4" />
 
     <GTTabs
       v-if="project"
       :tabs="[
         { id: 'tokens', label: t('project.tabTokens') },
         { id: 'apiKeys', label: t('apiKeys.title') },
+        { id: 'versions', label: t('versions.title') },
       ]"
     >
       <template #tokens>
@@ -122,6 +162,10 @@
 
       <template #apiKeys>
         <ApiKeyManager :project-id="project.id" :can-manage="isAdmin" />
+      </template>
+
+      <template #versions>
+        <VersionHistory :project-id="project.id" :can-manage="isAdmin" @activated="refreshConfig" />
       </template>
     </GTTabs>
   </section>
