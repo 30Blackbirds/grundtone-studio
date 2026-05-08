@@ -55,6 +55,31 @@
     "comingSoon": "Token-editor er på vej",
     "comingSoonBody": "Næste fase tilføjer en visuel editor for farver, typografi, spacing og radius — plus API-nøgle og publish-flow."
   },
+  "members": {
+    "title": "Medlemmer",
+    "active": "Aktive medlemmer",
+    "pending": "Afventende invitationer",
+    "invite": "Inviter medlem",
+    "sendInvite": "Send invitation",
+    "cancelInvite": "Annullér",
+    "remove": "Fjern",
+    "role": "Rolle",
+    "inviteError": "Kunne ikke sende invitation",
+    "roles": {
+      "owner": "Ejer",
+      "admin": "Admin",
+      "member": "Medlem"
+    }
+  },
+  "invitation": {
+    "title": "Invitation",
+    "body": "{email} er blevet inviteret til at deltage i {org} på Grundtone Studio.",
+    "accept": "Accepter",
+    "reject": "Afvis",
+    "acceptError": "Kunne ikke acceptere invitation",
+    "notFound": "Invitation kunne ikke findes eller er udløbet",
+    "signInRequired": "Log ind eller opret en konto for at acceptere invitationen."
+  },
   "skip": {
     "toContent": "Spring til hovedindhold"
   }

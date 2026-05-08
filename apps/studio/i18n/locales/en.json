@@ -55,6 +55,31 @@
     "comingSoon": "Token editor coming soon",
     "comingSoonBody": "The next phase adds a visual editor for colors, typography, spacing, and radius — plus API key generation and the publish flow."
   },
+  "members": {
+    "title": "Members",
+    "active": "Active members",
+    "pending": "Pending invitations",
+    "invite": "Invite member",
+    "sendInvite": "Send invitation",
+    "cancelInvite": "Cancel",
+    "remove": "Remove",
+    "role": "Role",
+    "inviteError": "Could not send invitation",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    }
+  },
+  "invitation": {
+    "title": "Invitation",
+    "body": "{email} has been invited to join {org} on Grundtone Studio.",
+    "accept": "Accept",
+    "reject": "Decline",
+    "acceptError": "Could not accept invitation",
+    "notFound": "Invitation not found or expired",
+    "signInRequired": "Sign in or create an account to accept the invitation."
+  },
   "skip": {
     "toContent": "Skip to main content"
   }

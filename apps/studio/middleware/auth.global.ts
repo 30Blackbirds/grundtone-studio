@@ -2,16 +2,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
 
   const { authClient } = await import('~~/lib/auth-client')
-  const publicRoutes = new Set(['/login', '/signup'])
+  const publicPaths = new Set(['/login', '/signup'])
+  const isPublicPath = publicPaths.has(to.path) || to.path.startsWith('/invitations/')
 
   const session = await authClient.getSession()
   const authed = Boolean(session.data?.session)
 
-  if (!authed && !publicRoutes.has(to.path)) {
-    return navigateTo('/login')
+  if (!authed && !isPublicPath) {
+    return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
   }
 
-  if (authed && publicRoutes.has(to.path)) {
+  if (authed && publicPaths.has(to.path)) {
     return navigateTo('/dashboard')
   }
 })

@@ -35,6 +35,25 @@ export const auth = betterAuth({
     }),
     organization({
       allowUserToCreateOrganization: true,
+      async sendInvitationEmail({ email: to, organization: org, invitation, inviter }) {
+        const baseUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
+        const acceptUrl = `${baseUrl}/invitations/${invitation.id}`
+        const subject = `Invitation to join ${org.name} on Grundtone Studio`
+        const text = [
+          `${inviter.user.name ?? inviter.user.email} invited you to join ${org.name} on Grundtone Studio.`,
+          '',
+          `Accept the invitation:`,
+          acceptUrl,
+          '',
+          `If you didn't expect this, ignore this email.`,
+        ].join('\n')
+        const html = `
+          <p>${inviter.user.name ?? inviter.user.email} invited you to join <strong>${org.name}</strong> on Grundtone Studio.</p>
+          <p><a href="${acceptUrl}">Accept the invitation</a></p>
+          <p>If you didn't expect this, ignore this email.</p>
+        `
+        await email.send({ to, subject, text, html })
+      },
     }),
   ],
 })

@@ -56,13 +56,32 @@ export const useOrgContext = () => {
     { default: () => [], watch: [activeSlug] },
   )
 
+  const { data: activeMember, refresh: refreshActiveMember } = useAsyncData(
+    () => `org-context-member-${activeOrg.value?.id ?? 'none'}`,
+    async () => {
+      if (!activeOrg.value?.id) return null
+      const res = await organization.getActiveMember({
+        fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+      })
+      return res.data ?? null
+    },
+    { default: () => null, watch: [activeOrg] },
+  )
+
+  const isOwner = computed(() => activeMember.value?.role === 'owner')
+  const isAdmin = computed(() => activeMember.value?.role === 'admin' || isOwner.value)
+
   return {
     orgs,
     activeOrg,
     activeSlug,
     activeProjectSlug,
     projects,
+    activeMember,
+    isOwner,
+    isAdmin,
     refreshOrgs,
     refreshProjects,
+    refreshActiveMember,
   }
 }

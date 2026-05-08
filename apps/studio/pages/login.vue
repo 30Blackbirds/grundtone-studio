@@ -9,6 +9,9 @@
   const error = ref<string | null>(null)
   const pending = ref(false)
 
+  const route = useRoute()
+  const redirect = computed(() => (route.query.redirect as string) || '/dashboard')
+
   async function submit() {
     pending.value = true
     error.value = null
@@ -18,7 +21,7 @@
       error.value = res.error.message ?? t('auth.login.error')
       return
     }
-    await navigateTo('/dashboard')
+    await navigateTo(redirect.value)
   }
 </script>
 
