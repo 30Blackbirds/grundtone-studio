@@ -17,12 +17,19 @@
     "db:generate": "pnpm --filter @grundtone-studio/studio db:generate",
     "db:migrate:local": "pnpm --filter @grundtone-studio/studio db:migrate:local",
     "db:studio": "pnpm --filter @grundtone-studio/studio db:studio",
+    "db:seed": "pnpm --filter @grundtone-studio/studio db:seed",
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,vue,css,json,md,yml,yaml}": ["prettier --write"],
-    "*.{ts,tsx,vue}": ["eslint --fix"],
-    "*.css": ["stylelint --fix"]
+    "*.{ts,tsx,vue,css,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx,vue}": [
+      "eslint --fix"
+    ],
+    "*.css": [
+      "stylelint --fix"
+    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
