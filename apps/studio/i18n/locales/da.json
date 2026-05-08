@@ -51,9 +51,56 @@
     "slugLabel": "Slug"
   },
   "project": {
-    "placeholder": "Projekt-detaljer og token-editor kommer her.",
-    "comingSoon": "Token-editor er på vej",
-    "comingSoonBody": "Næste fase tilføjer en visuel editor for farver, typografi, spacing og radius — plus API-nøgle og publish-flow."
+    "tabTokens": "Tokens",
+    "active": "Aktiv version: v{version}",
+    "notPublished": "Endnu ikke publiceret",
+    "saveDraft": "Gem kladde",
+    "discard": "Kassér ændringer"
+  },
+  "tokens": {
+    "colors": "Farver",
+    "typography": "Typografi",
+    "radius": "Border radius",
+    "spacing": "Spacing",
+    "color": {
+      "primary": "Primær",
+      "primaryLight": "Primær — lys",
+      "primaryDark": "Primær — mørk",
+      "onPrimary": "Tekst på primær",
+      "secondary": "Sekundær",
+      "success": "Succes",
+      "warning": "Advarsel",
+      "error": "Fejl",
+      "info": "Info",
+      "background": "Baggrund",
+      "surface": "Overflade",
+      "text": "Tekst"
+    },
+    "font": {
+      "base": "Brødtekst-skrifttype",
+      "heading": "Overskrift-skrifttype"
+    }
+  },
+  "apiKeys": {
+    "title": "API-nøgler",
+    "create": "Opret nøgle",
+    "generate": "Generér nøgle",
+    "active": "Aktive nøgler",
+    "revoked": "Tilbagekaldte nøgler",
+    "empty": "Ingen API-nøgler endnu.",
+    "environment": "Miljø",
+    "envLive": "Produktion (live)",
+    "envTest": "Test",
+    "allowedOrigins": "Tilladte origins",
+    "allowedOriginsHelp": "En per linje, fx 'acme.com' eller '*.acme.com'. Tom = alle origins tilladt.",
+    "anyOrigin": "Alle origins",
+    "shownOnce": "Kopiér nøglen nu — den vises kun denne ene gang",
+    "shownOnceBody": "Vi gemmer kun et hash af nøglen. Tab den og du må generere en ny.",
+    "copy": "Kopiér",
+    "copied": "Kopieret!",
+    "dismiss": "Færdig",
+    "revoke": "Tilbagekald",
+    "confirmRevoke": "Er du sikker på at du vil tilbagekalde denne nøgle? Den kan ikke bruges igen."
   },
   "members": {
     "title": "Medlemmer",

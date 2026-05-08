@@ -1,4 +1,3 @@
- 
 // Local dev seed — creates a test user, org, project for fast onboarding.
 // Run with: pnpm --filter @grundtone-studio/studio db:seed
 
@@ -20,7 +19,7 @@ const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is not set')
 
 const client = postgres(url, { max: 1, prepare: false })
-const db = drizzle(client, { schema })
+const db = drizzle(client, { schema, casing: 'snake_case' })
 
 async function ensureUser() {
   const existing = await db.select().from(schema.user).where(eq(schema.user.email, TEST_USER.email))

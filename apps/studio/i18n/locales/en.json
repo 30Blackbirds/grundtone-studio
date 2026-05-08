@@ -51,9 +51,56 @@
     "slugLabel": "Slug"
   },
   "project": {
-    "placeholder": "Project details and token editor will live here.",
-    "comingSoon": "Token editor coming soon",
-    "comingSoonBody": "The next phase adds a visual editor for colors, typography, spacing, and radius — plus API key generation and the publish flow."
+    "tabTokens": "Tokens",
+    "active": "Active version: v{version}",
+    "notPublished": "Not published yet",
+    "saveDraft": "Save draft",
+    "discard": "Discard changes"
+  },
+  "tokens": {
+    "colors": "Colors",
+    "typography": "Typography",
+    "radius": "Border radius",
+    "spacing": "Spacing",
+    "color": {
+      "primary": "Primary",
+      "primaryLight": "Primary — light",
+      "primaryDark": "Primary — dark",
+      "onPrimary": "Text on primary",
+      "secondary": "Secondary",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error",
+      "info": "Info",
+      "background": "Background",
+      "surface": "Surface",
+      "text": "Text"
+    },
+    "font": {
+      "base": "Body font family",
+      "heading": "Heading font family"
+    }
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "create": "Create key",
+    "generate": "Generate key",
+    "active": "Active keys",
+    "revoked": "Revoked keys",
+    "empty": "No API keys yet.",
+    "environment": "Environment",
+    "envLive": "Production (live)",
+    "envTest": "Test",
+    "allowedOrigins": "Allowed origins",
+    "allowedOriginsHelp": "One per line, e.g. 'acme.com' or '*.acme.com'. Empty = any origin allowed.",
+    "anyOrigin": "Any origin",
+    "shownOnce": "Copy the key now — it will only be shown this once",
+    "shownOnceBody": "We only store a hash of the key. Lose it and you must generate a new one.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "dismiss": "Done",
+    "revoke": "Revoke",
+    "confirmRevoke": "Are you sure you want to revoke this key? It cannot be used again."
   },
   "members": {
     "title": "Members",
