@@ -4,25 +4,28 @@
   const tokens = defineModel<Tokens>({ required: true })
   const { t } = useI18n()
 
-  function ensure<T>(_key: keyof Tokens, defaultValue: T): T {
-    return defaultValue
-  }
+  // Reactive sub-objects (Vue v-model proxies don't auto-create nested paths).
+  // Each computed widens the optional schema field into its non-null object
+  // shape so deep property access type-checks.
+  type Colors = NonNullable<Tokens['colors']>
+  type Typography = NonNullable<Tokens['typography']>
+  type Radius = NonNullable<Tokens['radius']>
+  type FontFamily = NonNullable<Typography['fontFamily']>
 
-  // Reactive sub-objects (vue v-model proxies don't auto-create nested paths)
-  const colors = computed({
-    get: () => tokens.value.colors ?? ensure('colors', {}),
+  const colors = computed<Colors>({
+    get: () => tokens.value.colors ?? {},
     set: (v) => (tokens.value = { ...tokens.value, colors: v }),
   })
-  const typography = computed({
-    get: () => tokens.value.typography ?? ensure('typography', {}),
+  const typography = computed<Typography>({
+    get: () => tokens.value.typography ?? {},
     set: (v) => (tokens.value = { ...tokens.value, typography: v }),
   })
-  const radius = computed({
-    get: () => tokens.value.radius ?? ensure('radius', {}),
+  const radius = computed<Radius>({
+    get: () => tokens.value.radius ?? {},
     set: (v) => (tokens.value = { ...tokens.value, radius: v }),
   })
 
-  const fontFamily = computed({
+  const fontFamily = computed<FontFamily>({
     get: () => typography.value.fontFamily ?? {},
     set: (v) => (typography.value = { ...typography.value, fontFamily: v }),
   })

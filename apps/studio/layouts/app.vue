@@ -24,7 +24,7 @@
         <span v-if="session.data?.user" class="text-tertiary text-sm">
           {{ session.data.user.email }}
         </span>
-        <GTButton variant="tertiary" size="sm" @click="handleSignOut">
+        <GTButton variant="outlined" size="sm" @click="handleSignOut">
           {{ t('app.signOut') }}
         </GTButton>
       </div>

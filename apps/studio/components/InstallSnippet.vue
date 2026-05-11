@@ -46,7 +46,7 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
     <div v-for="(code, id) in snippets" :key="id" class="flex flex-col gap-2">
       <div class="flex justify-between items-center">
         <strong class="text-sm">{{ t(`install.${id}`) }}</strong>
-        <GTButton variant="tertiary" size="sm" @click="copy(id, code)">
+        <GTButton variant="outlined" size="sm" @click="copy(id, code)">
           {{ copyState[id] === 'copied' ? t('apiKeys.copied') : t('apiKeys.copy') }}
         </GTButton>
       </div>

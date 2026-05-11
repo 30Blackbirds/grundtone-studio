@@ -48,10 +48,13 @@ export const useOrgContext = () => {
     () => `org-context-projects-${activeSlug.value ?? 'none'}`,
     async () => {
       if (!activeSlug.value) return []
-      return (await $fetch('/api/projects', {
+      // Bypass Nuxt's auto-typed $fetch — its route-shape inference recurses
+      // on our server route table and trips TS2321 (excessive stack depth).
+      const fetcher = $fetch as (url: string, opts?: unknown) => Promise<ProjectListItem[]>
+      return await fetcher('/api/projects', {
         headers: useRequestHeaders(['cookie']),
         query: { organizationSlug: activeSlug.value },
-      })) as ProjectListItem[]
+      })
     },
     { default: () => [], watch: [activeSlug] },
   )

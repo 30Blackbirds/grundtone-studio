@@ -134,12 +134,12 @@
           <span class="text-tertiary text-sm">{{ m.user?.email }}</span>
         </div>
         <div class="flex items-center gap-3">
-          <GTBadge :variant="m.role === 'owner' ? 'primary' : 'secondary'">
+          <GTBadge :variant="m.role === 'owner' ? 'info' : 'neutral'">
             {{ t(`members.roles.${m.role}`) }}
           </GTBadge>
           <GTButton
             v-if="isAdmin && m.role !== 'owner'"
-            variant="tertiary"
+            variant="outlined"
             size="sm"
             @click="removeMember(m.id)"
           >
@@ -163,7 +163,7 @@
               {{ t(`members.roles.${inv.role}`) }}
             </span>
           </div>
-          <GTButton v-if="isAdmin" variant="tertiary" size="sm" @click="cancelInvite(inv.id)">
+          <GTButton v-if="isAdmin" variant="outlined" size="sm" @click="cancelInvite(inv.id)">
             {{ t('members.cancelInvite') }}
           </GTButton>
         </li>

@@ -20,6 +20,12 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: false,
+    // Skip vue-tsc on grundtone-vue's source files — its package ships `.vue`
+    // sources alongside `dist`, which tsc tries to type-check and currently
+    // has a few upstream issues (tracked separately). We trust the dist types.
+    tsConfig: {
+      exclude: ['../../node_modules/.pnpm/@grundtone+vue*/**'],
+    },
   },
   runtimeConfig: {
     databaseUrl: '',

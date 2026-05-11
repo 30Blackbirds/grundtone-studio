@@ -1,1 +1,9 @@
+#!/usr/bin/env sh
+# Runs on every commit. Order is deliberate:
+#   1. lint-staged — prettier + eslint + stylelint on changed files only (fast)
+#   2. turbo typecheck — uses turbo cache so subsequent commits are ~instant
+
+set -e
+
 pnpm exec lint-staged
+pnpm turbo run typecheck --output-logs=errors-only

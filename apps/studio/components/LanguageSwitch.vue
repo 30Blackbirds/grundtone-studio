@@ -12,7 +12,7 @@
     <GTButton
       v-for="other in otherLocales"
       :key="other.code"
-      variant="tertiary"
+      variant="unstyled"
       size="sm"
       :aria-label="`${$t('app.language')}: ${other.name}`"
       @click="setLocale(other.code as 'da' | 'en')"

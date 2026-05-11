@@ -27,22 +27,22 @@
       <div class="flex gap-3">
         <GTButton variant="primary">Primary</GTButton>
         <GTButton variant="secondary">Secondary</GTButton>
-        <GTButton variant="tertiary">Tertiary</GTButton>
+        <GTButton variant="outlined">Outlined</GTButton>
       </div>
 
       <div class="flex gap-3">
-        <GTBadge variant="primary">primary</GTBadge>
+        <GTBadge variant="info">info</GTBadge>
         <GTBadge variant="success">success</GTBadge>
         <GTBadge variant="warning">warning</GTBadge>
         <GTBadge variant="error">error</GTBadge>
-        <GTBadge variant="info">info</GTBadge>
+        <GTBadge variant="neutral">neutral</GTBadge>
       </div>
 
       <GTInput label="Sample input" placeholder="Type something …" />
 
       <GTAlert variant="info" heading="Heads up">This alert previews the info palette.</GTAlert>
 
-      <GTCard variant="default" title="Card heading">
+      <GTCard variant="bordered" title="Card heading">
         <p class="m-0">
           A card uses surface, surface-raised, and text tokens together. Adjusting them in the
           editor updates this preview instantly.

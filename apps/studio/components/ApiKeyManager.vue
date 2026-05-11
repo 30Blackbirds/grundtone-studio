@@ -156,7 +156,7 @@
               {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }}
             </span>
           </div>
-          <GTButton v-if="canManage" variant="tertiary" size="sm" @click="revoke(k.id)">
+          <GTButton v-if="canManage" variant="outlined" size="sm" @click="revoke(k.id)">
             {{ t('apiKeys.revoke') }}
           </GTButton>
         </li>

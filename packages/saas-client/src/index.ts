@@ -57,9 +57,12 @@ export async function loadByApiKey(options: GrundtoneOptions): Promise<LoadResul
   if (!res.ok) {
     throw new Error(`Failed to load tokens: ${res.status} ${res.statusText}`)
   }
-  const tokens = (await res.json()) as Parameters<typeof createTheme>[0]
-
-  const themes = createTheme({ light: tokens, dark: tokens })
+  // Published Studio tokens are shaped { colors, typography, radius, spacing }
+  // — a partial theme, not a {light, dark} wrapper. createTheme's TS typing is
+  // too strict to express this cleanly, so we widen at the call site. Runtime
+  // shape is verified by the SDK integration test against a real CDN payload.
+  const tokens = (await res.json()) as unknown
+  const themes = createTheme({ light: tokens as never, dark: tokens as never })
   const requested = options.mode ?? 'light'
   const mode: 'light' | 'dark' = requested === 'auto' ? detectMode() : requested
   const theme = mode === 'dark' ? themes.dark : themes.light
