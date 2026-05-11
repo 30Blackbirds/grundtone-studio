@@ -15,6 +15,13 @@
       "when": 1776802719292,
       "tag": "0001_nappy_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778502543075,
+      "tag": "0002_famous_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
-import { requireAdmin, requireProjectAccess } from '~~/server/lib/project-access'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
 import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
@@ -23,8 +23,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  const access = await requireProjectAccess(event, projectId)
-  requireAdmin(access.role)
+  const access = await requireProjectAccess(event, projectId, 'editor')
 
   const [draft] = await db
     .select()

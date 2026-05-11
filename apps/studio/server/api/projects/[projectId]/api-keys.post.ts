@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
-import { requireAdmin, requireProjectAccess } from '~~/server/lib/project-access'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 import { generateApiKey } from '~~/server/lib/api-keys'
 
 const bodySchema = z.object({
@@ -13,8 +13,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  const access = await requireProjectAccess(event, projectId)
-  requireAdmin(access.role)
+  const access = await requireProjectAccess(event, projectId, 'admin')
 
   const parsed = bodySchema.safeParse((await readBody(event)) ?? {})
   if (!parsed.success) {

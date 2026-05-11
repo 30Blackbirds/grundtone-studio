@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
-import { requireAdmin, requireProjectAccess } from '~~/server/lib/project-access'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
@@ -10,8 +10,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'projectId and keyId required' })
   }
 
-  const access = await requireProjectAccess(event, projectId)
-  requireAdmin(access.role)
+  await requireProjectAccess(event, projectId, 'admin')
 
   const [updated] = await db
     .update(apiKey)
