@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable pnpm
 
 FROM base AS deps
@@ -19,7 +19,7 @@ COPY . .
 RUN pnpm --filter @grundtone/saas-client build && \
     pnpm --filter @grundtone-studio/studio build
 
-FROM node:24-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NITRO_PORT=3000
