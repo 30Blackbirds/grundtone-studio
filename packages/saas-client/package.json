@@ -1,8 +1,8 @@
 {
   "name": "@grundtone/saas-client",
   "private": true,
-  "version": "0.0.0",
-  "description": "Runtime SDK for Grundtone Studio — fetches tokens from CDN and applies them via @grundtone/core",
+  "version": "0.0.1",
+  "description": "Runtime SDK for Grundtone Studio — fetches tokens from CDN and applies them as CSS variables",
   "type": "module",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.mjs",
@@ -14,14 +14,13 @@
       "require": "./dist/index.umd.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "@grundtone/core": "^2.22.0"
   },
   "devDependencies": {
     "@grundtone/core": "^2.22.0",

@@ -78,6 +78,12 @@
 
   const activeKeys = computed(() => (keys.value ?? []).filter((k) => !k.revokedAt))
   const revokedKeys = computed(() => (keys.value ?? []).filter((k) => k.revokedAt))
+
+  // First active key drives the install snippet UI. New plaintext shown once
+  // takes precedence so the snippet matches what the user is about to copy.
+  const snippetKey = computed(
+    () => createdPlaintext.value ?? activeKeys.value[0]?.keyPrefix ?? null,
+  )
 </script>
 
 <template>
@@ -172,5 +178,8 @@
         </li>
       </ul>
     </section>
+
+    <hr />
+    <InstallSnippet :api-key="snippetKey" />
   </div>
 </template>

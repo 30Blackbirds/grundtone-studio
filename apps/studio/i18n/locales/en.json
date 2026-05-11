@@ -58,6 +58,16 @@
     "publish": "Publish",
     "discard": "Discard changes"
   },
+  "install": {
+    "title": "Install in your app",
+    "intro": "Three ways to pull your tokens into customer-facing code. Pick the one that fits your stack.",
+    "noKey": "Generate an API key first",
+    "noKeyBody": "The snippets show placeholder values. Create a key above to get real integration code.",
+    "scriptTag": "Script tag (vanilla, no build)",
+    "vuePlugin": "Vue 3 / Nuxt plugin",
+    "programmatic": "Programmatic (React, Svelte, …)",
+    "curl": "Test with curl"
+  },
   "versions": {
     "title": "Versions",
     "draft": "Draft",

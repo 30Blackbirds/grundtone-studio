@@ -58,6 +58,16 @@
     "publish": "Publicér",
     "discard": "Kassér ændringer"
   },
+  "install": {
+    "title": "Installer i din app",
+    "intro": "Tre måder at få dine tokens ind på kundesiden. Vælg den der passer dit stack.",
+    "noKey": "Generér en API-nøgle først",
+    "noKeyBody": "Snippet'erne viser pladsholder-værdier. Opret en nøgle ovenfor for at få den rigtige integration-kode.",
+    "scriptTag": "Script-tag (vanilla, ingen build)",
+    "vuePlugin": "Vue 3 / Nuxt-plugin",
+    "programmatic": "Programmatisk (React, Svelte, …)",
+    "curl": "Test med curl"
+  },
   "versions": {
     "title": "Versioner",
     "draft": "Kladde",
