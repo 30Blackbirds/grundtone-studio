@@ -83,7 +83,7 @@ jobs:
         run: pnpm stylelint
 
       - name: Apply migrations
-        run: pnpm db:migrate
+        run: pnpm --filter @grundtone-studio/studio db:migrate
 
       - name: Typecheck
         run: pnpm typecheck
