@@ -20,6 +20,9 @@
         <OrgSwitcher />
       </div>
       <div class="flex items-center gap-4">
+        <NuxtLink to="/changelog" class="text-tertiary text-sm no-underline">
+          {{ t('changelog.title') }}
+        </NuxtLink>
         <LanguageSwitch />
         <span v-if="session.data?.user" class="text-tertiary text-sm">
           {{ session.data.user.email }}

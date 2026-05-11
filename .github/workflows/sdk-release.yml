@@ -1,0 +1,66 @@
+name: SDK release
+
+# Owns the @grundtone/saas-client release lifecycle:
+#   1. On main pushes with pending changesets → open / refresh a "Version
+#      Packages" PR that bumps version + writes changelog.
+#   2. When that PR merges (no pending changesets remain) → build the SDK
+#      bundles, upload to Bunny.net at versioned + major-alias paths, and
+#      tag the release.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: sdk-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: release
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK bundles
+        run: pnpm --filter @grundtone/saas-client build
+
+      # changesets/action either opens a "Version Packages" PR (if there are
+      # pending changesets) or returns published: true once the bump PR merges.
+      - name: Version or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          publish: pnpm release:sdk
+          commit: 'chore(deps): version SDK packages'
+          title: 'chore(deps): version SDK packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SDK bundles to Bunny.net
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          BUNNY_STORAGE_ZONE: ${{ secrets.BUNNY_STORAGE_ZONE }}
+          BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+        run: bash scripts/upload-sdk-to-bunny.sh

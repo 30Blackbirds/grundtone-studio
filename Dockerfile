@@ -32,6 +32,9 @@ COPY --from=builder --chown=app:app /app/apps/studio/.output ./.output
 # Drizzle migrations + entrypoint for runtime db:migrate
 COPY --from=builder --chown=app:app /app/apps/studio/server/db ./server/db
 COPY --from=builder --chown=app:app /app/apps/studio/package.json ./package.json
+# Changelog files read by /api/changelog/[source] at runtime
+COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
+COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md
 COPY --chown=app:app docker/entrypoint.sh ./entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh

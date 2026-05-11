@@ -58,6 +58,13 @@
     "publish": "Publish",
     "discard": "Discard changes"
   },
+  "changelog": {
+    "title": "What's new",
+    "intro": "Follow what's changing in Grundtone Studio and the SDK. The studio app ships continuously; the SDK is semver-versioned.",
+    "studio": "Studio",
+    "sdk": "SDK",
+    "empty": "No releases yet."
+  },
   "install": {
     "title": "Install in your app",
     "intro": "Three ways to pull your tokens into customer-facing code. Pick the one that fits your stack.",

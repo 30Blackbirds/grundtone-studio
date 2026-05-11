@@ -21,6 +21,8 @@
     "db:migrate:local": "pnpm --filter @grundtone-studio/studio db:migrate:local",
     "db:studio": "pnpm --filter @grundtone-studio/studio db:studio",
     "db:seed": "pnpm --filter @grundtone-studio/studio db:seed",
+    "changeset": "changeset",
+    "release:sdk": "pnpm --filter @grundtone/saas-client build && changeset tag",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -35,6 +37,8 @@
     ]
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "eslint": "^10.2.1",

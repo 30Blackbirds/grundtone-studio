@@ -30,6 +30,7 @@
     "@nuxtjs/i18n": "^10.3.0",
     "better-auth": "^1.6.6",
     "drizzle-orm": "^0.45.2",
+    "marked": "^18.0.3",
     "nodemailer": "^8.0.5",
     "postgres": "^3.4.9",
     "tsx": "^4.21.0",

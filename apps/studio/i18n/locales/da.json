@@ -58,6 +58,13 @@
     "publish": "Publicér",
     "discard": "Kassér ændringer"
   },
+  "changelog": {
+    "title": "Hvad er nyt",
+    "intro": "Følg med i hvad der ændres i Grundtone Studio og SDK'en. Studio-app'en deployes løbende; SDK'en versioneres med semver.",
+    "studio": "Studio",
+    "sdk": "SDK",
+    "empty": "Ingen udgivelser endnu."
+  },
   "install": {
     "title": "Installer i din app",
     "intro": "Tre måder at få dine tokens ind på kundesiden. Vælg den der passer dit stack.",
