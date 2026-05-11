@@ -58,6 +58,35 @@
     "publish": "Publicér",
     "discard": "Kassér ændringer"
   },
+  "projectMembers": {
+    "title": "Medlemmer",
+    "invite": "Inviter til projektet",
+    "send": "Send invitation",
+    "role": "Rolle",
+    "direct": "Direkte medlemmer af projektet",
+    "directEmpty": "Ingen direkte medlemmer endnu. Inviter en for kun at give adgang til dette projekt.",
+    "inherited": "Org-medlemmer (arvet adgang)",
+    "inheritedHelp": "Disse personer har adgang via organisationen. Administrér dem under Medlemmer-siden på org-niveau.",
+    "pending": "Afventende invitationer",
+    "remove": "Fjern",
+    "cancelInvite": "Annullér",
+    "confirmRemove": "Fjern denne person fra projektet? Deres org-rolle påvirkes ikke.",
+    "roles": {
+      "viewer": "Læser",
+      "editor": "Redigerer",
+      "admin": "Administrator"
+    },
+    "orgRoles": {
+      "owner": "Ejer",
+      "admin": "Admin",
+      "member": "Medlem"
+    }
+  },
+  "projectInvitation": {
+    "title": "Du er inviteret",
+    "body": "{email} er inviteret til projektet \"{project}\" i {org} som {role}.",
+    "expired": "Invitationen er udløbet — bed afsender om at sende en ny."
+  },
   "onboarding": {
     "welcomeKicker": "Velkommen til",
     "welcomeTitle": "Grundtone Studio",

@@ -58,6 +58,35 @@
     "publish": "Publish",
     "discard": "Discard changes"
   },
+  "projectMembers": {
+    "title": "Members",
+    "invite": "Invite to project",
+    "send": "Send invitation",
+    "role": "Role",
+    "direct": "Direct project members",
+    "directEmpty": "No direct members yet. Invite someone to scope their access to just this project.",
+    "inherited": "Org members (inherited access)",
+    "inheritedHelp": "These people have access via the organization. Manage them on the org Members page.",
+    "pending": "Pending invitations",
+    "remove": "Remove",
+    "cancelInvite": "Cancel",
+    "confirmRemove": "Remove this person from the project? Their org role is unaffected.",
+    "roles": {
+      "viewer": "Viewer",
+      "editor": "Editor",
+      "admin": "Admin"
+    },
+    "orgRoles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    }
+  },
+  "projectInvitation": {
+    "title": "You're invited",
+    "body": "{email} was invited to the project \"{project}\" in {org} as {role}.",
+    "expired": "This invitation has expired — ask the sender to issue a new one."
+  },
   "onboarding": {
     "welcomeKicker": "Welcome to",
     "welcomeTitle": "Grundtone Studio",

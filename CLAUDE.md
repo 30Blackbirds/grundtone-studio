@@ -94,8 +94,12 @@ refactor), it cannot be marked completed without a test that exercises it.
 ## Architecture invariants
 
 - **All API endpoints validate via zod.** No raw `readBody()`.
-- **All project endpoints go through `requireProjectAccess()`** in `server/lib/project-access.ts`
-  for the membership check. Admin-only actions also call `requireAdmin(role)`.
+- **All project endpoints go through `requireProjectAccess(event, projectId, min='viewer')`** in
+  `server/lib/project-access.ts`. The third argument is the minimum project role required: `viewer`
+  for reads, `editor` for tokens/publish/activate, `admin` for keys + members.
+- **Effective project role** = `max(org-role-mapped, direct-project-role)`. Org `owner`/`admin` →
+  project `admin`; org `member` → project `editor`. Direct project members get exactly the role they
+  were invited for. `getProjectRole` is the only place this mapping is allowed to live.
 - **API keys: hash SHA-256 at rest, plaintext shown once.** Don't change the storage format.
 - **Storage paths:** `p/{projectId}/v{n}/tokens.{json,css}` are immutable;
   `p/{projectId}/current.{json,css}` is overwritten each publish.
