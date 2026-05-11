@@ -66,6 +66,22 @@ If your work doesn't fit a scope, talk it out before adding a new one.
 
 If a hook fails, **fix the underlying issue**. Don't bypass.
 
+## Definition of Done
+
+A change isn't done until you have **explicitly evaluated** whether it needs new tests. This is part
+of every commit, every PR, every TODO closure — not optional.
+
+For each change, answer in plain words (in the commit body or PR description):
+
+1. **What's the behaviour under test?** (e.g. "publish reserves version before S3 upload", "rate
+   limit returns 429 after N requests")
+2. **What tests cover it?** Existing or newly added — list the file(s).
+3. **If no tests:** why not? "Trivial wiring", "framework-only", "covered by an existing integration
+   test" are valid answers. "I didn't write any" is not.
+
+The code-reviewer agent blocks PRs that skip this evaluation. If a TODO is about behaviour (not pure
+refactor), it cannot be marked completed without a test that exercises it.
+
 ## Test conventions
 
 - Vitest in both `apps/studio/` and `packages/saas-client/`
@@ -73,7 +89,7 @@ If a hook fails, **fix the underlying issue**. Don't bypass.
   `server/lib/foo.test.ts`)
 - Server tests run in node environment; SDK tests use `happy-dom`
 - Focus tests on: token schema, css renderer, api-key crypto, publish pipeline, SDK behaviour. UI
-  components and trivial getters are lower priority.
+  components and trivial getters are lower priority — but evaluate them per the DoD above.
 
 ## Architecture invariants
 
