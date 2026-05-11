@@ -24,11 +24,19 @@
       </NuxtLink>
     </header>
 
-    <GTStepper :steps="steps" :active-step="stepIndex" />
+    <!--
+      Client-only: grundtone's GTInput/GTSelect mint auto-IDs from a global
+      counter that diverges between SSR and the client (different render
+      order), and the wizard is a stateful one-time flow with no SEO value
+      anyway. Same workaround as TokenPreview.
+    -->
+    <ClientOnly>
+      <GTStepper :steps="steps" :active-step="stepIndex" />
 
-    <OnboardingOrgStep v-if="state.step === 'org'" />
-    <OnboardingProjectStep v-else-if="state.step === 'project'" />
-    <OnboardingTokensStep v-else-if="state.step === 'tokens'" />
-    <OnboardingInstallStep v-else-if="state.step === 'install'" />
+      <OnboardingOrgStep v-if="state.step === 'org'" />
+      <OnboardingProjectStep v-else-if="state.step === 'project'" />
+      <OnboardingTokensStep v-else-if="state.step === 'tokens'" />
+      <OnboardingInstallStep v-else-if="state.step === 'install'" />
+    </ClientOnly>
   </section>
 </template>
