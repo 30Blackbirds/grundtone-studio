@@ -14,6 +14,13 @@
     return res.data ?? []
   })
 
+  // Authed users with no orgs land in the onboarding wizard instead of an
+  // empty dashboard. Runs only on the client because navigateTo during SSR
+  // breaks the auth-cookie round-trip on first signup.
+  onMounted(() => {
+    if ((orgs.value?.length ?? 0) === 0) navigateTo('/onboarding')
+  })
+
   const showCreate = ref(false)
   const orgName = ref('')
   const orgSlug = ref('')

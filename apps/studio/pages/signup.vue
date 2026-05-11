@@ -23,7 +23,9 @@
       error.value = res.error.message ?? t('auth.signup.error')
       return
     }
-    await navigateTo('/dashboard')
+    // First-time users go through onboarding; existing users with no orgs
+    // hit the same path via dashboard.vue's empty-state redirect.
+    await navigateTo('/onboarding')
   }
 </script>
 

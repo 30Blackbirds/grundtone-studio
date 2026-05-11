@@ -58,6 +58,55 @@
     "publish": "Publish",
     "discard": "Discard changes"
   },
+  "onboarding": {
+    "welcomeKicker": "Welcome to",
+    "welcomeTitle": "Grundtone Studio",
+    "skip": "Skip to dashboard",
+    "continue": "Continue",
+    "back": "Back",
+    "steps": {
+      "org": "Organization",
+      "project": "Project",
+      "tokens": "Brand",
+      "install": "Install"
+    },
+    "org": {
+      "title": "Create your organization",
+      "subtitle": "An organization holds your projects, members, and themes.",
+      "nameLabel": "Organization name",
+      "nameHelp": "The name your team will see.",
+      "slugLabel": "Slug",
+      "slugHelp": "Used in URLs. Lowercase letters, numbers, and dashes only.",
+      "error": "Could not create organization"
+    },
+    "project": {
+      "title": "Create your first project",
+      "subtitle": "Each organization can have many projects. {org} can always add more later.",
+      "nameLabel": "Project name",
+      "nameHelp": "E.g. 'Main', 'Marketing site', 'Mobile app'.",
+      "slugLabel": "Slug",
+      "slugHelp": "Used in URLs.",
+      "error": "Could not create project",
+      "noOrg": "We lost your organization — go back and try again."
+    },
+    "tokens": {
+      "title": "Pick your primary color",
+      "subtitle": "It drives the look of buttons, links, and highlights. You can fine-tune everything on the next page.",
+      "preview": "Preview",
+      "error": "Could not save tokens",
+      "noProject": "We lost your project — go back and try again."
+    },
+    "install": {
+      "title": "Almost there",
+      "subtitle": "We're publishing your tokens and minting your first API key.",
+      "publishing": "Publishing …",
+      "successHeading": "Done!",
+      "successBody": "Your tokens are live on the CDN and your API key is ready. Drop one of the snippets below into your customer app.",
+      "error": "Could not finish setup",
+      "retry": "Try again",
+      "finish": "Go to your project"
+    }
+  },
   "changelog": {
     "title": "What's new",
     "intro": "Follow what's changing in Grundtone Studio and the SDK. The studio app ships continuously; the SDK is semver-versioned.",

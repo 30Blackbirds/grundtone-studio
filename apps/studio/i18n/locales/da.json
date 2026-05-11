@@ -58,6 +58,55 @@
     "publish": "Publicér",
     "discard": "Kassér ændringer"
   },
+  "onboarding": {
+    "welcomeKicker": "Velkommen til",
+    "welcomeTitle": "Grundtone Studio",
+    "skip": "Spring over til dashboard",
+    "continue": "Fortsæt",
+    "back": "Tilbage",
+    "steps": {
+      "org": "Organisation",
+      "project": "Projekt",
+      "tokens": "Brand",
+      "install": "Installer"
+    },
+    "org": {
+      "title": "Opret din organisation",
+      "subtitle": "Organisationen samler projekter, medlemmer og temaer ét sted.",
+      "nameLabel": "Organisationsnavn",
+      "nameHelp": "Det navn dine medlemmer kommer til at se.",
+      "slugLabel": "Slug",
+      "slugHelp": "Bruges i URL'er. Kun små bogstaver, tal og bindestreger.",
+      "error": "Kunne ikke oprette organisation"
+    },
+    "project": {
+      "title": "Opret dit første projekt",
+      "subtitle": "Hver organisation kan have flere projekter. {org} kan altid få flere senere.",
+      "nameLabel": "Projektnavn",
+      "nameHelp": "Fx 'Main', 'Marketing site', 'Mobile app'.",
+      "slugLabel": "Slug",
+      "slugHelp": "Bruges i URL'er.",
+      "error": "Kunne ikke oprette projekt",
+      "noOrg": "Vi mistede din organisation — gå tilbage og prøv igen."
+    },
+    "tokens": {
+      "title": "Vælg din primær-farve",
+      "subtitle": "Det er den farve dine knapper, links og fremhævede elementer får. Du kan finjustere alt på næste side.",
+      "preview": "Forhåndsvisning",
+      "error": "Kunne ikke gemme tokens",
+      "noProject": "Vi mistede dit projekt — gå tilbage og prøv igen."
+    },
+    "install": {
+      "title": "Næsten færdig",
+      "subtitle": "Vi publicerer dine tokens og opretter din første API-nøgle.",
+      "publishing": "Publicerer …",
+      "successHeading": "Klar!",
+      "successBody": "Dine tokens er live på CDN'et, og du har en API-nøgle. Kopiér én af snippets'erne nedenfor ind i din kundeapp.",
+      "error": "Kunne ikke afslutte opsætningen",
+      "retry": "Prøv igen",
+      "finish": "Gå til dit projekt"
+    }
+  },
   "changelog": {
     "title": "Hvad er nyt",
     "intro": "Følg med i hvad der ændres i Grundtone Studio og SDK'en. Studio-app'en deployes løbende; SDK'en versioneres med semver.",
