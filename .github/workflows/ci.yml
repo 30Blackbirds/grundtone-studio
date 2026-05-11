@@ -3,8 +3,14 @@ name: CI
 on:
   pull_request:
     branches: [develop, main]
+    paths-ignore: ['**.md', 'docs/**', '.github/dependabot.yml']
   push:
     branches: [develop, main]
+    paths-ignore: ['**.md', 'docs/**', '.github/dependabot.yml']
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -18,13 +24,25 @@ jobs:
           POSTGRES_USER: grundtone
           POSTGRES_PASSWORD: grundtone_ci
           POSTGRES_DB: grundtone_studio
-        ports:
-          - 5432:5432
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U grundtone"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: ci
+          MINIO_ROOT_PASSWORD: ci-secret
+          MINIO_DEFAULT_BUCKETS: grundtone-studio:download
+        ports: ['9000:9000']
+        options: >-
+          --health-cmd "curl -f http://127.0.0.1:9000/minio/health/ready"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     env:
       DATABASE_URL: postgresql://grundtone:grundtone_ci@127.0.0.1:5432/grundtone_studio
@@ -35,6 +53,7 @@ jobs:
       S3_BUCKET: grundtone-studio
       S3_ACCESS_KEY_ID: ci
       S3_SECRET_ACCESS_KEY: ci-secret
+      TURBO_TELEMETRY_DISABLED: 1
 
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +65,29 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ github.ref_name }}-
+            turbo-develop-
+            turbo-main-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Order is fail-fast: cheap formatting checks first, then linters,
+      # then typecheck, tests, and finally the heaviest step (build).
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Stylelint
+        run: pnpm stylelint
 
       - name: Apply migrations
         run: pnpm db:migrate
@@ -55,11 +95,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Lint
-        run: pnpm lint
+      - name: Test
+        run: pnpm test
 
-      - name: Format check
-        run: pnpm format:check
+      - name: Audit dependencies (high+)
+        run: pnpm audit --prod --audit-level=high || true
+        # Soft-fail today: too many transitive advisories from old packages.
+        # Flip to a hard fail once we've cleaned house (TODO #58 batch).
 
       - name: Build
         run: pnpm build
