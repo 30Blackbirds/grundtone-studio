@@ -15,8 +15,14 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
   trustedOrigins: [
     process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+    // Local dev: cover whichever port Nuxt grabbed (3000 is occasionally
+    // taken by another orphaned dev server and Nuxt falls back to 3001/3002).
     'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
   ],
   emailAndPassword: {
     enabled: true,
