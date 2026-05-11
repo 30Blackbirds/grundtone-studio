@@ -10,8 +10,8 @@
   watchEffect(() => {
     if (!previewRoot.value) return
     try {
-      const theme = createTheme({ light: props.tokens })
-      applyThemeToDOM(theme, previewRoot.value)
+      const themes = createTheme({ light: props.tokens })
+      applyThemeToDOM(themes.light, previewRoot.value)
     } catch (err) {
       console.warn('Failed to apply preview theme', err)
     }
@@ -42,8 +42,7 @@
 
       <GTAlert variant="info" heading="Heads up">This alert previews the info palette.</GTAlert>
 
-      <GTCard variant="default">
-        <h3 class="mt-0">Card heading</h3>
+      <GTCard variant="default" title="Card heading">
         <p class="m-0">
           A card uses surface, surface-raised, and text tokens together. Adjusting them in the
           editor updates this preview instantly.

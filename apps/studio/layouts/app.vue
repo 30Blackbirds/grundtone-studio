@@ -3,7 +3,7 @@
 
   const session = useSession()
   const { t } = useI18n()
-  const { activeOrg } = useOrgContext()
+  const { activeSlug } = useOrgContext()
 
   async function handleSignOut() {
     await signOut()
@@ -30,7 +30,7 @@
       </div>
     </header>
     <div class="flex">
-      <AppSidebar v-if="activeOrg" />
+      <AppSidebar v-if="activeSlug" />
       <main id="main" class="flex-1">
         <slot />
       </main>

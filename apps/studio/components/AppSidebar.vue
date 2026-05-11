@@ -6,9 +6,11 @@
 </script>
 
 <template>
-  <aside v-if="activeOrg" class="app-sidebar border-r bg-surface p-4">
+  <aside v-if="activeSlug" class="app-sidebar border-r bg-surface p-4">
     <header class="mb-4">
-      <p class="text-xs uppercase text-tertiary tracking-wide m-0">{{ activeOrg.name }}</p>
+      <p class="text-xs uppercase text-tertiary tracking-wide m-0">
+        {{ activeOrg?.name ?? activeSlug }}
+      </p>
       <h2 class="text-sm m-0">{{ $t('projects.title') }}</h2>
     </header>
 

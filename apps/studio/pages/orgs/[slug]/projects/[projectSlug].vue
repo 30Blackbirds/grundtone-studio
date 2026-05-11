@@ -151,22 +151,24 @@
         { id: 'versions', label: t('versions.title') },
       ]"
     >
-      <template #tokens>
+      <GTTabPanel id="tokens">
         <div class="grid grid-cols-2 gap-6">
           <TokenEditor v-model="tokens" />
           <div class="sticky top-4 self-start">
-            <TokenPreview :tokens="tokens" />
+            <ClientOnly>
+              <TokenPreview :tokens="tokens" />
+            </ClientOnly>
           </div>
         </div>
-      </template>
+      </GTTabPanel>
 
-      <template #apiKeys>
+      <GTTabPanel id="apiKeys">
         <ApiKeyManager :project-id="project.id" :can-manage="isAdmin" />
-      </template>
+      </GTTabPanel>
 
-      <template #versions>
+      <GTTabPanel id="versions">
         <VersionHistory :project-id="project.id" :can-manage="isAdmin" @activated="refreshConfig" />
-      </template>
+      </GTTabPanel>
     </GTTabs>
   </section>
 </template>
