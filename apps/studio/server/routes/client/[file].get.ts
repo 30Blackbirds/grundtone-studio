@@ -1,12 +1,16 @@
 import { readFile } from 'node:fs/promises'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 
 // Maps dev CDN-style URLs to the local saas-client build output. In production
 // these files are uploaded to Bunny.net during release; here we serve them
 // directly from the workspace package so install snippets work end-to-end.
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const SDK_DIR = resolve(__dirname, '../../../../../packages/saas-client/dist')
+//
+// import.meta.url is unreliable in Nitro dev (handlers get bundled into a
+// transient .nitro location), so we resolve from process.cwd(). Nuxt dev
+// runs from apps/studio/, so ../../packages/saas-client/dist hits the right
+// workspace package.
+const CWD_RELATIVE = '../../packages/saas-client/dist'
+const SDK_DIR = resolve(process.cwd(), CWD_RELATIVE)
 
 const FILE_MAP: Record<string, { source: string; contentType: string }> = {
   'v1.js': { source: 'index.umd.js', contentType: 'application/javascript' },
