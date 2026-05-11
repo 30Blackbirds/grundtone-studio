@@ -1,25 +1,28 @@
 {
-  "name": "grundtone-studio",
+  "name": "grundtone-studio-monorepo",
   "private": true,
   "type": "module",
   "version": "0.0.0",
   "description": "Private commercial SaaS for configuring Grundtone design systems",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "typecheck": "nuxt typecheck",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx server/db/migrate.ts",
-    "db:migrate:local": "tsx --env-file=.env server/db/migrate.ts",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "lint": "eslint . && stylelint \"**/*.css\"",
-    "lint:fix": "eslint --fix . && stylelint --fix \"**/*.css\"",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint && stylelint \"**/*.css\"",
+    "lint:fix": "turbo run lint -- --fix && stylelint --fix \"**/*.css\"",
+    "stylelint": "stylelint \"**/*.css\"",
     "format": "prettier --write \"**/*.{ts,tsx,vue,css,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,vue,css,json,md,yml,yaml}\"",
+    "check": "turbo run lint typecheck test && stylelint \"**/*.css\" && prettier --check \"**/*.{ts,tsx,vue,css,json,md,yml,yaml}\"",
+    "studio": "pnpm --filter @grundtone-studio/studio",
+    "saas-client": "pnpm --filter @grundtone/saas-client",
+    "db:generate": "pnpm --filter @grundtone-studio/studio db:generate",
+    "db:migrate:local": "pnpm --filter @grundtone-studio/studio db:migrate:local",
+    "db:studio": "pnpm --filter @grundtone-studio/studio db:studio",
+    "db:seed": "pnpm --filter @grundtone-studio/studio db:seed",
+    "changeset": "changeset",
+    "release:sdk": "pnpm --filter @grundtone/saas-client build && changeset tag",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -34,38 +37,20 @@
     ]
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@nuxt/eslint": "^1.15.2",
-    "@types/node": "^22.15.17",
-    "@types/nodemailer": "^8.0.0",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "nuxt": "^3.19.2",
     "prettier": "^3.8.3",
-    "sass": "^1.99.0",
     "stylelint": "^17.8.0",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "^5.8.3",
-    "vue": "^3.5.26",
-    "vue-router": "^4.5.1",
-    "vue-tsc": "^2.2.10"
+    "turbo": "^2.5.0"
   },
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "pnpm@10.14.0",
-  "dependencies": {
-    "@grundtone/core": "^2.22.0",
-    "@grundtone/nuxt": "^2.23.3",
-    "@grundtone/vue": "^2.23.3",
-    "better-auth": "^1.6.6",
-    "drizzle-orm": "^0.45.2",
-    "nodemailer": "^8.0.5",
-    "postgres": "^3.4.9",
-    "tsx": "^4.21.0",
-    "zod": "^4.3.6"
-  }
+  "packageManager": "pnpm@10.14.0"
 }

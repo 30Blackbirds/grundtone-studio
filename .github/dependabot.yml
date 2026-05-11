@@ -1,0 +1,58 @@
+version: 2
+updates:
+  # Workspace-root + per-package npm deps, grouped weekly to keep PR noise low.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels: [dependencies, automated]
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    ignore:
+      # Grundtone packages — bumped manually so the design system and Studio
+      # stay synchronised. Renovate-style auto-bump would cause invariant drift.
+      - dependency-name: '@grundtone/*'
+    groups:
+      types:
+        patterns: ['@types/*']
+      eslint:
+        patterns: ['eslint', 'eslint-*', '@nuxt/eslint', '@typescript-eslint/*']
+      vitest:
+        patterns: ['vitest', '@vitest/*', 'happy-dom']
+      drizzle:
+        patterns: ['drizzle-*']
+      aws-sdk:
+        patterns: ['@aws-sdk/*']
+      nuxt:
+        patterns: ['nuxt', '@nuxt/*', '@nuxtjs/*']
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # GitHub Actions versions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, automated, ci]
+    commit-message:
+      prefix: ci
+
+  # Docker base image (Dockerfile / docker-compose).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, automated, docker]
+    commit-message:
+      prefix: deploy

@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Runs once per push, before the network call. Heavier than pre-commit so
+# repeated saves stay snappy, but cheaper than letting CI catch a bad push.
+
+set -e
+
+pnpm turbo run test --output-logs=errors-only

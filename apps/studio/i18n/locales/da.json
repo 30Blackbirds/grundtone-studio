@@ -1,0 +1,163 @@
+{
+  "app": {
+    "name": "Grundtone Studio",
+    "signOut": "Log ud",
+    "signIn": "Log ind",
+    "signUp": "Opret konto",
+    "create": "Opret",
+    "cancel": "Annullér",
+    "save": "Gem",
+    "delete": "Slet",
+    "loading": "Indlæser …",
+    "language": "Sprog"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Adgangskode",
+    "name": "Navn",
+    "login": {
+      "title": "Log ind",
+      "submit": "Log ind",
+      "noAccount": "Ingen konto?",
+      "createAccount": "Opret en",
+      "error": "Login mislykkedes"
+    },
+    "signup": {
+      "title": "Opret konto",
+      "submit": "Opret konto",
+      "haveAccount": "Har du allerede en konto?",
+      "loginLink": "Log ind",
+      "error": "Kunne ikke oprette konto"
+    },
+    "magicLink": {
+      "subject": "Log ind på Grundtone Studio",
+      "body": "Klik på linket nedenfor for at logge ind:",
+      "ignore": "Hvis du ikke har anmodet om dette, kan du ignorere e-mailen."
+    }
+  },
+  "orgs": {
+    "title": "Organisationer",
+    "new": "Ny organisation",
+    "empty": "Ingen organisationer endnu.",
+    "nameLabel": "Navn",
+    "slugLabel": "Slug",
+    "createError": "Kunne ikke oprette organisation"
+  },
+  "projects": {
+    "title": "Projekter",
+    "new": "Nyt projekt",
+    "empty": "Ingen projekter endnu.",
+    "nameLabel": "Navn",
+    "slugLabel": "Slug"
+  },
+  "project": {
+    "tabTokens": "Tokens",
+    "active": "Aktiv version: v{version}",
+    "notPublished": "Endnu ikke publiceret",
+    "saveDraft": "Gem kladde",
+    "publish": "Publicér",
+    "discard": "Kassér ændringer"
+  },
+  "changelog": {
+    "title": "Hvad er nyt",
+    "intro": "Følg med i hvad der ændres i Grundtone Studio og SDK'en. Studio-app'en deployes løbende; SDK'en versioneres med semver.",
+    "studio": "Studio",
+    "sdk": "SDK",
+    "empty": "Ingen udgivelser endnu."
+  },
+  "install": {
+    "title": "Installer i din app",
+    "intro": "Tre måder at få dine tokens ind på kundesiden. Vælg den der passer dit stack.",
+    "noKey": "Generér en API-nøgle først",
+    "noKeyBody": "Snippet'erne viser pladsholder-værdier. Opret en nøgle ovenfor for at få den rigtige integration-kode.",
+    "scriptTag": "Script-tag (vanilla, ingen build)",
+    "vuePlugin": "Vue 3 / Nuxt-plugin",
+    "programmatic": "Programmatisk (React, Svelte, …)",
+    "curl": "Test med curl"
+  },
+  "versions": {
+    "title": "Versioner",
+    "draft": "Kladde",
+    "draftLabel": "Ikke-publiceret kladde",
+    "published": "Publicerede versioner",
+    "active": "Aktiv",
+    "activate": "Aktivér",
+    "empty": "Ingen versioner publiceret endnu.",
+    "publishedOn": "Publiceret {date}",
+    "editedOn": "Senest redigeret {date}",
+    "confirmActivate": "Skift den aktive version til denne? Kunder der bruger CDN'et skifter inden for ~1 minut."
+  },
+  "tokens": {
+    "colors": "Farver",
+    "typography": "Typografi",
+    "radius": "Border radius",
+    "spacing": "Spacing",
+    "color": {
+      "primary": "Primær",
+      "primaryLight": "Primær — lys",
+      "primaryDark": "Primær — mørk",
+      "onPrimary": "Tekst på primær",
+      "secondary": "Sekundær",
+      "success": "Succes",
+      "warning": "Advarsel",
+      "error": "Fejl",
+      "info": "Info",
+      "background": "Baggrund",
+      "surface": "Overflade",
+      "text": "Tekst"
+    },
+    "font": {
+      "base": "Brødtekst-skrifttype",
+      "heading": "Overskrift-skrifttype"
+    }
+  },
+  "apiKeys": {
+    "title": "API-nøgler",
+    "create": "Opret nøgle",
+    "generate": "Generér nøgle",
+    "active": "Aktive nøgler",
+    "revoked": "Tilbagekaldte nøgler",
+    "empty": "Ingen API-nøgler endnu.",
+    "environment": "Miljø",
+    "envLive": "Produktion (live)",
+    "envTest": "Test",
+    "allowedOrigins": "Tilladte origins",
+    "allowedOriginsHelp": "En per linje, fx 'acme.com' eller '*.acme.com'. Tom = alle origins tilladt.",
+    "anyOrigin": "Alle origins",
+    "shownOnce": "Kopiér nøglen nu — den vises kun denne ene gang",
+    "shownOnceBody": "Vi gemmer kun et hash af nøglen. Tab den og du må generere en ny.",
+    "copy": "Kopiér",
+    "copied": "Kopieret!",
+    "dismiss": "Færdig",
+    "revoke": "Tilbagekald",
+    "confirmRevoke": "Er du sikker på at du vil tilbagekalde denne nøgle? Den kan ikke bruges igen."
+  },
+  "members": {
+    "title": "Medlemmer",
+    "active": "Aktive medlemmer",
+    "pending": "Afventende invitationer",
+    "invite": "Inviter medlem",
+    "sendInvite": "Send invitation",
+    "cancelInvite": "Annullér",
+    "remove": "Fjern",
+    "role": "Rolle",
+    "inviteError": "Kunne ikke sende invitation",
+    "roles": {
+      "owner": "Ejer",
+      "admin": "Admin",
+      "member": "Medlem"
+    }
+  },
+  "invitation": {
+    "title": "Invitation",
+    "body": "{email} er blevet inviteret til at deltage i {org} på Grundtone Studio.",
+    "accept": "Accepter",
+    "reject": "Afvis",
+    "acceptError": "Kunne ikke acceptere invitation",
+    "notFound": "Invitation kunne ikke findes eller er udløbet",
+    "signInRequired": "Log ind eller opret en konto for at acceptere invitationen."
+  },
+  "skip": {
+    "toContent": "Spring til hovedindhold"
+  }
+}

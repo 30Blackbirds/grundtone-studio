@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grundtone SDK · script-tag test</title>
+    <link
+      rel="stylesheet"
+      href="/k/REPLACE_WITH_REAL_KEY/tokens.css"
+      onerror="document.getElementById('css-status').textContent = 'CSS load failed — replace REPLACE_WITH_REAL_KEY with a real pk_live_… key from your project.'"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: var(--font-family-base, system-ui, sans-serif);
+        background: var(--color-background, #fff);
+        color: var(--color-text, #111);
+      }
+      .swatch {
+        display: inline-block;
+        inline-size: 4rem;
+        block-size: 4rem;
+        margin-right: 0.5rem;
+        border: 1px solid var(--color-text, #ccc);
+        border-radius: var(--radius-md, 8px);
+        vertical-align: top;
+      }
+      pre {
+        background: var(--color-surface, #f5f5f5);
+        padding: 1rem;
+        border-radius: var(--radius-md, 8px);
+        overflow-x: auto;
+      }
+      button {
+        background: var(--color-primary, #4f46e5);
+        color: var(--color-on-primary, #fff);
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-md, 8px);
+        font-family: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Grundtone SDK · script-tag test</h1>
+    <p>
+      This page replays the script-tag install pattern from the project page. Replace the
+      <code>REPLACE_WITH_REAL_KEY</code> placeholders in both the link tag and the script tag below
+      with a real <code>pk_live_…</code> key from a published Studio project.
+    </p>
+
+    <h2>Status</h2>
+    <p id="css-status">CSS loaded via &lt;link&gt;.</p>
+    <p id="js-status">SDK pending…</p>
+
+    <h2>Sample palette</h2>
+    <div>
+      <span class="swatch" style="background: var(--color-primary)"></span>
+      <span class="swatch" style="background: var(--color-secondary)"></span>
+      <span class="swatch" style="background: var(--color-success)"></span>
+      <span class="swatch" style="background: var(--color-warning)"></span>
+      <span class="swatch" style="background: var(--color-error)"></span>
+      <span class="swatch" style="background: var(--color-info)"></span>
+    </div>
+
+    <h2>Action</h2>
+    <button>Primary button</button>
+
+    <h2>Resolved CSS variables</h2>
+    <pre id="vars">computing…</pre>
+
+    <!-- Replace data-api-key with a real key. The auto-init in the bundle takes care of the rest. -->
+    <script src="/client/v1.js" data-api-key="REPLACE_WITH_REAL_KEY"></script>
+    <script>
+      window.addEventListener('load', () => {
+        document.getElementById('js-status').textContent =
+          typeof window.GrundtoneSaasClient !== 'undefined'
+            ? `SDK loaded · v${window.GrundtoneSaasClient.VERSION}`
+            : 'SDK failed to load — is /client/v1.js available?'
+
+        const root = document.documentElement
+        const names = [
+          '--color-primary',
+          '--color-secondary',
+          '--color-text',
+          '--color-background',
+          '--radius-md',
+          '--font-family-base',
+        ]
+        document.getElementById('vars').textContent = names
+          .map((n) => `${n}: ${getComputedStyle(root).getPropertyValue(n).trim() || '(unset)'}`)
+          .join('\n')
+      })
+    </script>
+  </body>
+</html>

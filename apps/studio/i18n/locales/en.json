@@ -1,0 +1,163 @@
+{
+  "app": {
+    "name": "Grundtone Studio",
+    "signOut": "Sign out",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "create": "Create",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading …",
+    "language": "Language"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "noAccount": "No account?",
+      "createAccount": "Sign up",
+      "error": "Sign in failed"
+    },
+    "signup": {
+      "title": "Sign up",
+      "submit": "Sign up",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "error": "Could not create account"
+    },
+    "magicLink": {
+      "subject": "Sign in to Grundtone Studio",
+      "body": "Click the link below to sign in:",
+      "ignore": "If you didn't request this, ignore this email."
+    }
+  },
+  "orgs": {
+    "title": "Organizations",
+    "new": "New organization",
+    "empty": "No organizations yet.",
+    "nameLabel": "Name",
+    "slugLabel": "Slug",
+    "createError": "Could not create organization"
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "empty": "No projects yet.",
+    "nameLabel": "Name",
+    "slugLabel": "Slug"
+  },
+  "project": {
+    "tabTokens": "Tokens",
+    "active": "Active version: v{version}",
+    "notPublished": "Not published yet",
+    "saveDraft": "Save draft",
+    "publish": "Publish",
+    "discard": "Discard changes"
+  },
+  "changelog": {
+    "title": "What's new",
+    "intro": "Follow what's changing in Grundtone Studio and the SDK. The studio app ships continuously; the SDK is semver-versioned.",
+    "studio": "Studio",
+    "sdk": "SDK",
+    "empty": "No releases yet."
+  },
+  "install": {
+    "title": "Install in your app",
+    "intro": "Three ways to pull your tokens into customer-facing code. Pick the one that fits your stack.",
+    "noKey": "Generate an API key first",
+    "noKeyBody": "The snippets show placeholder values. Create a key above to get real integration code.",
+    "scriptTag": "Script tag (vanilla, no build)",
+    "vuePlugin": "Vue 3 / Nuxt plugin",
+    "programmatic": "Programmatic (React, Svelte, …)",
+    "curl": "Test with curl"
+  },
+  "versions": {
+    "title": "Versions",
+    "draft": "Draft",
+    "draftLabel": "Unpublished draft",
+    "published": "Published versions",
+    "active": "Active",
+    "activate": "Activate",
+    "empty": "No versions published yet.",
+    "publishedOn": "Published {date}",
+    "editedOn": "Last edited {date}",
+    "confirmActivate": "Switch the active version to this one? Customers using the CDN will switch within ~1 minute."
+  },
+  "tokens": {
+    "colors": "Colors",
+    "typography": "Typography",
+    "radius": "Border radius",
+    "spacing": "Spacing",
+    "color": {
+      "primary": "Primary",
+      "primaryLight": "Primary — light",
+      "primaryDark": "Primary — dark",
+      "onPrimary": "Text on primary",
+      "secondary": "Secondary",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error",
+      "info": "Info",
+      "background": "Background",
+      "surface": "Surface",
+      "text": "Text"
+    },
+    "font": {
+      "base": "Body font family",
+      "heading": "Heading font family"
+    }
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "create": "Create key",
+    "generate": "Generate key",
+    "active": "Active keys",
+    "revoked": "Revoked keys",
+    "empty": "No API keys yet.",
+    "environment": "Environment",
+    "envLive": "Production (live)",
+    "envTest": "Test",
+    "allowedOrigins": "Allowed origins",
+    "allowedOriginsHelp": "One per line, e.g. 'acme.com' or '*.acme.com'. Empty = any origin allowed.",
+    "anyOrigin": "Any origin",
+    "shownOnce": "Copy the key now — it will only be shown this once",
+    "shownOnceBody": "We only store a hash of the key. Lose it and you must generate a new one.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "dismiss": "Done",
+    "revoke": "Revoke",
+    "confirmRevoke": "Are you sure you want to revoke this key? It cannot be used again."
+  },
+  "members": {
+    "title": "Members",
+    "active": "Active members",
+    "pending": "Pending invitations",
+    "invite": "Invite member",
+    "sendInvite": "Send invitation",
+    "cancelInvite": "Cancel",
+    "remove": "Remove",
+    "role": "Role",
+    "inviteError": "Could not send invitation",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    }
+  },
+  "invitation": {
+    "title": "Invitation",
+    "body": "{email} has been invited to join {org} on Grundtone Studio.",
+    "accept": "Accept",
+    "reject": "Decline",
+    "acceptError": "Could not accept invitation",
+    "notFound": "Invitation not found or expired",
+    "signInRequired": "Sign in or create an account to accept the invitation."
+  },
+  "skip": {
+    "toContent": "Skip to main content"
+  }
+}

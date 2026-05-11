@@ -5,4 +5,11 @@ node_modules
 dist
 coverage
 pnpm-lock.yaml
-server/db/migrations
+
+# Drizzle-generated migration snapshots — overwritten by codegen, hands off.
+apps/studio/server/db/migrations
+
+# Auto-generated changeset summaries inherit their own formatting from the tool.
+.changeset/*.md
+!.changeset/README.md
+!.changeset/config.json

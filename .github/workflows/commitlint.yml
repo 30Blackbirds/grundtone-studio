@@ -1,0 +1,45 @@
+name: Commit lint
+
+# Runs commitlint against the PR title (which becomes the squash-merge subject
+# on `main`) and every commit on the PR branch. The pre-commit hook handles
+# local commits; this catches contributors without the hook installed.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: commitlint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install root devDependencies only
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter grundtone-studio-monorepo
+
+      - name: Lint PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: echo "$PR_TITLE" | pnpm exec commitlint
+
+      - name: Lint commits in PR
+        run: |
+          pnpm exec commitlint \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to "${{ github.event.pull_request.head.sha }}" \
+            --verbose

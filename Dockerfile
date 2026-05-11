@@ -3,19 +3,21 @@ RUN corepack enable pnpm
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml .npmrc ./
+# Workspace manifests first for cache-friendly install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
+COPY apps/studio/package.json ./apps/studio/
+COPY packages/saas-client/package.json ./packages/saas-client/
 RUN pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/studio/node_modules ./apps/studio/node_modules
+COPY --from=deps /app/packages/saas-client/node_modules ./packages/saas-client/node_modules
 COPY . .
-RUN pnpm build
-
-FROM base AS prod-deps
-WORKDIR /app
-COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+# Build saas-client first (workspace dep), then the Nuxt app
+RUN pnpm --filter @grundtone/saas-client build && \
+    pnpm --filter @grundtone-studio/studio build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -25,10 +27,14 @@ ENV NITRO_HOST=0.0.0.0
 
 RUN addgroup -S app && adduser -S app -G app
 
-COPY --from=builder --chown=app:app /app/.output ./.output
-COPY --from=prod-deps --chown=app:app /app/node_modules ./node_modules
-COPY --chown=app:app package.json ./
-COPY --chown=app:app server/db ./server/db
+# Nitro produces a self-contained .output bundle — no extra node_modules needed
+COPY --from=builder --chown=app:app /app/apps/studio/.output ./.output
+# Drizzle migrations + entrypoint for runtime db:migrate
+COPY --from=builder --chown=app:app /app/apps/studio/server/db ./server/db
+COPY --from=builder --chown=app:app /app/apps/studio/package.json ./package.json
+# Changelog files read by /api/changelog/[source] at runtime
+COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
+COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md
 COPY --chown=app:app docker/entrypoint.sh ./entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
