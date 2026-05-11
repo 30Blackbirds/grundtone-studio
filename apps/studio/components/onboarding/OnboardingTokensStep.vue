@@ -55,12 +55,15 @@
       <TokenColorField v-model="state.primaryColor" :label="t('tokens.color.primary')" />
 
       <ClientOnly>
-        <div ref="previewEl" class="p-4 border rounded-lg bg-surface">
-          <p class="text-tertiary text-sm mt-0">{{ t('onboarding.tokens.preview') }}</p>
-          <div class="flex gap-3">
-            <GTButton variant="primary">Primary</GTButton>
-            <GTButton variant="secondary">Secondary</GTButton>
-          </div>
+        <!-- Ref on a wrapper div so applyThemeToDOM has a stable DOM node;
+             CSS variables cascade into the GTCard children. -->
+        <div ref="previewEl">
+          <GTCard variant="bordered" :title="t('onboarding.tokens.preview')">
+            <div class="flex gap-3">
+              <GTButton variant="primary">Primary</GTButton>
+              <GTButton variant="secondary">Secondary</GTButton>
+            </div>
+          </GTCard>
         </div>
       </ClientOnly>
     </div>
