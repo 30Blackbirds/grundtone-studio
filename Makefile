@@ -36,10 +36,10 @@ db: up migrate seed ## Bring DB up + migrate + seed (no dev server)
 db-studio: up ## Open Drizzle Studio (schema-aware web UI for the DB)
 	pnpm db:studio
 
-migrate: ## Apply pending Drizzle migrations
+migrate: up ## Apply pending Drizzle migrations (auto-starts DB if down)
 	pnpm db:migrate:local
 
-seed: ## Seed dev user + org + project (idempotent)
+seed: up ## Seed dev user + org + project (auto-starts DB if down, idempotent)
 	pnpm db:seed
 
 test: ## Run the workspace test suite
