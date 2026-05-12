@@ -5,7 +5,7 @@
 # test fixtures, and starts the Nuxt dev server in one go.
 
 .DEFAULT_GOAL := help
-.PHONY: help dev stop reset db migrate seed test lint typecheck build install logs clean
+.PHONY: help dev stop reset db db-studio migrate seed test lint typecheck build install logs clean
 
 STUDIO_DIR := apps/studio
 PG_CONTAINER := grundtone-studio-postgres-1
@@ -30,6 +30,9 @@ reset: ## Nuke containers + volumes and restart fresh
 	$(MAKE) dev
 
 db: up migrate seed ## Bring DB up + migrate + seed (no dev server)
+
+db-studio: up ## Open Drizzle Studio (schema-aware web UI for the DB)
+	pnpm db:studio
 
 migrate: ## Apply pending Drizzle migrations
 	pnpm db:migrate:local
