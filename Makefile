@@ -8,7 +8,9 @@
 .PHONY: help dev stop reset db db-studio migrate seed test lint typecheck build install logs clean
 
 STUDIO_DIR := apps/studio
-PG_CONTAINER := grundtone-studio-postgres-1
+# docker compose derives the project name from the compose file's directory,
+# so containers are studio-{service}-1, not grundtone-studio-{service}-1.
+PG_CONTAINER := studio-postgres-1
 
 # ─── Public targets ────────────────────────────────────────────────────────
 
