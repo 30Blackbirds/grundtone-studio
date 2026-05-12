@@ -2,7 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
   devtools: { enabled: true },
-  modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n'],
+  modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
   i18n: {
     defaultLocale: 'da',
@@ -38,6 +38,17 @@ export default defineNuxtConfig({
     public: {
       appUrl: '',
       cdnBase: '',
+      sentryDsn: '',
+      sentryEnvironment: '',
+    },
+  },
+  sentry: {
+    // Source maps upload requires SENTRY_AUTH_TOKEN in the build env.
+    // Wire it into the GitHub Actions build job via the `release` environment
+    // before Phase 6 launch.
+    sourceMapsUploadOptions: {
+      org: 'asp-productions-aps',
+      project: 'grundtone-studio',
     },
   },
 })
