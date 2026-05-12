@@ -1,0 +1,80 @@
+import { describe, it, expect } from 'vitest'
+import {
+  localeFromCookieHeader,
+  magicLinkEmail,
+  orgInviteEmail,
+  projectInviteEmail,
+} from './email-templates'
+
+describe('localeFromCookieHeader', () => {
+  it('returns the locale stored in i18n_locale', () => {
+    expect(localeFromCookieHeader('i18n_locale=en')).toBe('en')
+    expect(localeFromCookieHeader('i18n_locale=da')).toBe('da')
+  })
+
+  it('survives other cookies in the same header', () => {
+    expect(localeFromCookieHeader('session=abc; i18n_locale=en; gb_consent=true')).toBe('en')
+  })
+
+  it('falls back to da when the cookie is missing or unknown', () => {
+    expect(localeFromCookieHeader(undefined)).toBe('da')
+    expect(localeFromCookieHeader('')).toBe('da')
+    expect(localeFromCookieHeader('i18n_locale=klingon')).toBe('da')
+    expect(localeFromCookieHeader('other=1')).toBe('da')
+  })
+})
+
+describe('magicLinkEmail', () => {
+  const args = { url: 'https://studio.grundtone.io/magic/abc' }
+
+  it('renders Danish by default', () => {
+    const m = magicLinkEmail(args)
+    expect(m.subject).toBe('Log ind på Grundtone Studio')
+    expect(m.text).toContain(args.url)
+    expect(m.html).toContain(`href="${args.url}"`)
+  })
+
+  it('renders English when locale is en', () => {
+    const m = magicLinkEmail(args, 'en')
+    expect(m.subject).toBe('Sign in to Grundtone Studio')
+    expect(m.text).toContain(args.url)
+  })
+})
+
+describe('orgInviteEmail', () => {
+  it('escapes user-controlled strings in HTML', () => {
+    const m = orgInviteEmail(
+      {
+        acceptUrl: 'https://studio.grundtone.io/invitations/1',
+        orgName: 'Acme <script>alert(1)</script>',
+        inviterDisplay: 'Bobby "Tables" Drop',
+      },
+      'en',
+    )
+    expect(m.html).not.toContain('<script>')
+    expect(m.html).toContain('&lt;script&gt;')
+    expect(m.html).toContain('&quot;Tables&quot;')
+    // Subject stays plaintext — text-only context, no escape needed.
+    expect(m.subject).toContain('Acme <script>')
+  })
+})
+
+describe('projectInviteEmail', () => {
+  const args = {
+    acceptUrl: 'https://studio.grundtone.io/invitations/project/1',
+    projectName: 'Main',
+    orgName: 'Acme',
+    role: 'editor' as const,
+    expiresInDays: 7,
+  }
+
+  it('localizes the role label per locale', () => {
+    expect(projectInviteEmail(args, 'da').html).toContain('Redigerer')
+    expect(projectInviteEmail(args, 'en').html).toContain('Editor')
+  })
+
+  it('mentions the expiry window in both locales', () => {
+    expect(projectInviteEmail(args, 'da').text).toContain('7 dage')
+    expect(projectInviteEmail(args, 'en').text).toContain('7 days')
+  })
+})

@@ -4,6 +4,7 @@ import { db } from '~~/server/db'
 import { projectInvitation } from '~~/server/db/schema'
 import { PROJECT_ROLES, requireProjectAccess } from '~~/server/lib/project-access'
 import { email } from '~~/server/lib/email'
+import { localeFromEvent, projectInviteEmail } from '~~/server/lib/email-templates'
 
 const INVITE_TTL_DAYS = 7
 
@@ -61,20 +62,16 @@ export default defineEventHandler(async (event) => {
 
   await email.send({
     to: parsed.data.email,
-    subject: `Invitation to ${access.project.name} on Grundtone Studio`,
-    text: [
-      `You've been invited to the project "${access.project.name}" as ${parsed.data.role}.`,
-      '',
-      `Accept the invitation:`,
-      acceptUrl,
-      '',
-      `Link expires in ${INVITE_TTL_DAYS} days. If you didn't expect this, ignore the email.`,
-    ].join('\n'),
-    html: `
-      <p>You've been invited to the project <strong>${access.project.name}</strong> as <code>${parsed.data.role}</code>.</p>
-      <p><a href="${acceptUrl}">Accept the invitation</a></p>
-      <p>Link expires in ${INVITE_TTL_DAYS} days. If you didn't expect this, ignore the email.</p>
-    `,
+    ...projectInviteEmail(
+      {
+        acceptUrl,
+        projectName: access.project.name,
+        orgName: access.organization.name,
+        role: parsed.data.role,
+        expiresInDays: INVITE_TTL_DAYS,
+      },
+      localeFromEvent(event),
+    ),
   })
 
   return row

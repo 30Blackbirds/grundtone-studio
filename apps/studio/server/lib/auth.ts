@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { magicLink, organization } from 'better-auth/plugins'
 import { db } from '../db'
 import { email } from './email'
+import { localeFromBetterAuthContext, magicLinkEmail, orgInviteEmail } from './email-templates'
 
 const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) {
@@ -30,35 +31,28 @@ export const auth = betterAuth({
   },
   plugins: [
     magicLink({
-      sendMagicLink: async ({ email: to, url }) => {
-        await email.send({
-          to,
-          subject: 'Sign in to Grundtone Studio',
-          text: `Click the link below to sign in:\n\n${url}\n\nIf you didn't request this, ignore this email.`,
-          html: `<p>Click the link below to sign in:</p><p><a href="${url}">${url}</a></p><p>If you didn't request this, ignore this email.</p>`,
-        })
+      sendMagicLink: async ({ email: to, url }, request) => {
+        const locale = localeFromBetterAuthContext(request)
+        await email.send({ to, ...magicLinkEmail({ url }, locale) })
       },
     }),
     organization({
       allowUserToCreateOrganization: true,
-      async sendInvitationEmail({ email: to, organization: org, invitation, inviter }) {
+      async sendInvitationEmail({ email: to, organization: org, invitation, inviter }, request) {
+        const locale = localeFromBetterAuthContext(request)
         const baseUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
         const acceptUrl = `${baseUrl}/invitations/${invitation.id}`
-        const subject = `Invitation to join ${org.name} on Grundtone Studio`
-        const text = [
-          `${inviter.user.name ?? inviter.user.email} invited you to join ${org.name} on Grundtone Studio.`,
-          '',
-          `Accept the invitation:`,
-          acceptUrl,
-          '',
-          `If you didn't expect this, ignore this email.`,
-        ].join('\n')
-        const html = `
-          <p>${inviter.user.name ?? inviter.user.email} invited you to join <strong>${org.name}</strong> on Grundtone Studio.</p>
-          <p><a href="${acceptUrl}">Accept the invitation</a></p>
-          <p>If you didn't expect this, ignore this email.</p>
-        `
-        await email.send({ to, subject, text, html })
+        await email.send({
+          to,
+          ...orgInviteEmail(
+            {
+              acceptUrl,
+              orgName: org.name,
+              inviterDisplay: inviter.user.name ?? inviter.user.email,
+            },
+            locale,
+          ),
+        })
       },
     }),
   ],
