@@ -63,10 +63,22 @@ export const useOrgContext = () => {
     () => `org-context-member-${activeOrg.value?.id ?? 'none'}`,
     async () => {
       if (!activeOrg.value?.id) return null
-      const res = await organization.getActiveMember({
-        fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
-      })
-      return res.data ?? null
+      try {
+        const res = await organization.getActiveMember({
+          fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+        })
+        return res.data ?? null
+      } catch (err) {
+        // Stale session: the session cookie's activeOrganizationId points at
+        // an org that no longer exists (typical after a DB reseed during dev,
+        // or right after a user got removed from an org). Clear it so the
+        // next page load isn't trapped in a 404 loop.
+        const msg = (err as { message?: string } | null)?.message ?? String(err)
+        if (/not found|404/i.test(msg)) {
+          await organization.setActive({ organizationId: null }).catch(() => {})
+        }
+        return null
+      }
     },
     { default: () => null, watch: [activeOrg] },
   )
