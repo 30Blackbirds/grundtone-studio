@@ -14,17 +14,17 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: 'pg' }),
   secret,
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
-    // Local dev: cover whichever port Nuxt grabbed (3000 is occasionally
-    // taken by another orphaned dev server and Nuxt falls back to 3001/3002).
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-    'http://127.0.0.1:3002',
-  ],
+  // Production locks down to BETTER_AUTH_URL. Dev accepts any localhost port
+  // because Nuxt falls back to 3001/3002/3003/... when an orphaned dev server
+  // is holding 3000, and we shouldn't have to chase the port each time.
+  trustedOrigins:
+    process.env.NODE_ENV === 'production'
+      ? [process.env.BETTER_AUTH_URL ?? '']
+      : [
+          process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+          ...Array.from({ length: 20 }, (_, i) => `http://localhost:${3000 + i}`),
+          ...Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${3000 + i}`),
+        ],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
