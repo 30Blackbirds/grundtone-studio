@@ -166,8 +166,10 @@
     },
     "orgRoles": {
       "owner": "Owner",
+      "manager": "Manager",
       "admin": "Admin",
-      "member": "Member"
+      "member": "Member",
+      "billing": "Billing"
     }
   },
   "projectInvitation": {
@@ -312,9 +314,42 @@
     "inviteError": "Could not send invitation",
     "roles": {
       "owner": "Owner",
+      "manager": "Manager",
       "admin": "Admin",
-      "member": "Member"
-    }
+      "member": "Member",
+      "billing": "Billing"
+    },
+    "roleDescriptions": {
+      "owner": "Unrestricted access to the organization, its data, and its settings. Can add, modify, and delete projects and members, as well as make billing and plan changes.",
+      "manager": "Gains admin access on all projects as well as the ability to add and remove organization members.",
+      "admin": "Admin privileges on projects they are a member of. They can create new projects, and remove projects they hold membership on. They can manage memberships of projects they are members of. By default they can invite members to the organization.",
+      "member": "Members can view most data within the organization and act on the projects they are added to. By default they can invite members to the organization.",
+      "billing": "Can manage subscription and billing details."
+    },
+    "manage": "Manage"
+  },
+  "memberDetail": {
+    "settings": "Settings",
+    "loading": "Loading…",
+    "basics": "Basics",
+    "status": "Status",
+    "statusActive": "Active",
+    "added": "Added",
+    "currentRole": "Current role",
+    "organizationRole": "Organization role",
+    "projectsHeading": "Projects",
+    "projectRole": "Project role",
+    "addToProject": "Add to project",
+    "direct": "Direct",
+    "noProjects": "No direct project memberships. Access is inherited from the organization role.",
+    "inheritedNotice": "This user's organization role as {role} grants them a minimum project-level role of {projectRole} on every project.",
+    "save": "Save member",
+    "saveError": "Could not update member",
+    "removeHeading": "Remove from organization",
+    "removeBody": "Remove this person from the organization. They lose access to every project immediately.",
+    "removeAction": "Remove from organization",
+    "confirmRemove": "Remove this member from the organization? They lose access to every project immediately.",
+    "cannotManageHierarchy": "You can't change a role at or above your own."
   },
   "invitation": {
     "title": "Invitation",

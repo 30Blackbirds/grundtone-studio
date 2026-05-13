@@ -13,9 +13,13 @@ interface MembersResponse {
 
 const ROLE_RANK: Record<ProjectRole, number> = { viewer: 0, editor: 1, admin: 2 }
 
+// Mirrors server/lib/project-access.ts. Sentry-style:
+//   owner | manager  → admin  (full power on every project)
+//   admin  | member  → viewer (read-only across the org by default)
+//   billing          → null   (no project access)
 function orgRoleToProjectRole(role: string | undefined | null): ProjectRole | null {
-  if (role === 'owner' || role === 'admin') return 'admin'
-  if (role === 'member') return 'editor'
+  if (role === 'owner' || role === 'manager') return 'admin'
+  if (role === 'admin' || role === 'member') return 'viewer'
   return null
 }
 

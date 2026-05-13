@@ -80,8 +80,10 @@
     await refresh()
   }
 
-  function orgBadgeVariant(role: string): 'info' | 'neutral' {
-    return role === 'owner' || role === 'admin' ? 'info' : 'neutral'
+  function orgBadgeVariant(role: string): 'info' | 'warning' | 'neutral' {
+    if (role === 'owner') return 'info'
+    if (role === 'manager' || role === 'admin') return 'warning'
+    return 'neutral'
   }
 </script>
 

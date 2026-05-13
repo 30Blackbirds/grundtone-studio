@@ -1,9 +1,37 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { magicLink, organization } from 'better-auth/plugins'
+import { createAccessControl } from 'better-auth/plugins/access'
+import {
+  adminAc,
+  defaultStatements,
+  memberAc,
+  ownerAc,
+} from 'better-auth/plugins/organization/access'
 import { db } from '../db'
 import { email } from './email'
 import { localeFromBetterAuthContext, magicLinkEmail, orgInviteEmail } from './email-templates'
+
+// Sentry-style 5-tier org roles. Better Auth ships with owner/admin/member;
+// we add `billing` and `manager` so the invite/update endpoints don't reject
+// them. Real access enforcement happens in server/lib/project-access.ts via
+// requireOrgRole — these AC permissions are placeholders to satisfy Better
+// Auth's built-in role validator (validStaticRoles check at invite time).
+const orgAc = createAccessControl(defaultStatements)
+const billingAc = orgAc.newRole({
+  organization: [],
+  member: [],
+  invitation: [],
+  team: [],
+  ac: [],
+})
+const managerAc = orgAc.newRole({
+  organization: ['update'],
+  member: ['create', 'update', 'delete'],
+  invitation: ['create', 'cancel'],
+  team: ['create', 'update', 'delete'],
+  ac: ['create', 'read', 'update', 'delete'],
+})
 
 const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) {
@@ -38,6 +66,16 @@ export const auth = betterAuth({
     }),
     organization({
       allowUserToCreateOrganization: true,
+      // The user who creates an org gets 'owner'. Sentry-equivalent: unrestricted.
+      creatorRole: 'owner',
+      ac: orgAc,
+      roles: {
+        owner: ownerAc,
+        manager: managerAc,
+        admin: adminAc,
+        member: memberAc,
+        billing: billingAc,
+      },
       async sendInvitationEmail({ email: to, organization: org, invitation, inviter }, request) {
         const locale = localeFromBetterAuthContext(request)
         const baseUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'

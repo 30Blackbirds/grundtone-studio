@@ -5,29 +5,53 @@ import { project, projectMember } from '../db/schema'
 import { member, organization } from '../db/schema/auth'
 import { auth } from './auth'
 
-// Two-layer permissions. A user can be reached by EITHER:
-//   - membership in the project's organization (org-role)
-//   - direct membership of the project (project-role)
-// The effective role is whichever is broader (org wins ties). Org owners
-// always get full power on every project in their org regardless of any
-// project-role override.
+// Two-layer permissions, Sentry-style.
 //
-// Project-role uses three tiers; org-role still uses Better Auth's
-// owner/admin/member triple. Mapping:
-//   owner   ─┐
-//   admin   ─┼─→ admin     (full editor + member management)
-//   member  ───→ editor    (can edit tokens + publish + API keys)
-//                viewer    (read-only — no API keys, no edits)
+// Org-role is one of:
+//   billing  — manage subscription only; no project access
+//   member   — read-only across the org; project access only via direct invite
+//   admin    — same as member, but can create new projects (becomes admin of
+//              those) and gets admin on projects they're invited to
+//   manager  — admin on every project + can add/remove org members
+//   owner    — unrestricted; the user who creates the org gets this role
+//
+// Project-role is one of: viewer, editor, admin.
+//
+// Effective project role = max(org-role-mapped, direct-project-role). Mapping:
+//   owner | manager  → admin   (full power on every project)
+//   admin  | member  → viewer  (read-only on every project by default)
+//   billing          → null    (no project access at all)
+//
+// "admin" at the org level gets elevated to project admin only when they're
+// invited to a specific project as admin. Same for write access at "member".
 
 export type ProjectRole = 'viewer' | 'editor' | 'admin'
 export const PROJECT_ROLES = ['viewer', 'editor', 'admin'] as const
 const ROLE_RANK: Record<ProjectRole, number> = { viewer: 0, editor: 1, admin: 2 }
 
-export type OrgRole = 'owner' | 'admin' | 'member'
+export type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
+export const ORG_ROLES = ['billing', 'member', 'admin', 'manager', 'owner'] as const
+const ORG_ROLE_RANK: Record<OrgRole, number> = {
+  billing: 0,
+  member: 1,
+  admin: 2,
+  manager: 3,
+  owner: 4,
+}
 
-function projectRoleFromOrgRole(orgRole: string): ProjectRole | null {
-  if (orgRole === 'owner' || orgRole === 'admin') return 'admin'
-  if (orgRole === 'member') return 'editor'
+function isOrgRole(value: string): value is OrgRole {
+  return (
+    value === 'billing' ||
+    value === 'member' ||
+    value === 'admin' ||
+    value === 'manager' ||
+    value === 'owner'
+  )
+}
+
+function projectRoleFromOrgRole(orgRole: OrgRole): ProjectRole | null {
+  if (orgRole === 'owner' || orgRole === 'manager') return 'admin'
+  if (orgRole === 'admin' || orgRole === 'member') return 'viewer'
   return null
 }
 
@@ -54,8 +78,6 @@ export interface ProjectAccess {
 /**
  * Resolve the effective project role for a user, combining org membership
  * and direct project membership. Returns null if the user has no access.
- * Pure-ish: only touches DB, no event/session — safe to use from background
- * jobs and tests.
  */
 export async function getProjectRole(
   userId: string,
@@ -68,10 +90,7 @@ export async function getProjectRole(
     .select({ role: member.role })
     .from(member)
     .where(and(eq(member.organizationId, proj.organizationId), eq(member.userId, userId)))
-  const orgRole: OrgRole | null =
-    orgMember?.role === 'owner' || orgMember?.role === 'admin' || orgMember?.role === 'member'
-      ? orgMember.role
-      : null
+  const orgRole: OrgRole | null = orgMember && isOrgRole(orgMember.role) ? orgMember.role : null
 
   const [projMember] = await db
     .select({ role: projectMember.role })
@@ -93,8 +112,6 @@ export async function getProjectRole(
 /**
  * Verify the current session has access to a project at minimum `min` role.
  * Returns project + effective role + source. Throws 401/403/404 otherwise.
- *
- * Default `min = viewer` means "any access".
  */
 export async function requireProjectAccess(
   event: H3Event,
@@ -128,4 +145,46 @@ export async function requireProjectAccess(
     organization: orgRow,
     ...resolved,
   }
+}
+
+export interface OrgAccess {
+  userId: string
+  organizationId: string
+  role: OrgRole
+}
+
+/**
+ * Verify the current session has membership in the given org at minimum
+ * `min` role. Use for org-level endpoints (member management, billing,
+ * org-wide settings). Project endpoints should use `requireProjectAccess`.
+ */
+export async function requireOrgRole(
+  event: H3Event,
+  organizationId: string,
+  min: OrgRole = 'member',
+): Promise<OrgAccess> {
+  const session = await auth.api.getSession({ headers: event.headers })
+  if (!session) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+
+  const [orgMember] = await db
+    .select({ role: member.role })
+    .from(member)
+    .where(and(eq(member.organizationId, organizationId), eq(member.userId, session.user.id)))
+
+  if (!orgMember || !isOrgRole(orgMember.role)) {
+    throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
+  }
+
+  if (ORG_ROLE_RANK[orgMember.role] < ORG_ROLE_RANK[min]) {
+    throw createError({ statusCode: 403, statusMessage: `Requires org:${min}` })
+  }
+
+  return { userId: session.user.id, organizationId, role: orgMember.role }
+}
+
+export const orgRoleHelpers = {
+  canManageOrgMembers: (role: OrgRole) => role === 'owner' || role === 'manager',
+  canManageBilling: (role: OrgRole) => role === 'owner' || role === 'billing',
+  canCreateProjects: (role: OrgRole) => role === 'owner' || role === 'manager' || role === 'admin',
+  canViewProjects: (role: OrgRole) => role !== 'billing',
 }

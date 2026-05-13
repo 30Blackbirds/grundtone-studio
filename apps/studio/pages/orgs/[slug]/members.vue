@@ -7,9 +7,42 @@
   const route = useRoute()
   const slug = computed(() => route.params.slug as string)
 
-  const { activeOrg, isAdmin } = useOrgContext()
+  const { activeOrg, canManageOrgMembers } = useOrgContext()
 
-  const { data: members, refresh: refreshMembers } = await useAsyncData(
+  type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
+  const ROLE_OPTIONS: Array<{ value: OrgRole; label: string; description: string }> = [
+    {
+      value: 'billing',
+      label: t('members.roles.billing'),
+      description: t('members.roleDescriptions.billing'),
+    },
+    {
+      value: 'member',
+      label: t('members.roles.member'),
+      description: t('members.roleDescriptions.member'),
+    },
+    {
+      value: 'admin',
+      label: t('members.roles.admin'),
+      description: t('members.roleDescriptions.admin'),
+    },
+    {
+      value: 'manager',
+      label: t('members.roles.manager'),
+      description: t('members.roleDescriptions.manager'),
+    },
+    {
+      value: 'owner',
+      label: t('members.roles.owner'),
+      description: t('members.roleDescriptions.owner'),
+    },
+  ]
+  // The role-edit dropdown excludes 'owner' because Better Auth's
+  // updateMemberRole doesn't promote to owner — there's a separate transfer
+  // flow. Inviting as owner is also blocked by default for the same reason.
+  const ASSIGNABLE_ROLES = ROLE_OPTIONS.filter((r) => r.value !== 'owner')
+
+  const { data: members } = await useAsyncData(
     () => `members-${slug.value}`,
     async () => {
       if (!activeOrg.value?.id) return []
@@ -35,7 +68,7 @@
 
   const showInvite = ref(false)
   const inviteEmail = ref('')
-  const inviteRole = ref<'admin' | 'member'>('member')
+  const inviteRole = ref<OrgRole>('member')
   const inviting = ref(false)
   const inviteError = ref<string | null>(null)
 
@@ -45,7 +78,9 @@
     inviteError.value = null
     const res = await organization.inviteMember({
       email: inviteEmail.value,
-      role: inviteRole.value,
+      // Better Auth's client types narrow this to 'admin' | 'member' but the
+      // server-side ac config accepts our custom roles too.
+      role: inviteRole.value as 'admin' | 'member',
       organizationId: activeOrg.value.id,
     })
     inviting.value = false
@@ -64,13 +99,10 @@
     await refreshInvitations()
   }
 
-  async function removeMember(memberId: string) {
-    if (!activeOrg.value?.id) return
-    await organization.removeMember({
-      memberIdOrEmail: memberId,
-      organizationId: activeOrg.value.id,
-    })
-    await refreshMembers()
+  function roleBadgeVariant(role: string): 'info' | 'warning' | 'neutral' {
+    if (role === 'owner') return 'info'
+    if (role === 'manager' || role === 'admin') return 'warning'
+    return 'neutral'
   }
 </script>
 
@@ -86,7 +118,7 @@
 
     <header class="flex justify-between items-center mb-6">
       <h1 class="m-0">{{ t('members.title') }}</h1>
-      <GTButton v-if="isAdmin && !showInvite" @click="showInvite = true">
+      <GTButton v-if="canManageOrgMembers && !showInvite" @click="showInvite = true">
         {{ t('members.invite') }}
       </GTButton>
     </header>
@@ -107,12 +139,12 @@
         <GTSelect
           v-model="inviteRole"
           :label="t('members.role')"
-          :options="[
-            { value: 'member', label: t('members.roles.member') },
-            { value: 'admin', label: t('members.roles.admin') },
-          ]"
+          :options="ASSIGNABLE_ROLES.map((r) => ({ value: r.value, label: r.label }))"
         />
       </div>
+      <p class="text-tertiary text-sm m-0">
+        {{ ASSIGNABLE_ROLES.find((r) => r.value === inviteRole)?.description }}
+      </p>
       <GTAlert v-if="inviteError" variant="error" :heading="inviteError" />
       <div class="flex gap-3 justify-end">
         <GTButton type="button" variant="secondary" @click="showInvite = false">
@@ -134,17 +166,16 @@
           <span class="text-tertiary text-sm">{{ m.user?.email }}</span>
         </div>
         <div class="flex items-center gap-3">
-          <GTBadge :variant="m.role === 'owner' ? 'info' : 'neutral'">
+          <GTBadge :variant="roleBadgeVariant(m.role)">
             {{ t(`members.roles.${m.role}`) }}
           </GTBadge>
-          <GTButton
-            v-if="isAdmin && m.role !== 'owner'"
-            variant="outlined"
-            size="sm"
-            @click="removeMember(m.id)"
+          <NuxtLink
+            v-if="canManageOrgMembers"
+            :to="`/orgs/${slug}/members/${m.id}`"
+            class="text-primary text-sm"
           >
-            {{ t('members.remove') }}
-          </GTButton>
+            {{ t('members.manage') }}
+          </NuxtLink>
         </div>
       </li>
     </ul>
@@ -163,7 +194,12 @@
               {{ t(`members.roles.${inv.role}`) }}
             </span>
           </div>
-          <GTButton v-if="isAdmin" variant="outlined" size="sm" @click="cancelInvite(inv.id)">
+          <GTButton
+            v-if="canManageOrgMembers"
+            variant="outlined"
+            size="sm"
+            @click="cancelInvite(inv.id)"
+          >
             {{ t('members.cancelInvite') }}
           </GTButton>
         </li>

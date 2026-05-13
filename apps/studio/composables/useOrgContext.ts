@@ -83,8 +83,27 @@ export const useOrgContext = () => {
     { default: () => null, watch: [activeOrg] },
   )
 
-  const isOwner = computed(() => activeMember.value?.role === 'owner')
-  const isAdmin = computed(() => activeMember.value?.role === 'admin' || isOwner.value)
+  // Sentry-style 5-tier org roles (see server/lib/project-access.ts for the
+  // canonical mapping). UI gates derive from these flags rather than reading
+  // role strings directly, so a role rename doesn't ripple through templates.
+  //
+  // Better Auth's client types narrow Member.role to 'owner' | 'admin' | 'member',
+  // so we widen via string at the read boundary — the actual values are
+  // validated by the server-side ac config in server/lib/auth.ts.
+  type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
+  const role = computed<OrgRole | null>(() => {
+    const r = activeMember.value?.role as string | undefined
+    return r === 'billing' || r === 'member' || r === 'admin' || r === 'manager' || r === 'owner'
+      ? r
+      : null
+  })
+  const isOwner = computed(() => role.value === 'owner')
+  const isManager = computed(() => role.value === 'manager')
+  const isAdmin = computed(() => role.value === 'admin')
+  const canManageOrgMembers = computed(() => isOwner.value || isManager.value)
+  const canManageBilling = computed(() => isOwner.value || role.value === 'billing')
+  const canCreateProjects = computed(() => isOwner.value || isManager.value || isAdmin.value)
+  const canViewProjects = computed(() => Boolean(role.value) && role.value !== 'billing')
 
   return {
     orgs,
@@ -93,8 +112,14 @@ export const useOrgContext = () => {
     activeProjectSlug,
     projects,
     activeMember,
+    role,
     isOwner,
+    isManager,
     isAdmin,
+    canManageOrgMembers,
+    canManageBilling,
+    canCreateProjects,
+    canViewProjects,
     refreshOrgs,
     refreshProjects,
     refreshActiveMember,

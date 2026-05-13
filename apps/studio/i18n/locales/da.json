@@ -166,8 +166,10 @@
     },
     "orgRoles": {
       "owner": "Ejer",
+      "manager": "Manager",
       "admin": "Admin",
-      "member": "Medlem"
+      "member": "Medlem",
+      "billing": "Fakturering"
     }
   },
   "projectInvitation": {
@@ -312,9 +314,42 @@
     "inviteError": "Kunne ikke sende invitation",
     "roles": {
       "owner": "Ejer",
+      "manager": "Manager",
       "admin": "Admin",
-      "member": "Medlem"
-    }
+      "member": "Medlem",
+      "billing": "Fakturering"
+    },
+    "roleDescriptions": {
+      "owner": "Ubegrænset adgang til organisationen, dens data og indstillinger. Kan tilføje, ændre og slette projekter og medlemmer samt ændre abonnement og plan.",
+      "manager": "Får admin-adgang på alle projekter samt mulighed for at tilføje og fjerne organisationsmedlemmer.",
+      "admin": "Admin-rettigheder på de projekter, de er medlem af. Kan oprette nye projekter og fjerne projekter, de er medlem af. Kan administrere medlemskaber på projekter, de er medlem af. Kan som udgangspunkt invitere medlemmer til organisationen.",
+      "member": "Medlemmer kan se det meste data i organisationen og handle på de projekter, de er føjet til. Kan som udgangspunkt invitere medlemmer til organisationen.",
+      "billing": "Kan administrere abonnement og fakturering."
+    },
+    "manage": "Administrér"
+  },
+  "memberDetail": {
+    "settings": "Indstillinger",
+    "loading": "Indlæser…",
+    "basics": "Stamdata",
+    "status": "Status",
+    "statusActive": "Aktiv",
+    "added": "Tilføjet",
+    "currentRole": "Nuværende rolle",
+    "organizationRole": "Organisationsrolle",
+    "projectsHeading": "Projekter",
+    "projectRole": "Projektrolle",
+    "addToProject": "Føj til projekt",
+    "direct": "Direkte",
+    "noProjects": "Ingen direkte projekt-medlemskaber. Adgang arves fra organisationsrollen.",
+    "inheritedNotice": "Denne brugers organisationsrolle som {role} giver dem minimum projektrollen {projectRole} på alle projekter.",
+    "save": "Gem medlem",
+    "saveError": "Kunne ikke opdatere medlem",
+    "removeHeading": "Fjern fra organisationen",
+    "removeBody": "Fjern denne person fra organisationen. De mister øjeblikkeligt adgang til alle projekter.",
+    "removeAction": "Fjern fra organisationen",
+    "confirmRemove": "Fjern dette medlem fra organisationen? De mister øjeblikkeligt adgang til alle projekter.",
+    "cannotManageHierarchy": "Du kan ikke ændre en rolle på eller over dit eget niveau."
   },
   "invitation": {
     "title": "Invitation",
