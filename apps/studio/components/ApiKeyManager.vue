@@ -89,7 +89,14 @@
 <template>
   <div class="flex flex-col gap-6">
     <header class="flex justify-between items-center">
-      <h2 class="m-0">{{ t('apiKeys.title') }}</h2>
+      <div class="flex items-center gap-2">
+        <h2 class="m-0">{{ t('apiKeys.title') }}</h2>
+        <GTTooltip :content="t('apiKeys.whatIsItTooltip')" position="bottom">
+          <button type="button" class="text-tertiary" :aria-label="t('apiKeys.whatIsItLabel')">
+            <GTIcon name="info" size="sm" />
+          </button>
+        </GTTooltip>
+      </div>
       <GTButton v-if="canManage && !showCreate && !createdPlaintext" @click="showCreate = true">
         {{ t('apiKeys.create') }}
       </GTButton>

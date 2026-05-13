@@ -49,9 +49,13 @@ upload "${DIST}/index.umd.js"      "v${VERSION}.js"
 upload "${DIST}/index.mjs"         "v${VERSION}.mjs"
 upload "${DIST}/index.umd.js.map"  "v${VERSION}.js.map"
 upload "${DIST}/index.mjs.map"     "v${VERSION}.mjs.map"
+upload "${DIST}/index.umd.js.sri"  "v${VERSION}.js.sri"
+upload "${DIST}/index.mjs.sri"     "v${VERSION}.mjs.sri"
 
-upload "${DIST}/index.umd.js"  "v${MAJOR}.js"
-upload "${DIST}/index.mjs"     "v${MAJOR}.mjs"
+upload "${DIST}/index.umd.js"      "v${MAJOR}.js"
+upload "${DIST}/index.mjs"         "v${MAJOR}.mjs"
+upload "${DIST}/index.umd.js.sri"  "v${MAJOR}.js.sri"
+upload "${DIST}/index.mjs.sri"     "v${MAJOR}.mjs.sri"
 
 # Purge the major-alias from Bunny's pull-cache so the new bytes are served
 # immediately. The versioned paths don't need purging — they're new keys.

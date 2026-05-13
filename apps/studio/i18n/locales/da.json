@@ -11,6 +11,94 @@
     "loading": "Indlæser …",
     "language": "Sprog"
   },
+  "footer": {
+    "installGuide": "Installations-guide",
+    "privacy": "Privatlivspolitik",
+    "dpa": "Databehandleraftale",
+    "subProcessors": "Underleverandører"
+  },
+  "privacy": {
+    "title": "Privatlivspolitik",
+    "updated": "Senest opdateret: maj 2026",
+    "intro": "Grundtone Studio er en platform til konfiguration og distribution af design tokens. Vi behandler kun de personoplysninger der er nødvendige for at levere tjenesten. Denne side opsummerer hvad vi indsamler, hvorfor, hvor længe vi gemmer det, og hvordan du kontakter os.",
+    "controllerHeading": "Dataansvarlig",
+    "controller": "ASP Productions ApS, CVR under registrering — operer som KlangHaus. Dataansvarlig er ansvarlig for behandlingen beskrevet nedenfor; spørgsmål rettes til kontaktadressen i bunden.",
+    "dataHeading": "Hvad vi indsamler",
+    "data": {
+      "account": "Kontodata: navn, email, hashet kodeord (Better Auth). Bruges til autentificering og til at mærke det indhold du opretter.",
+      "session": "Sessionsdata: et strengt nødvendigt session-cookie + IP-adresse og user-agent for login. Bruges til at holde dig logget ind og opdage mistænkelig aktivitet.",
+      "tokens": "Projektdata: design tokens, versionshistorik, API-nøgler (hashede), medlems-roller. Gemmes for at levere produktet.",
+      "cdn": "CDN-adgangslogs: API-key-prefix, origin, request-timing. Gemmes 30 dage til misbrugsdetektion."
+    },
+    "legalHeading": "Behandlingshjemmel",
+    "legal": "Kontrakt (levering af Studio til dig) for konto-, sessions- og projektdata. Legitim interesse (sikkerhed + misbrugsforebyggelse) for adgangslogs. Vi kører ingen marketing-tracking og har ingen reklame-cookies.",
+    "retentionHeading": "Opbevaringsperiode",
+    "retention": {
+      "account": "Kontodata: indtil du sletter kontoen, derefter slettet inden for 30 dage.",
+      "session": "Sessioner: 30 dages inaktivitet, derefter automatisk udløbet.",
+      "tokens": "Projektdata: gemmes så længe organisationen eksisterer. Sletning af org kaskaderer.",
+      "logs": "Adgangslogs: 30 dage, derefter droppet."
+    },
+    "rightsHeading": "Dine rettigheder",
+    "rights": "Du har under GDPR ret til indsigt, berigtigelse, sletning, begrænsning og dataportabilitet. Vi svarer inden for én måned. Skriv til kontaktadressen nedenfor eller brug kontosletnings-flowet i Studio (post-MVP).",
+    "subProcessorsHeading": "Underleverandører",
+    "subProcessors": "Vi bruger et lille sæt EU-baserede databehandlere til at drive Studio. Den fulde liste står på",
+    "subProcessorsLink": "Underleverandører",
+    "contactHeading": "Kontakt"
+  },
+  "dpa": {
+    "title": "Databehandleraftale",
+    "updated": "Senest opdateret: maj 2026",
+    "intakeHeading": "Skal du bruge en signeret kopi?",
+    "intakeBody": "Denne side er en offentlig skabelon der opsummerer hvad vores DPA dækker. For at få en signeret kopi på dit firmas brevpapir, skriv til",
+    "intro": "Denne skabelon opsummerer den databehandleraftale (DPA) Grundtone (ASP Productions ApS) tilbyder til organisationer der bruger Studio som databehandler under GDPR art. 28. Den fulde underskrivbare kontrakt udleveres på forespørgsel.",
+    "scopeHeading": "Omfang",
+    "scope": "Grundtone er databehandler for design tokens, organisationsmedlemskab og projektindhold som dit team uploader. I forbliver dataansvarlig for de data.",
+    "processingHeading": "Behandling",
+    "processing": {
+      "purpose": "Formål: levere Studio's design-token-konfiguration og CDN-distribution.",
+      "duration": "Varighed: indtil kontraktophør eller skriftlig anmodning om sletning.",
+      "dataTypes": "Datatyper: kontoinfo, design tokens, API-nøgler (hashede), CDN-adgangslogs.",
+      "subjects": "Registrerede: jeres organisations admins, designere, og slutbrugere hvis browsere henter tokens via jeres API-key."
+    },
+    "securityHeading": "Sikkerhedsforanstaltninger",
+    "security": {
+      "encryption": "TLS i transit, AES-256 at rest på UpCloud Managed Postgres + Object Storage.",
+      "access": "Rolle-baseret adgang: kun autoriseret KlangHaus-personale har adgang til produktion; adgang logges.",
+      "audit": "Auditlog af admin-handlinger gemmes i 12 måneder.",
+      "incident": "Notifikation om brud på persondatasikkerheden inden for 72 timer fra opdagelse."
+    },
+    "subProcessorsHeading": "Underleverandører",
+    "subProcessors": "Vi bruger EU-baserede underleverandører listet på",
+    "terminationHeading": "Ophør",
+    "termination": "Ved ophør slettes alle jeres data fra produktionssystemer inden for 30 dage. Backups slettes på deres normale rotation, maks. 90 dage. Slette-certifikat udleveres på forespørgsel.",
+    "lawHeading": "Lovvalg",
+    "law": "Dansk lov. Tvister behandles af Københavns Byret medmindre tvingende forbrugerbeskyttelsesregler bestemmer andet."
+  },
+  "subProcessors": {
+    "title": "Underleverandører",
+    "updated": "Senest opdateret: maj 2026",
+    "intro": "Grundtone bruger følgende EU-baserede underleverandører til at drive Studio. Hver leverandør har sin egen DPA + GDPR-forpligtelser — links nedenfor.",
+    "dpaLink": "Deres DPA →",
+    "notification": "Vi notificerer kunder 30 dage før tilføjelse af en ny underleverandør medmindre en akut sikkerhedsudskiftning er nødvendig. Materielle indvendinger kan medføre kontraktophør per DPA'en.",
+    "upcloud": { "role": "App-hosting, Managed PostgreSQL, Object Storage" },
+    "bunny": { "role": "CDN edge-caching for /k/-endpoints (offentlig API-nøgle i URL)" },
+    "postmark": { "role": "Transaktionel email-levering (magic links, invitationer)" },
+    "sentry": { "role": "Fejl-tracking + performance-monitoring" },
+    "github": { "role": "Kildekode-hosting + CI; ingen produktions-kundedata" }
+  },
+  "integrationGuide": {
+    "title": "Integrations-guide",
+    "intro": "Drop dine publicerede Grundtone-tokens ind i enhver frontend. Vælg den snippet der matcher din stack.",
+    "scriptTag": "Script-tag (vanilla)",
+    "keyNoticeHeading": "Mangler du en API-nøgle?",
+    "keyNoticeBody": "Opret en inde i Studio under projektets 'API keys'-tab.",
+    "keyNoticeLink": "Åbn dashboard →",
+    "sriHeading": "Produktion: pin en version + brug Sub-Resource Integrity",
+    "sriBody": "For langlivede produktions-deploys: pin til en immutable version-URL og tilføj en SRI-hash. Den tilsvarende hash serveres på samme path med .sri-suffix.",
+    "modeHeading": "Light / dark mode",
+    "modeBody": "SDK'en anvender det tema der matcher det valgte mode. Brug 'auto' for at følge styresystemets præference."
+  },
   "auth": {
     "email": "Email",
     "password": "Adgangskode",
@@ -193,6 +281,8 @@
     "title": "API-nøgler",
     "create": "Opret nøgle",
     "generate": "Generér nøgle",
+    "whatIsItLabel": "Hvad er en API-nøgle?",
+    "whatIsItTooltip": "En API-nøgle (pk_live_…) er en publishable token som din kundeapp bruger til at hente projektets design tokens. Den er sikker at sende med i klient-kode — som Stripes pk_live-nøgler. Lås den til specifikke origins nedenfor for at begrænse hvem der kan bruge den.",
     "active": "Aktive nøgler",
     "revoked": "Tilbagekaldte nøgler",
     "empty": "Ingen API-nøgler endnu.",
