@@ -351,6 +351,35 @@
     "confirmRemove": "Remove this member from the organization? They lose access to every project immediately.",
     "cannotManageHierarchy": "You can't change a role at or above your own."
   },
+  "audit": {
+    "title": "Audit log",
+    "intro": "Append-only record of organization activity.",
+    "filterByAction": "Filter by action",
+    "refresh": "Refresh",
+    "empty": "No audit events match the current filter.",
+    "olderHint": "Older events truncated. Refine the filter to see specific actions.",
+    "systemActor": "System",
+    "restrictedHeading": "Audit log is restricted",
+    "restrictedBody": "Only managers and owners can view the audit log.",
+    "actions": {
+      "all": "All actions",
+      "member.invited": "Invited member",
+      "member.invite_cancelled": "Cancelled invitation",
+      "member.invite_accepted": "Accepted invitation",
+      "member.added": "Added member",
+      "member.removed": "Removed member",
+      "member.role_changed": "Changed role",
+      "project.created": "Created project",
+      "project.member.added": "Added project member",
+      "project.member.removed": "Removed project member",
+      "project.member.role_changed": "Changed project member role",
+      "api_key.created": "Created API key",
+      "api_key.revoked": "Revoked API key",
+      "config.published": "Published configuration",
+      "config.activated": "Activated version",
+      "organization.updated": "Updated organization"
+    }
+  },
   "invitation": {
     "title": "Invitation",
     "body": "{email} has been invited to join {org} on Grundtone Studio.",

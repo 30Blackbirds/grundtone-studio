@@ -1,6 +1,7 @@
 import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -108,6 +109,15 @@ export default defineEventHandler(async (event) => {
     })
 
   // TODO #56: invalidate Bunny.net cache for /k/{anyKey}/* of this project
+
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'config.published',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { version: promoted.version },
+  })
 
   return {
     version: promoted.version,

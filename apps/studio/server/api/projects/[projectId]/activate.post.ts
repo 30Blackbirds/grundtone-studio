@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject, getObjectAsString } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -69,6 +70,15 @@ export default defineEventHandler(async (event) => {
         activatedBy: access.userId,
       },
     })
+
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'config.activated',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { version: version.version },
+  })
 
   return { version: version.version, activatedAt: new Date() }
 })

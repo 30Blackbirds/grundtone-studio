@@ -351,6 +351,35 @@
     "confirmRemove": "Fjern dette medlem fra organisationen? De mister øjeblikkeligt adgang til alle projekter.",
     "cannotManageHierarchy": "Du kan ikke ændre en rolle på eller over dit eget niveau."
   },
+  "audit": {
+    "title": "Revisionslog",
+    "intro": "Append-only register over aktivitet i organisationen.",
+    "filterByAction": "Filtrér efter handling",
+    "refresh": "Genindlæs",
+    "empty": "Ingen revisionslog-events matcher det nuværende filter.",
+    "olderHint": "Ældre events er afkortet. Forfin filteret for at se specifikke handlinger.",
+    "systemActor": "System",
+    "restrictedHeading": "Revisionslog er begrænset",
+    "restrictedBody": "Kun managers og ejere kan se revisionsloggen.",
+    "actions": {
+      "all": "Alle handlinger",
+      "member.invited": "Inviterede medlem",
+      "member.invite_cancelled": "Annullerede invitation",
+      "member.invite_accepted": "Accepterede invitation",
+      "member.added": "Tilføjede medlem",
+      "member.removed": "Fjernede medlem",
+      "member.role_changed": "Ændrede rolle",
+      "project.created": "Oprettede projekt",
+      "project.member.added": "Tilføjede projektmedlem",
+      "project.member.removed": "Fjernede projektmedlem",
+      "project.member.role_changed": "Ændrede projektmedlems rolle",
+      "api_key.created": "Oprettede API-nøgle",
+      "api_key.revoked": "Tilbagekaldte API-nøgle",
+      "config.published": "Publicerede konfiguration",
+      "config.activated": "Aktiverede version",
+      "organization.updated": "Opdaterede organisation"
+    }
+  },
   "invitation": {
     "title": "Invitation",
     "body": "{email} er blevet inviteret til at deltage i {org} på Grundtone Studio.",

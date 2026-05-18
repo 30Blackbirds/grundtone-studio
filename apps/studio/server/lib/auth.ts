@@ -9,6 +9,7 @@ import {
   ownerAc,
 } from 'better-auth/plugins/organization/access'
 import { db } from '../db'
+import { recordAuditEvent } from './audit'
 import { email } from './email'
 import { localeFromBetterAuthContext, magicLinkEmail, orgInviteEmail } from './email-templates'
 
@@ -91,6 +92,55 @@ export const auth = betterAuth({
             locale,
           ),
         })
+      },
+      // Audit hooks. Better Auth doesn't expose the H3 event here, so we
+      // record actor-from-hook and leave IP/user-agent null. The audit
+      // helper still picks up actor on endpoint-side mutations via the
+      // session, so non-Better-Auth actions stay fully attributed.
+      organizationHooks: {
+        afterAddMember: async ({ member, user, organization: org }) => {
+          await recordAuditEvent(null, {
+            organizationId: org.id,
+            action: 'member.added',
+            targetType: 'member',
+            targetId: member.userId,
+            targetLabel: user.email,
+            after: { role: member.role },
+          })
+        },
+        afterRemoveMember: async ({ member, user, organization: org }) => {
+          await recordAuditEvent(null, {
+            organizationId: org.id,
+            action: 'member.removed',
+            targetType: 'member',
+            targetId: member.userId,
+            targetLabel: user.email,
+            before: { role: member.role },
+          })
+        },
+        afterUpdateMemberRole: async ({ member, previousRole, user, organization: org }) => {
+          await recordAuditEvent(null, {
+            organizationId: org.id,
+            action: 'member.role_changed',
+            targetType: 'member',
+            targetId: member.userId,
+            targetLabel: user.email,
+            before: { role: previousRole },
+            after: { role: member.role },
+          })
+        },
+        afterCreateInvitation: async ({ invitation, inviter, organization: org }) => {
+          await recordAuditEvent(null, {
+            organizationId: org.id,
+            action: 'member.invited',
+            targetType: 'invitation',
+            targetId: invitation.id,
+            targetLabel: invitation.email,
+            after: { role: invitation.role },
+            actorUserId: inviter.user.id,
+            actorEmail: inviter.user.email,
+          })
+        },
       },
     }),
   ],

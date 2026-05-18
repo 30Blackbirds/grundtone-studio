@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { generateApiKey } from '~~/server/lib/api-keys'
 
@@ -40,6 +41,15 @@ export default defineEventHandler(async (event) => {
       allowedOrigins: apiKey.allowedOrigins,
       createdAt: apiKey.createdAt,
     })
+
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'api_key.created',
+    targetType: 'api_key',
+    targetId: created.id,
+    targetLabel: `${created.keyPrefix} (${access.project.name})`,
+    after: { environment: created.environment, allowedOrigins: created.allowedOrigins },
+  })
 
   return {
     ...created,

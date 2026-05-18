@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { auth } from '~~/server/lib/auth'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 
@@ -38,6 +39,15 @@ export default defineEventHandler(async (event) => {
       name: parsed.data.name,
     })
     .returning()
+
+  await recordAuditEvent(event, {
+    organizationId: org.id,
+    action: 'project.created',
+    targetType: 'project',
+    targetId: inserted.id,
+    targetLabel: inserted.name,
+    after: { slug: inserted.slug, name: inserted.name },
+  })
 
   return inserted
 })

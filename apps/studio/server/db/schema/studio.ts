@@ -99,6 +99,39 @@ export const projectMember = pgTable(
   ],
 )
 
+// Append-only audit log for org-level actions. Never delete rows. Captures
+// who did what, on which target, before/after state, IP, and timestamp.
+// The viewer at /orgs/[slug]/audit reads from this; mutations write via the
+// recordAuditEvent helper in server/lib/audit.ts.
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: text().notNull(),
+    actorUserId: text(),
+    // Denormalized so audit rows survive user deletion. Captured at write-time
+    // from the actor's session and stays put forever.
+    actorEmail: text(),
+    action: text().notNull(),
+    targetType: text(),
+    targetId: text(),
+    // Human-readable label captured at write-time (e.g. project name or
+    // member email at the moment of the action). Denormalized for the same
+    // reason as actorEmail.
+    targetLabel: text(),
+    before: jsonb().$type<Record<string, unknown>>(),
+    after: jsonb().$type<Record<string, unknown>>(),
+    ipAddress: text(),
+    userAgent: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('audit_log_org_created_idx').on(t.organizationId, t.createdAt),
+    index('audit_log_actor_idx').on(t.actorUserId),
+    index('audit_log_action_idx').on(t.action),
+  ],
+)
+
 export const projectInvitation = pgTable(
   'project_invitation',
   {
