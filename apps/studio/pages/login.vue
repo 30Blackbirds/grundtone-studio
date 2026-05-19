@@ -18,6 +18,14 @@
     const res = await signIn.email({ email: email.value, password: password.value })
     pending.value = false
     if (res.error) {
+      // Better Auth flags pending verification with code EMAIL_NOT_VERIFIED;
+      // bounce the user to the inbox-check page (and pre-fill the resend
+      // form) instead of leaving them stuck on a generic login error.
+      const code = (res.error as { code?: string }).code
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
+        return
+      }
       error.value = res.error.message ?? t('auth.login.error')
       return
     }

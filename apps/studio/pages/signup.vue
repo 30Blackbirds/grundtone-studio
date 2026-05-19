@@ -17,15 +17,20 @@
       email: email.value,
       password: password.value,
       name: name.value,
+      // After the user clicks the verification link, Better Auth signs them
+      // in and redirects here. /dashboard's empty-state pushes new users into
+      // the onboarding wizard automatically.
+      callbackURL: '/dashboard',
     })
     pending.value = false
     if (res.error) {
       error.value = res.error.message ?? t('auth.signup.error')
       return
     }
-    // First-time users go through onboarding; existing users with no orgs
-    // hit the same path via dashboard.vue's empty-state redirect.
-    await navigateTo('/onboarding')
+    // requireEmailVerification: true blocks sign-in until the verification
+    // link is clicked. Park the user on /verify-email; the Better Auth flow
+    // sends them to /dashboard via callbackURL once the email is confirmed.
+    await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
   }
 </script>
 

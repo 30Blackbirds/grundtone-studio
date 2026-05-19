@@ -117,6 +117,7 @@
       "loginLink": "Log ind",
       "error": "Kunne ikke oprette konto"
     },
+    "verifyRequired": "Bekræft din e-mail før du logger ind. Tjek din indbakke for linket.",
     "magicLink": {
       "subject": "Log ind på Grundtone Studio",
       "body": "Klik på linket nedenfor for at logge ind:",
@@ -350,6 +351,18 @@
     "removeAction": "Fjern fra organisationen",
     "confirmRemove": "Fjern dette medlem fra organisationen? De mister øjeblikkeligt adgang til alle projekter.",
     "cannotManageHierarchy": "Du kan ikke ændre en rolle på eller over dit eget niveau."
+  },
+  "verifyEmail": {
+    "title": "Tjek din indbakke",
+    "bodyWithEmail": "Vi har sendt et verifikationslink til {email}. Klik på linket for at fuldføre din tilmelding.",
+    "bodyGeneric": "Vi har sendt et verifikationslink til din e-mail. Klik på linket for at fuldføre din tilmelding.",
+    "didntArriveHint": "Linket kan tage et minut at nå frem. Husk at tjekke spam-mappen.",
+    "resend": "Send verifikationsmail igen",
+    "resending": "Sender…",
+    "resentHeading": "Verifikationsmail sendt igen",
+    "resentBody": "Vi har sendt endnu et verifikationslink til {email}.",
+    "resendError": "Kunne ikke sende verifikationsmail igen",
+    "backToLogin": "Tilbage til login"
   },
   "audit": {
     "title": "Revisionslog",
