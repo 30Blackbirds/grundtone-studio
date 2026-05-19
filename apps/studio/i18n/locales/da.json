@@ -261,6 +261,8 @@
     "typography": "Typografi",
     "radius": "Border radius",
     "spacing": "Spacing",
+    "contrast": "Kontrast (WCAG 2.1)",
+    "contrastHint": "Parrene nedenfor tjekkes mod WCAG 2.1 — AAA for komfortabel læsning, AA for det lovmæssige minimum.",
     "color": {
       "primary": "Primær",
       "primaryLight": "Primær — lys",
@@ -278,6 +280,23 @@
     "font": {
       "base": "Brødtekst-skrifttype",
       "heading": "Overskrift-skrifttype"
+    }
+  },
+  "contrast": {
+    "unparseable": "Kan ikke læse denne farve — brug #RRGGBB",
+    "level": {
+      "AAA": "AAA",
+      "AA": "AA",
+      "AA-large": "AA (kun store skrifttyper)",
+      "fail": "Fejl"
+    },
+    "pair": {
+      "textOnBackground": "Tekst på baggrund",
+      "textOnSurface": "Tekst på overflade",
+      "textSecondaryOnBackground": "Sekundær tekst på baggrund",
+      "textTertiaryOnBackground": "Tertiær tekst på baggrund",
+      "onPrimaryOnPrimary": "On-primær på primær",
+      "onPrimaryOnPrimaryDark": "On-primær på primær mørk"
     }
   },
   "apiKeys": {

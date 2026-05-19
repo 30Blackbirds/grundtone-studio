@@ -110,6 +110,47 @@
     </section>
 
     <section>
+      <h3 class="mt-0 mb-3">{{ t('tokens.contrast') }}</h3>
+      <p class="text-tertiary text-sm mt-0 mb-3">{{ t('tokens.contrastHint') }}</p>
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Each pair below covers a real visual surface in the rendered theme.
+             AAA = comfortable for body copy; AA = legal minimum; AA-large only
+             passes for headings or UI; fail = needs fixing. -->
+        <ContrastBadge
+          :label="t('contrast.pair.textOnBackground')"
+          :fg="colors.text"
+          :bg="colors.background"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.textOnSurface')"
+          :fg="colors.text"
+          :bg="colors.surface"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.textSecondaryOnBackground')"
+          :fg="colors.textSecondary"
+          :bg="colors.background"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.textTertiaryOnBackground')"
+          :fg="colors.textTertiary"
+          :bg="colors.background"
+          size="large"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.onPrimaryOnPrimary')"
+          :fg="colors.onPrimary"
+          :bg="colors.primary"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.onPrimaryOnPrimaryDark')"
+          :fg="colors.onPrimary"
+          :bg="colors.primaryDark"
+        />
+      </div>
+    </section>
+
+    <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.typography') }}</h3>
       <div class="grid grid-cols-2 gap-4">
         <GTInput

@@ -261,6 +261,8 @@
     "typography": "Typography",
     "radius": "Border radius",
     "spacing": "Spacing",
+    "contrast": "Contrast (WCAG 2.1)",
+    "contrastHint": "Pairs below check against WCAG 2.1 — AAA for comfortable reading, AA for the legal minimum.",
     "color": {
       "primary": "Primary",
       "primaryLight": "Primary — light",
@@ -278,6 +280,23 @@
     "font": {
       "base": "Body font family",
       "heading": "Heading font family"
+    }
+  },
+  "contrast": {
+    "unparseable": "Can't read this color — use #RRGGBB",
+    "level": {
+      "AAA": "AAA",
+      "AA": "AA",
+      "AA-large": "AA (large only)",
+      "fail": "Fail"
+    },
+    "pair": {
+      "textOnBackground": "Text on background",
+      "textOnSurface": "Text on surface",
+      "textSecondaryOnBackground": "Secondary text on background",
+      "textTertiaryOnBackground": "Tertiary text on background",
+      "onPrimaryOnPrimary": "On-primary on primary",
+      "onPrimaryOnPrimaryDark": "On-primary on primary dark"
     }
   },
   "apiKeys": {
