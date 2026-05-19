@@ -99,6 +99,37 @@ export const projectMember = pgTable(
   ],
 )
 
+// Postmark delivery / bounce / spam-complaint events, captured via the
+// /api/email/webhook receiver. Append-only — used to attribute hard bounces
+// to a recipient and to flag spam complaints. The full webhook body is
+// preserved in `payload` for forensics if Postmark's structured fields don't
+// cover a future event type.
+export const emailEvent = pgTable(
+  'email_event',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    // Postmark's MessageID from the original send. Pairs the event back to
+    // the outbound message even when the recipient address has been
+    // suppressed since.
+    messageId: text(),
+    recipient: text().notNull(),
+    // Delivery | Bounce | SpamComplaint | Open | Click | SubscriptionChange.
+    // Stored verbatim from Postmark's RecordType field.
+    eventType: text().notNull(),
+    // Set on Bounce events: HardBounce | SoftBounce | Transient | Blocked …
+    // Empty for Delivery/SpamComplaint/Open/Click.
+    bounceType: text(),
+    description: text(),
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('email_event_recipient_idx').on(t.recipient),
+    index('email_event_message_idx').on(t.messageId),
+    index('email_event_received_idx').on(t.receivedAt),
+  ],
+)
+
 // Append-only audit log for org-level actions. Never delete rows. Captures
 // who did what, on which target, before/after state, IP, and timestamp.
 // The viewer at /orgs/[slug]/audit reads from this; mutations write via the
