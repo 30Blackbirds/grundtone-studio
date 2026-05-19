@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  await requireProjectAccess(event, projectId)
+  await requireProjectAccess(event, projectId, 'admin')
 
   const keys = await db
     .select({

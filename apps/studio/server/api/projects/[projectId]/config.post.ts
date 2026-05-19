@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  const access = await requireProjectAccess(event, projectId)
+  const access = await requireProjectAccess(event, projectId, 'editor')
 
   const parsed = tokensSchema.safeParse(await readBody(event))
   if (!parsed.success) {

@@ -2,8 +2,19 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
 
   const { authClient } = await import('~~/lib/auth-client')
-  const publicPaths = new Set(['/login', '/signup'])
-  const isPublicPath = publicPaths.has(to.path) || to.path.startsWith('/invitations/')
+
+  // Pre-auth routes: anyone can reach these without a session. Auth pages
+  // (/login, /signup) get a special-case post-auth redirect to /dashboard.
+  const authPaths = new Set(['/login', '/signup'])
+  const publicPaths = new Set([
+    ...authPaths,
+    '/privacy',
+    '/dpa',
+    '/sub-processors',
+    '/docs/install',
+  ])
+  const isPublicPath =
+    publicPaths.has(to.path) || to.path.startsWith('/invitations/') || to.path.startsWith('/docs/')
 
   const session = await authClient.getSession()
   const authed = Boolean(session.data?.session)
@@ -12,7 +23,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
   }
 
-  if (authed && publicPaths.has(to.path)) {
+  if (authed && authPaths.has(to.path)) {
     return navigateTo('/dashboard')
   }
 })

@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { auth } from '~~/server/lib/auth'
+import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(120),
@@ -22,10 +24,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
   }
 
-  const org = await auth.api.getFullOrganization({
-    headers: event.headers,
-    query: { organizationSlug: parsed.data.organizationSlug },
-  })
+  const org = await lookupOrgBySlug(event, parsed.data.organizationSlug)
   if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
 
   const member = org.members?.find((m) => m.userId === session.user.id)
@@ -40,6 +39,15 @@ export default defineEventHandler(async (event) => {
       name: parsed.data.name,
     })
     .returning()
+
+  await recordAuditEvent(event, {
+    organizationId: org.id,
+    action: 'project.created',
+    targetType: 'project',
+    targetId: inserted.id,
+    targetLabel: inserted.name,
+    after: { slug: inserted.slug, name: inserted.name },
+  })
 
   return inserted
 })

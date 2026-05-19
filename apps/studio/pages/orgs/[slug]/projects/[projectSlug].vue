@@ -7,7 +7,6 @@
   const route = useRoute()
   const slug = computed(() => route.params.slug as string)
   const projectSlug = computed(() => route.params.projectSlug as string)
-  const { isAdmin } = useOrgContext()
 
   interface ProjectRow {
     id: string
@@ -25,6 +24,14 @@
       return projects.find((p) => p.slug === projectSlug.value) ?? null
     },
   )
+
+  // Two-layer permissions: effective project role drives every UI gate on
+  // this page. Sentry-style mapping (see server/lib/project-access.ts):
+  // org owner/manager → project:admin; org admin/member → project:viewer;
+  // org billing → no access. Direct project members get exactly the role they
+  // were invited for, and the effective role is max(org-mapped, direct).
+  const projectId = computed(() => project.value?.id ?? null)
+  const { canEdit, canManage } = useProjectRole(projectId)
 
   interface ConfigResponse {
     draft: { id: string; version: number; tokens: Tokens } | null
@@ -122,7 +129,7 @@
           {{ t('project.discard') }}
         </GTButton>
         <GTButton
-          v-if="isDirty"
+          v-if="isDirty && canEdit"
           variant="secondary"
           :loading="saving"
           :disabled="publishing"
@@ -131,7 +138,7 @@
           {{ t('project.saveDraft') }}
         </GTButton>
         <GTButton
-          v-if="isAdmin && (isDirty || hasDraft)"
+          v-if="canEdit && (isDirty || hasDraft)"
           :loading="publishing"
           :disabled="saving"
           @click="publish"
@@ -149,6 +156,7 @@
         { id: 'tokens', label: t('project.tabTokens') },
         { id: 'apiKeys', label: t('apiKeys.title') },
         { id: 'versions', label: t('versions.title') },
+        { id: 'members', label: t('projectMembers.title') },
       ]"
     >
       <GTTabPanel id="tokens">
@@ -163,11 +171,15 @@
       </GTTabPanel>
 
       <GTTabPanel id="apiKeys">
-        <ApiKeyManager :project-id="project.id" :can-manage="isAdmin" />
+        <ApiKeyManager :project-id="project.id" :can-manage="canManage" />
       </GTTabPanel>
 
       <GTTabPanel id="versions">
-        <VersionHistory :project-id="project.id" :can-manage="isAdmin" @activated="refreshConfig" />
+        <VersionHistory :project-id="project.id" :can-manage="canEdit" @activated="refreshConfig" />
+      </GTTabPanel>
+
+      <GTTabPanel id="members">
+        <ProjectMembersManager :project-id="project.id" :can-manage="canManage" />
       </GTTabPanel>
     </GTTabs>
   </section>

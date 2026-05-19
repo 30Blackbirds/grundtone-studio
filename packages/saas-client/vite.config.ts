@@ -1,9 +1,38 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import dts from 'vite-plugin-dts'
 import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
+
+/**
+ * Emit a SHA-384 hash file next to every output bundle, so consumers can
+ * pin the script-tag with a Sub-Resource Integrity attribute.
+ *
+ *   <script src="cdn.grundtone.io/client/v1.0.0.js"
+ *           integrity="sha384-<hash from v1.0.0.js.sri>"
+ *           crossorigin="anonymous"></script>
+ *
+ * sri-release.yml uploads both the bundle and its .sri file so the CDN
+ * serves matching pairs.
+ */
+function sriHashes(): Plugin {
+  return {
+    name: 'sri-hashes',
+    apply: 'build',
+    closeBundle() {
+      const dist = resolve(__dirname, 'dist')
+      for (const file of readdirSync(dist)) {
+        if (!/\.(js|mjs)$/.test(file)) continue
+        const body = readFileSync(resolve(dist, file))
+        const hash = createHash('sha384').update(body).digest('base64')
+        writeFileSync(resolve(dist, `${file}.sri`), `sha384-${hash}\n`)
+      }
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [dts({ rollupTypes: true })],
+  plugins: [dts({ rollupTypes: true }), sriHashes()],
   define: {
     // Auto-init from <script data-api-key="..."> only fires when document.currentScript
     // is non-null AND this flag is true. ESM bundlers skip auto-init because

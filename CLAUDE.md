@@ -94,8 +94,16 @@ refactor), it cannot be marked completed without a test that exercises it.
 ## Architecture invariants
 
 - **All API endpoints validate via zod.** No raw `readBody()`.
-- **All project endpoints go through `requireProjectAccess()`** in `server/lib/project-access.ts`
-  for the membership check. Admin-only actions also call `requireAdmin(role)`.
+- **All project endpoints go through `requireProjectAccess(event, projectId, min='viewer')`** in
+  `server/lib/project-access.ts`. The third argument is the minimum project role required: `viewer`
+  for reads, `editor` for tokens/publish/activate, `admin` for keys + members.
+- **Org roles** are Sentry-style 5-tier: `billing → member → admin → manager → owner`. Skaberen af
+  en org får `owner`. Org-level helpers (`canManageOrgMembers`, `canManageBilling`,
+  `canCreateProjects`) live in `useOrgRoles` (client) and `orgRoleHelpers` (server).
+- **Effective project role** = `max(org-role-mapped, direct-project-role)`. Org `owner`/`manager` →
+  project `admin`; org `admin`/`member` → project `viewer`; org `billing` → `null`. Direct project
+  members get exactly the role they were invited for. `getProjectRole` is the only place this
+  mapping is allowed to live.
 - **API keys: hash SHA-256 at rest, plaintext shown once.** Don't change the storage format.
 - **Storage paths:** `p/{projectId}/v{n}/tokens.{json,css}` are immutable;
   `p/{projectId}/current.{json,css}` is overwritten each publish.
@@ -120,6 +128,20 @@ refactor), it cannot be marked completed without a test that exercises it.
   external APIs).
 - Default exports only when the framework requires them (Nuxt pages, Nitro handlers, Vue
   components). Otherwise named exports.
+
+## Refactor over duplicate
+
+When a feature replaces or supersedes existing code, **refactor or delete the old code in the same
+PR**. Don't leave parallel implementations, unused helpers, or stale UI gates behind. Specifically:
+
+- A new permission check superseding `isAdmin`/`requireAdmin` means every existing call site moves
+  to the new helper. The old helper either gets deleted or becomes a thin alias with a deprecation
+  comment that points to its retirement task.
+- A schema change that re-models an existing relationship updates the migration AND the seed AND the
+  tests AND the docs — not just the new tables.
+- A new component that fits an old component's spot replaces it. The old file gets deleted unless
+  it's still consumed elsewhere.
+- "Leaving the old code around just in case" is not a justification. Git keeps it around.
 
 ## When in doubt
 

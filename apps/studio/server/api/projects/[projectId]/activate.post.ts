@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
-import { requireAdmin, requireProjectAccess } from '~~/server/lib/project-access'
+import { recordAuditEvent } from '~~/server/lib/audit'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject, getObjectAsString } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
 
@@ -12,8 +13,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  const access = await requireProjectAccess(event, projectId)
-  requireAdmin(access.role)
+  const access = await requireProjectAccess(event, projectId, 'editor')
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) {
@@ -70,6 +70,15 @@ export default defineEventHandler(async (event) => {
         activatedBy: access.userId,
       },
     })
+
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'config.activated',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { version: version.version },
+  })
 
   return { version: version.version, activatedAt: new Date() }
 })

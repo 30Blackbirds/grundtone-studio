@@ -17,6 +17,8 @@ const FILE_MAP: Record<string, { source: string; contentType: string }> = {
   'v1.mjs': { source: 'index.mjs', contentType: 'application/javascript' },
   'v1.js.map': { source: 'index.umd.js.map', contentType: 'application/json' },
   'v1.mjs.map': { source: 'index.mjs.map', contentType: 'application/json' },
+  'v1.js.sri': { source: 'index.umd.js.sri', contentType: 'text/plain' },
+  'v1.mjs.sri': { source: 'index.mjs.sri', contentType: 'text/plain' },
 }
 
 export default defineEventHandler(async (event) => {

@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
-import { requireAdmin, requireProjectAccess } from '~~/server/lib/project-access'
+import { recordAuditEvent } from '~~/server/lib/audit'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 import { generateApiKey } from '~~/server/lib/api-keys'
 
 const bodySchema = z.object({
@@ -13,8 +14,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  const access = await requireProjectAccess(event, projectId)
-  requireAdmin(access.role)
+  const access = await requireProjectAccess(event, projectId, 'admin')
 
   const parsed = bodySchema.safeParse((await readBody(event)) ?? {})
   if (!parsed.success) {
@@ -41,6 +41,15 @@ export default defineEventHandler(async (event) => {
       allowedOrigins: apiKey.allowedOrigins,
       createdAt: apiKey.createdAt,
     })
+
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'api_key.created',
+    targetType: 'api_key',
+    targetId: created.id,
+    targetLabel: `${created.keyPrefix} (${access.project.name})`,
+    after: { environment: created.environment, allowedOrigins: created.allowedOrigins },
+  })
 
   return {
     ...created,

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-  const { activeOrg, activeSlug, activeProjectSlug, projects } = useOrgContext()
+  const { activeOrg, activeSlug, activeProjectSlug, projects, canManageOrgMembers } =
+    useOrgContext()
   const route = useRoute()
 
-  const isMembersActive = computed(() => route.path === `/orgs/${activeSlug.value}/members`)
+  const isMembersActive = computed(() => route.path.startsWith(`/orgs/${activeSlug.value}/members`))
+  const isAuditActive = computed(() => route.path === `/orgs/${activeSlug.value}/audit`)
 </script>
 
 <template>
@@ -39,6 +41,15 @@
             :class="{ 'bg-surface-raised font-bold': isMembersActive }"
           >
             {{ $t('members.title') }}
+          </NuxtLink>
+        </li>
+        <li v-if="canManageOrgMembers">
+          <NuxtLink
+            :to="`/orgs/${activeSlug}/audit`"
+            class="block p-2 rounded text-sm no-underline text-inherit hover:bg-surface-raised"
+            :class="{ 'bg-surface-raised font-bold': isAuditActive }"
+          >
+            {{ $t('audit.title') }}
           </NuxtLink>
         </li>
       </ul>

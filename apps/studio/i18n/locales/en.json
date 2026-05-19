@@ -11,6 +11,94 @@
     "loading": "Loading …",
     "language": "Language"
   },
+  "footer": {
+    "installGuide": "Install guide",
+    "privacy": "Privacy",
+    "dpa": "DPA",
+    "subProcessors": "Sub-processors"
+  },
+  "privacy": {
+    "title": "Privacy policy",
+    "updated": "Last updated: May 2026",
+    "intro": "Grundtone Studio is a platform for configuring and distributing design tokens. We process the minimum personal data required to deliver that service. This page summarises what we collect, why, how long we keep it, and how to contact us.",
+    "controllerHeading": "Data controller",
+    "controller": "ASP Productions ApS, CVR pending — operating as KlangHaus. The data controller is responsible for what's described below; for questions, write to the contact address at the bottom.",
+    "dataHeading": "What we collect",
+    "data": {
+      "account": "Account data: name, email, hashed password (Better Auth). Used to authenticate and to label content you create.",
+      "session": "Session data: a strictly necessary session cookie + the IP address and user-agent of your login. Used to keep you signed in and to detect suspicious activity.",
+      "tokens": "Project data: design tokens, version history, API keys (hashed), member roles. Stored to deliver the product.",
+      "cdn": "CDN access logs: API key prefix, origin, request timing. Retained 30 days for abuse detection."
+    },
+    "legalHeading": "Legal basis",
+    "legal": "Contract (delivering Studio to you) for account, session, and project data. Legitimate interest (security + abuse prevention) for access logs. We do not run marketing tracking and have no advertising cookies.",
+    "retentionHeading": "Retention",
+    "retention": {
+      "account": "Account data: until you delete the account, then deleted within 30 days.",
+      "session": "Sessions: 30 days of inactivity, then expired automatically.",
+      "tokens": "Project data: kept while the org exists. Deleting the org cascades.",
+      "logs": "Access logs: 30 days, then dropped."
+    },
+    "rightsHeading": "Your rights",
+    "rights": "You can request access, correction, deletion, restriction, and data portability under GDPR. We respond within one month. Write to the contact address below or open the account-deletion flow inside Studio (post-MVP).",
+    "subProcessorsHeading": "Sub-processors",
+    "subProcessors": "We use a small set of EU-located processors to operate Studio. The full list is at",
+    "subProcessorsLink": "Sub-processors",
+    "contactHeading": "Contact"
+  },
+  "dpa": {
+    "title": "Data processing agreement",
+    "updated": "Last updated: May 2026",
+    "intakeHeading": "Need a signed copy?",
+    "intakeBody": "This page is a public template covering what our DPA contains. To get a signed copy on your company letterhead, write to",
+    "intro": "This template summarises the Data Processing Agreement (DPA) Grundtone (ASP Productions ApS) offers to organisations that use Studio as a data processor under GDPR art. 28. The full signable contract is provided on request.",
+    "scopeHeading": "Scope",
+    "scope": "Grundtone acts as data processor for design tokens, organisation membership data, and project content that your team uploads. You remain the data controller for that data.",
+    "processingHeading": "Processing",
+    "processing": {
+      "purpose": "Purpose: deliver Studio's design-token configuration and CDN distribution service.",
+      "duration": "Duration: until contract termination or your written request to delete.",
+      "dataTypes": "Data types: account info, design tokens, API keys (hashed), CDN access logs.",
+      "subjects": "Data subjects: your organisation's admins, designers, and end users whose browsers fetch tokens via your API key."
+    },
+    "securityHeading": "Security measures",
+    "security": {
+      "encryption": "TLS in transit, AES-256 at rest on UpCloud Managed Postgres + Object Storage.",
+      "access": "Role-based access: only authorised KlangHaus personnel can access production systems; access is logged.",
+      "audit": "Audit log of admin actions retained for 12 months.",
+      "incident": "Personal data breach notification to you within 72 hours of discovery."
+    },
+    "subProcessorsHeading": "Sub-processors",
+    "subProcessors": "We use the EU-located sub-processors listed at",
+    "terminationHeading": "Termination",
+    "termination": "On termination, all your data is deleted from production systems within 30 days. Backups are purged on their normal rotation, max 90 days. A deletion certificate is available on request.",
+    "lawHeading": "Governing law",
+    "law": "Danish law. Disputes go to the Court of Copenhagen unless mandatory consumer-protection rules apply differently."
+  },
+  "subProcessors": {
+    "title": "Sub-processors",
+    "updated": "Last updated: May 2026",
+    "intro": "Grundtone uses the following EU-located sub-processors to operate Studio. Each provider has its own DPA + GDPR commitments — links below.",
+    "dpaLink": "Their DPA →",
+    "notification": "We notify customers 30 days before adding a new sub-processor unless an urgent security replacement is required. Material objections can lead to contract termination per the DPA.",
+    "upcloud": { "role": "Application hosting, Managed PostgreSQL, Object Storage" },
+    "bunny": { "role": "CDN edge caching for /k/ endpoints (public API key in URL)" },
+    "postmark": { "role": "Transactional email delivery (magic links, invitations)" },
+    "sentry": { "role": "Error tracking + performance monitoring" },
+    "github": { "role": "Source code hosting + CI; no production customer data" }
+  },
+  "integrationGuide": {
+    "title": "Integration guide",
+    "intro": "Drop your published Grundtone tokens into any frontend. Pick the snippet that matches your stack.",
+    "scriptTag": "Script tag (vanilla)",
+    "keyNoticeHeading": "Need an API key first?",
+    "keyNoticeBody": "Create one inside Studio under the project's 'API keys' tab.",
+    "keyNoticeLink": "Open dashboard →",
+    "sriHeading": "Production: pin a version + use Sub-Resource Integrity",
+    "sriBody": "For long-lived production deploys, pin to an immutable version URL and add an SRI hash. The corresponding hash is served at the same path with a .sri suffix.",
+    "modeHeading": "Light / dark mode",
+    "modeBody": "The SDK applies the theme matching the chosen mode. Use 'auto' to follow the OS preference."
+  },
   "auth": {
     "email": "Email",
     "password": "Password",
@@ -57,6 +145,86 @@
     "saveDraft": "Save draft",
     "publish": "Publish",
     "discard": "Discard changes"
+  },
+  "projectMembers": {
+    "title": "Members",
+    "invite": "Invite to project",
+    "send": "Send invitation",
+    "role": "Role",
+    "direct": "Direct project members",
+    "directEmpty": "No direct members yet. Invite someone to scope their access to just this project.",
+    "inherited": "Org members (inherited access)",
+    "inheritedHelp": "These people have access via the organization. Manage them on the org Members page.",
+    "pending": "Pending invitations",
+    "remove": "Remove",
+    "cancelInvite": "Cancel",
+    "confirmRemove": "Remove this person from the project? Their org role is unaffected.",
+    "roles": {
+      "viewer": "Viewer",
+      "editor": "Editor",
+      "admin": "Admin"
+    },
+    "orgRoles": {
+      "owner": "Owner",
+      "manager": "Manager",
+      "admin": "Admin",
+      "member": "Member",
+      "billing": "Billing"
+    }
+  },
+  "projectInvitation": {
+    "title": "You're invited",
+    "body": "{email} was invited to the project \"{project}\" in {org} as {role}.",
+    "expired": "This invitation has expired — ask the sender to issue a new one."
+  },
+  "onboarding": {
+    "welcomeKicker": "Welcome to",
+    "welcomeTitle": "Grundtone Studio",
+    "skip": "Skip to dashboard",
+    "continue": "Continue",
+    "back": "Back",
+    "steps": {
+      "org": "Organization",
+      "project": "Project",
+      "tokens": "Brand",
+      "install": "Install"
+    },
+    "org": {
+      "title": "Create your organization",
+      "subtitle": "An organization holds your projects, members, and themes.",
+      "nameLabel": "Organization name",
+      "nameHelp": "The name your team will see.",
+      "slugLabel": "Slug",
+      "slugHelp": "Used in URLs. Lowercase letters, numbers, and dashes only.",
+      "error": "Could not create organization"
+    },
+    "project": {
+      "title": "Create your first project",
+      "subtitle": "Each organization can have many projects. {org} can always add more later.",
+      "nameLabel": "Project name",
+      "nameHelp": "E.g. 'Main', 'Marketing site', 'Mobile app'.",
+      "slugLabel": "Slug",
+      "slugHelp": "Used in URLs.",
+      "error": "Could not create project",
+      "noOrg": "We lost your organization — go back and try again."
+    },
+    "tokens": {
+      "title": "Pick your primary color",
+      "subtitle": "It drives the look of buttons, links, and highlights. You can fine-tune everything on the next page.",
+      "preview": "Preview",
+      "error": "Could not save tokens",
+      "noProject": "We lost your project — go back and try again."
+    },
+    "install": {
+      "title": "Almost there",
+      "subtitle": "We're publishing your tokens and minting your first API key.",
+      "publishing": "Publishing …",
+      "successHeading": "Done!",
+      "successBody": "Your tokens are live on the CDN and your API key is ready. Drop one of the snippets below into your customer app.",
+      "error": "Could not finish setup",
+      "retry": "Try again",
+      "finish": "Go to your project"
+    }
   },
   "changelog": {
     "title": "What's new",
@@ -115,6 +283,8 @@
     "title": "API keys",
     "create": "Create key",
     "generate": "Generate key",
+    "whatIsItLabel": "What is an API key?",
+    "whatIsItTooltip": "An API key (pk_live_…) is a publishable token your customer app uses to fetch this project's design tokens. It's safe to ship in client code — like Stripe's pk_live keys. Lock it to specific origins below to limit who can use it.",
     "active": "Active keys",
     "revoked": "Revoked keys",
     "empty": "No API keys yet.",
@@ -144,8 +314,70 @@
     "inviteError": "Could not send invitation",
     "roles": {
       "owner": "Owner",
+      "manager": "Manager",
       "admin": "Admin",
-      "member": "Member"
+      "member": "Member",
+      "billing": "Billing"
+    },
+    "roleDescriptions": {
+      "owner": "Unrestricted access to the organization, its data, and its settings. Can add, modify, and delete projects and members, as well as make billing and plan changes.",
+      "manager": "Gains admin access on all projects as well as the ability to add and remove organization members.",
+      "admin": "Admin privileges on projects they are a member of. They can create new projects, and remove projects they hold membership on. They can manage memberships of projects they are members of. By default they can invite members to the organization.",
+      "member": "Members can view most data within the organization and act on the projects they are added to. By default they can invite members to the organization.",
+      "billing": "Can manage subscription and billing details."
+    },
+    "manage": "Manage"
+  },
+  "memberDetail": {
+    "settings": "Settings",
+    "loading": "Loading…",
+    "basics": "Basics",
+    "status": "Status",
+    "statusActive": "Active",
+    "added": "Added",
+    "currentRole": "Current role",
+    "organizationRole": "Organization role",
+    "projectsHeading": "Projects",
+    "projectRole": "Project role",
+    "addToProject": "Add to project",
+    "direct": "Direct",
+    "noProjects": "No direct project memberships. Access is inherited from the organization role.",
+    "inheritedNotice": "This user's organization role as {role} grants them a minimum project-level role of {projectRole} on every project.",
+    "save": "Save member",
+    "saveError": "Could not update member",
+    "removeHeading": "Remove from organization",
+    "removeBody": "Remove this person from the organization. They lose access to every project immediately.",
+    "removeAction": "Remove from organization",
+    "confirmRemove": "Remove this member from the organization? They lose access to every project immediately.",
+    "cannotManageHierarchy": "You can't change a role at or above your own."
+  },
+  "audit": {
+    "title": "Audit log",
+    "intro": "Append-only record of organization activity.",
+    "filterByAction": "Filter by action",
+    "refresh": "Refresh",
+    "empty": "No audit events match the current filter.",
+    "olderHint": "Older events truncated. Refine the filter to see specific actions.",
+    "systemActor": "System",
+    "restrictedHeading": "Audit log is restricted",
+    "restrictedBody": "Only managers and owners can view the audit log.",
+    "actions": {
+      "all": "All actions",
+      "member.invited": "Invited member",
+      "member.invite_cancelled": "Cancelled invitation",
+      "member.invite_accepted": "Accepted invitation",
+      "member.added": "Added member",
+      "member.removed": "Removed member",
+      "member.role_changed": "Changed role",
+      "project.created": "Created project",
+      "project.member.added": "Added project member",
+      "project.member.removed": "Removed project member",
+      "project.member.role_changed": "Changed project member role",
+      "api_key.created": "Created API key",
+      "api_key.revoked": "Revoked API key",
+      "config.published": "Published configuration",
+      "config.activated": "Activated version",
+      "organization.updated": "Updated organization"
     }
   },
   "invitation": {

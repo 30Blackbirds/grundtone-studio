@@ -63,16 +63,47 @@ export const useOrgContext = () => {
     () => `org-context-member-${activeOrg.value?.id ?? 'none'}`,
     async () => {
       if (!activeOrg.value?.id) return null
-      const res = await organization.getActiveMember({
-        fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
-      })
-      return res.data ?? null
+      try {
+        const res = await organization.getActiveMember({
+          fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+        })
+        return res.data ?? null
+      } catch (err) {
+        // Stale session: the session cookie's activeOrganizationId points at
+        // an org that no longer exists (typical after a DB reseed during dev,
+        // or right after a user got removed from an org). Clear it so the
+        // next page load isn't trapped in a 404 loop.
+        const msg = (err as { message?: string } | null)?.message ?? String(err)
+        if (/not found|404/i.test(msg)) {
+          await organization.setActive({ organizationId: null }).catch(() => {})
+        }
+        return null
+      }
     },
     { default: () => null, watch: [activeOrg] },
   )
 
-  const isOwner = computed(() => activeMember.value?.role === 'owner')
-  const isAdmin = computed(() => activeMember.value?.role === 'admin' || isOwner.value)
+  // Sentry-style 5-tier org roles (see server/lib/project-access.ts for the
+  // canonical mapping). UI gates derive from these flags rather than reading
+  // role strings directly, so a role rename doesn't ripple through templates.
+  //
+  // Better Auth's client types narrow Member.role to 'owner' | 'admin' | 'member',
+  // so we widen via string at the read boundary — the actual values are
+  // validated by the server-side ac config in server/lib/auth.ts.
+  type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
+  const role = computed<OrgRole | null>(() => {
+    const r = activeMember.value?.role as string | undefined
+    return r === 'billing' || r === 'member' || r === 'admin' || r === 'manager' || r === 'owner'
+      ? r
+      : null
+  })
+  const isOwner = computed(() => role.value === 'owner')
+  const isManager = computed(() => role.value === 'manager')
+  const isAdmin = computed(() => role.value === 'admin')
+  const canManageOrgMembers = computed(() => isOwner.value || isManager.value)
+  const canManageBilling = computed(() => isOwner.value || role.value === 'billing')
+  const canCreateProjects = computed(() => isOwner.value || isManager.value || isAdmin.value)
+  const canViewProjects = computed(() => Boolean(role.value) && role.value !== 'billing')
 
   return {
     orgs,
@@ -81,8 +112,14 @@ export const useOrgContext = () => {
     activeProjectSlug,
     projects,
     activeMember,
+    role,
     isOwner,
+    isManager,
     isAdmin,
+    canManageOrgMembers,
+    canManageBilling,
+    canCreateProjects,
+    canViewProjects,
     refreshOrgs,
     refreshProjects,
     refreshActiveMember,
