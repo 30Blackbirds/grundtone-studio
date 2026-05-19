@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from 'nodemailer'
+import { withRetry } from './retry'
 
 export type SendEmailArgs = {
   to: string
@@ -38,6 +39,20 @@ export const email: EmailService = {
       return
     }
 
-    await transporter.sendMail({ from, to, subject, text, html })
+    // Postmark + STARTTLS occasionally fails on transient network blips
+    // (DNS resync, connection reset). 3 attempts with exponential backoff
+    // covers ~1.5s of disruption — enough for typical hiccups, short
+    // enough that the user's request doesn't hang. Permanent failures
+    // (auth, sender-signature) still bubble up to the caller after the
+    // last attempt.
+    await withRetry(
+      () => {
+        // `transporter` is non-null inside this branch; capture it locally
+        // so the closure doesn't have to re-narrow on every retry.
+        const t = transporter!
+        return t.sendMail({ from, to, subject, text, html })
+      },
+      { attempts: 3, initialDelayMs: 100, factor: 2, label: `email:${to}` },
+    )
   },
 }
