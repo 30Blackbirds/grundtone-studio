@@ -11,7 +11,12 @@ import {
 import { db } from '../db'
 import { recordAuditEvent } from './audit'
 import { email } from './email'
-import { localeFromBetterAuthContext, magicLinkEmail, orgInviteEmail } from './email-templates'
+import {
+  localeFromBetterAuthContext,
+  magicLinkEmail,
+  orgInviteEmail,
+  verifyEmailEmail,
+} from './email-templates'
 
 // Sentry-style 5-tier org roles. Better Auth ships with owner/admin/member;
 // we add `billing` and `manager` so the invite/update endpoints don't reject
@@ -56,7 +61,28 @@ export const auth = betterAuth({
         ],
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    // Sign-in is blocked until the user clicks the verification link; the
+    // verify endpoint redirects to /dashboard on success.
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    // Fire the verification email immediately on email/password signup so
+    // the inbox check is the natural next step instead of a separate "send
+    // verification email" click.
+    sendOnSignUp: true,
+    // After the user clicks the link, Better Auth verifies the token and
+    // signs them in, then redirects to callbackURL. The verify-email page
+    // appends `?callbackURL=/dashboard` so they land where onboarding takes
+    // over from there.
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60, // 1 hour, matches the template's expiry copy.
+    sendVerificationEmail: async ({ user, url }, request) => {
+      const locale = localeFromBetterAuthContext(request)
+      await email.send({
+        to: user.email,
+        ...verifyEmailEmail({ url, name: user.name }, locale),
+      })
+    },
   },
   plugins: [
     magicLink({

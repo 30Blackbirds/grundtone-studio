@@ -4,6 +4,7 @@ import {
   magicLinkEmail,
   orgInviteEmail,
   projectInviteEmail,
+  verifyEmailEmail,
 } from './email-templates'
 
 describe('localeFromCookieHeader', () => {
@@ -56,6 +57,34 @@ describe('orgInviteEmail', () => {
     expect(m.html).toContain('&quot;Tables&quot;')
     // Subject stays plaintext — text-only context, no escape needed.
     expect(m.subject).toContain('Acme <script>')
+  })
+})
+
+describe('verifyEmailEmail', () => {
+  const args = { url: 'https://studio.grundtone.io/api/auth/verify-email?token=xyz' }
+
+  it('renders Danish by default with personalized greeting when name is given', () => {
+    const m = verifyEmailEmail({ ...args, name: 'Allan' })
+    expect(m.subject).toBe('Bekræft din e-mail til Grundtone Studio')
+    expect(m.text).toContain('Hej Allan,')
+    expect(m.html).toContain(`href="${args.url}"`)
+  })
+
+  it('falls back to a generic greeting when name is missing', () => {
+    const m = verifyEmailEmail(args)
+    expect(m.text).toContain('Hej,')
+    expect(m.text).not.toContain('Hej undefined')
+  })
+
+  it('renders English when locale is en', () => {
+    const m = verifyEmailEmail({ ...args, name: 'Allan' }, 'en')
+    expect(m.subject).toBe('Verify your email for Grundtone Studio')
+    expect(m.text).toContain('Hi Allan,')
+  })
+
+  it('mentions the 1-hour expiry window in both locales', () => {
+    expect(verifyEmailEmail(args, 'da').text).toContain('1 time')
+    expect(verifyEmailEmail(args, 'en').text).toContain('1 hour')
   })
 })
 
