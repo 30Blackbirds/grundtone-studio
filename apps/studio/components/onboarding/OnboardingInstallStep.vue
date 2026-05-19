@@ -9,7 +9,10 @@
   const errorMessage = ref<string | null>(null)
 
   async function runFinalizeOnce() {
-    if (status.value !== 'idle' || !state.value.projectId) return
+    // Allow retries from the error state so the "Try again" button works;
+    // block re-entry while a finalize is already in flight or completed.
+    if ((status.value !== 'idle' && status.value !== 'error') || !state.value.projectId) return
+    errorMessage.value = null
     status.value = 'publishing'
     try {
       await fetcher(`/api/projects/${state.value.projectId}/publish`, { method: 'POST' })
