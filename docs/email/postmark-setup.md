@@ -26,8 +26,9 @@ A "Server" in Postmark is a logical bucket per environment. Recommended layout:
 | Staging     | `grundtone-stage` | Pre-prod smoke tests                       |
 | Local dev   | (no server)       | nodemailer logs to console; see `email.ts` |
 
-For each server, **generate a Server API Token** (Settings → API Tokens). This is the value bound to
-`POSTMARK_SERVER_TOKEN` in our environment.
+For each server, **generate a Server API Token** (Settings → API Tokens). The app talks to Postmark
+over SMTP, so this token goes into both `SMTP_USER` and `SMTP_PASSWORD` (Postmark uses the same
+token for both — see env-var section below).
 
 ## 3. Configure the sender signature
 

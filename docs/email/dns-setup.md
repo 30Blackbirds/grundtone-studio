@@ -71,8 +71,11 @@ _dmarc   TXT   "v=DMARC1; p=none; rua=mailto:postmaster@grundtone.com; fo=1"
 After adding all four records, propagation can take 5–30 minutes. Verify via:
 
 ```bash
+# Replace <selector> with the DKIM selector Postmark generated for the
+# sender signature — find it under Postmark dashboard → Servers → Settings
+# → Sender Signatures → DKIM (the value before "._domainkey").
 dig +short TXT grundtone.com
-dig +short TXT 20240515pm._domainkey.grundtone.com
+dig +short TXT <selector>._domainkey.grundtone.com
 dig +short CNAME pm-bounces.grundtone.com
 dig +short TXT _dmarc.grundtone.com
 ```
