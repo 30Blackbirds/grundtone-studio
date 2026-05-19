@@ -71,9 +71,11 @@ export const auth = betterAuth({
     // verification email" click.
     sendOnSignUp: true,
     // After the user clicks the link, Better Auth verifies the token and
-    // signs them in, then redirects to callbackURL. The verify-email page
-    // appends `?callbackURL=/dashboard` so they land where onboarding takes
-    // over from there.
+    // signs them in, then redirects to the callbackURL that was supplied
+    // when the verification was triggered. We pass `/dashboard` on both
+    // signUp.email() (in signup.vue) and authClient.sendVerificationEmail()
+    // (the resend button in verify-email.vue), so the onboarding wizard's
+    // empty-state catches the user immediately after verification.
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60, // 1 hour, matches the template's expiry copy.
     sendVerificationEmail: async ({ user, url }, request) => {
