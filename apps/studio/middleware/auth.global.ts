@@ -8,6 +8,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const authPaths = new Set(['/login', '/signup'])
   const publicPaths = new Set([
     ...authPaths,
+    '/verify-email',
     '/privacy',
     '/dpa',
     '/sub-processors',

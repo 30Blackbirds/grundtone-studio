@@ -117,6 +117,7 @@
       "loginLink": "Sign in",
       "error": "Could not create account"
     },
+    "verifyRequired": "Please verify your email before signing in. Check your inbox for the link.",
     "magicLink": {
       "subject": "Sign in to Grundtone Studio",
       "body": "Click the link below to sign in:",
@@ -350,6 +351,18 @@
     "removeAction": "Remove from organization",
     "confirmRemove": "Remove this member from the organization? They lose access to every project immediately.",
     "cannotManageHierarchy": "You can't change a role at or above your own."
+  },
+  "verifyEmail": {
+    "title": "Check your inbox",
+    "bodyWithEmail": "We've sent a verification link to {email}. Click the link to finish signing up.",
+    "bodyGeneric": "We've sent a verification link to your email. Click the link to finish signing up.",
+    "didntArriveHint": "The link can take a minute to arrive. Don't forget to check your spam folder.",
+    "resend": "Resend verification email",
+    "resending": "Sending…",
+    "resentHeading": "Verification email resent",
+    "resentBody": "We've sent another verification link to {email}.",
+    "resendError": "Could not resend verification email",
+    "backToLogin": "Back to sign in"
   },
   "audit": {
     "title": "Audit log",
