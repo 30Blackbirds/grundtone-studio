@@ -22,9 +22,22 @@ const client = postgres(url, { max: 1, prepare: false })
 const db = drizzle(client, { schema, casing: 'snake_case' })
 
 async function ensureUser() {
+  // requireEmailVerification: true blocks sign-in until the user clicks
+  // a link delivered over SMTP. The dev sender logs to console instead of
+  // delivering, so we mark the seeded admin verified directly — both on
+  // first-time seeds and on subsequent idempotent runs (pre-existing rows
+  // from before the verification flag was flipped need backfilling).
   const existing = await db.select().from(schema.user).where(eq(schema.user.email, TEST_USER.email))
   if (existing.length > 0) {
-    console.log(`✓ user already exists: ${TEST_USER.email}`)
+    if (!existing[0].emailVerified) {
+      await db
+        .update(schema.user)
+        .set({ emailVerified: true })
+        .where(eq(schema.user.id, existing[0].id))
+      console.log(`✓ user already exists, flipped to verified: ${TEST_USER.email}`)
+    } else {
+      console.log(`✓ user already exists (verified): ${TEST_USER.email}`)
+    }
     return existing[0]
   }
   const res = await auth.api.signUpEmail({
@@ -34,7 +47,8 @@ async function ensureUser() {
       name: TEST_USER.name,
     },
   })
-  console.log(`✓ created user: ${TEST_USER.email}`)
+  await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, res.user.id))
+  console.log(`✓ created user (verified): ${TEST_USER.email}`)
   return res.user
 }
 
