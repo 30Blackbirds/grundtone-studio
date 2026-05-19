@@ -26,9 +26,10 @@
   )
 
   // Two-layer permissions: effective project role drives every UI gate on
-  // this page. Org admins implicitly land at project:admin; org members land
-  // at project:editor; direct project members get whatever they were invited
-  // for. See server/lib/project-access.ts.
+  // this page. Sentry-style mapping (see server/lib/project-access.ts):
+  // org owner/manager → project:admin; org admin/member → project:viewer;
+  // org billing → no access. Direct project members get exactly the role they
+  // were invited for, and the effective role is max(org-mapped, direct).
   const projectId = computed(() => project.value?.id ?? null)
   const { canEdit, canManage } = useProjectRole(projectId)
 

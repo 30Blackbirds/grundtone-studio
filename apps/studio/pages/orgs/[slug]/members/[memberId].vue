@@ -1,10 +1,11 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
   import {
-    ORG_ROLES,
+    ASSIGNABLE_ORG_ROLES,
     canAssignRole,
     canManageMember,
     isOrgRole,
+    type AssignableOrgRole,
     type OrgRole,
   } from '~~/composables/useOrgRoles'
 
@@ -55,9 +56,13 @@
     { default: () => [], watch: [member] },
   )
 
-  const selectedRole = ref<OrgRole | null>(null)
+  // The picker only offers assignable roles (everything except owner). If the
+  // member is already owner, we leave the selection empty so the dirty check
+  // prevents a no-op save and the picker just acts as a read-only display.
+  const selectedRole = ref<AssignableOrgRole | null>(null)
   watchEffect(() => {
-    selectedRole.value = currentRole.value
+    selectedRole.value =
+      currentRole.value && currentRole.value !== 'owner' ? currentRole.value : null
   })
 
   const saving = ref(false)
@@ -71,18 +76,20 @@
     return canManageMember(actorRole.value, currentRole.value)
   })
 
-  function roleAssignable(role: OrgRole): boolean {
+  function roleAssignable(role: AssignableOrgRole): boolean {
     if (!actorRole.value) return false
     return canAssignRole(actorRole.value, role)
   }
 
-  const ROLE_DEFS: Array<{ id: OrgRole; label: string; description: string }> = ORG_ROLES.map(
-    (r) => ({
+  // Owner is excluded — Better Auth's updateMemberRole can't promote to owner,
+  // it's a separate transfer flow. The picker reflects what the server can
+  // actually accept.
+  const ROLE_DEFS: Array<{ id: AssignableOrgRole; label: string; description: string }> =
+    ASSIGNABLE_ORG_ROLES.map((r) => ({
       id: r,
       label: t(`members.roles.${r}`),
       description: t(`members.roleDescriptions.${r}`),
-    }),
-  )
+    }))
 
   // Sentry shows: "This user's organization role as an X has granted them a
   // minimum team-level role of Y." For us, owner+manager get project:admin on
@@ -98,9 +105,14 @@
     if (!activeOrg.value?.id || !selectedRole.value || !dirty.value) return
     saving.value = true
     saveError.value = null
+    // Better Auth's client types narrow this to 'admin' | 'member' because it
+    // doesn't see our server-side ac config (which adds 'manager' + 'billing').
+    // The picker is constrained to AssignableOrgRole, so the cast is
+    // correct-by-construction at this point — the server-side ac validates
+    // the actual value against its full role table.
     const res = await organization.updateMemberRole({
       memberId: memberId.value,
-      role: selectedRole.value as 'admin' | 'member',
+      role: selectedRole.value as unknown as 'admin' | 'member',
       organizationId: activeOrg.value.id,
     })
     saving.value = false

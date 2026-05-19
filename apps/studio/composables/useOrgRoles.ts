@@ -5,6 +5,18 @@ export type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
 
 export const ORG_ROLES: readonly OrgRole[] = ['billing', 'member', 'admin', 'manager', 'owner']
 
+// Roles that can be set via Better Auth's updateMemberRole / inviteMember.
+// Owner is excluded — promoting to owner requires a separate transfer flow
+// (Better Auth doesn't expose it through updateMemberRole). Keep the picker
+// in sync with what the server actually accepts.
+export type AssignableOrgRole = Exclude<OrgRole, 'owner'>
+export const ASSIGNABLE_ORG_ROLES: readonly AssignableOrgRole[] = [
+  'billing',
+  'member',
+  'admin',
+  'manager',
+]
+
 export const ORG_ROLE_RANK: Record<OrgRole, number> = {
   billing: 0,
   member: 1,

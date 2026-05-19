@@ -78,18 +78,30 @@ export interface ProjectAccess {
 /**
  * Resolve the effective project role for a user, combining org membership
  * and direct project membership. Returns null if the user has no access.
+ *
+ * Pass `knownOrganizationId` when you've already fetched the project row to
+ * skip the inner project lookup — requireProjectAccess does this on every
+ * request, so the optimization matters at scale.
  */
 export async function getProjectRole(
   userId: string,
   projectId: string,
+  knownOrganizationId?: string,
 ): Promise<Pick<ProjectAccess, 'role' | 'source' | 'orgRole' | 'projectRole'> | null> {
-  const [proj] = await db.select().from(project).where(eq(project.id, projectId))
-  if (!proj) return null
+  let organizationId = knownOrganizationId
+  if (!organizationId) {
+    const [proj] = await db
+      .select({ organizationId: project.organizationId })
+      .from(project)
+      .where(eq(project.id, projectId))
+    if (!proj) return null
+    organizationId = proj.organizationId
+  }
 
   const [orgMember] = await db
     .select({ role: member.role })
     .from(member)
-    .where(and(eq(member.organizationId, proj.organizationId), eq(member.userId, userId)))
+    .where(and(eq(member.organizationId, organizationId), eq(member.userId, userId)))
   const orgRole: OrgRole | null = orgMember && isOrgRole(orgMember.role) ? orgMember.role : null
 
   const [projMember] = await db
@@ -130,7 +142,7 @@ export async function requireProjectAccess(
     .where(eq(organization.id, proj.organizationId))
   if (!orgRow) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
 
-  const resolved = await getProjectRole(session.user.id, projectId)
+  const resolved = await getProjectRole(session.user.id, projectId, proj.organizationId)
   if (!resolved) {
     throw createError({ statusCode: 403, statusMessage: 'No access to this project' })
   }
