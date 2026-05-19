@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 const inserts: Array<Record<string, unknown>> = []
 
@@ -39,10 +39,23 @@ const basic = (user: string, pass: string) =>
   `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`
 
 describe('postmark webhook receiver', () => {
+  // Capture the env vars before the suite touches them so we can restore
+  // afterwards. Otherwise the test would leak USER/PASS into the global
+  // env and any later suite that reads them.
+  const priorUser = process.env.POSTMARK_WEBHOOK_USER
+  const priorPass = process.env.POSTMARK_WEBHOOK_PASS
+
   beforeEach(() => {
     inserts.length = 0
     process.env.POSTMARK_WEBHOOK_USER = USER
     process.env.POSTMARK_WEBHOOK_PASS = PASS
+  })
+
+  afterAll(() => {
+    if (priorUser === undefined) delete process.env.POSTMARK_WEBHOOK_USER
+    else process.env.POSTMARK_WEBHOOK_USER = priorUser
+    if (priorPass === undefined) delete process.env.POSTMARK_WEBHOOK_PASS
+    else process.env.POSTMARK_WEBHOOK_PASS = priorPass
   })
 
   it('500s when secrets are not configured', async () => {

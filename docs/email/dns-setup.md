@@ -1,14 +1,17 @@
 # Email DNS records — `grundtone.com`
 
-Three records gate whether transactional mail (verification, magic link, invitations) lands in
-customer inboxes vs. spam:
+This runbook configures four DNS records for transactional mail (verification, magic link,
+invitations). Three of them govern inbox placement and domain authentication:
 
 - **SPF** — declares which servers are allowed to send from `grundtone.com`.
 - **DKIM** — cryptographically signs outgoing mail so receivers can verify it really came from us.
 - **DMARC** — tells receivers what to do when SPF/DKIM disagree (quarantine, reject, or report).
 
-Without all three, providers like Gmail and Microsoft route our verification mail to spam — which
-silently breaks signup.
+The fourth is a **Return-Path CNAME**, which lets Postmark attribute bounces correctly so the
+deliverability score doesn't suffer.
+
+Without SPF, DKIM, and DMARC, providers like Gmail and Microsoft route our verification mail to spam
+— which silently breaks signup.
 
 ## Records to add at the registrar
 

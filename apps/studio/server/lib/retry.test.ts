@@ -1,9 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { withRetry } from './retry'
 
 describe('withRetry', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    // Restore real timers so flaky fake-timer state doesn't leak into
+    // sibling test files. Mirrors ttl-cache.test.ts.
+    vi.useRealTimers()
   })
 
   it('returns immediately when the call succeeds on the first attempt', async () => {

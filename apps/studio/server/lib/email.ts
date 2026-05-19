@@ -41,10 +41,10 @@ export const email: EmailService = {
 
     // Postmark + STARTTLS occasionally fails on transient network blips
     // (DNS resync, connection reset). 3 attempts with exponential backoff
-    // covers ~1.5s of disruption — enough for typical hiccups, short
-    // enough that the user's request doesn't hang. Permanent failures
-    // (auth, sender-signature) still bubble up to the caller after the
-    // last attempt.
+    // adds 100ms + 200ms = 300ms of delay between retries — long enough
+    // for brief hiccups, short enough that the user's request doesn't
+    // hang. Permanent failures (auth, sender-signature) still bubble up
+    // to the caller after the last attempt.
     await withRetry(
       () => {
         // `transporter` is non-null inside this branch; capture it locally

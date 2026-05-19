@@ -15,6 +15,21 @@ export interface RetryOptions {
 }
 
 export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions): Promise<T> {
+  // Validate up front — silly inputs (attempts = 0, negative delay,
+  // shrinking factor) would otherwise either throw `undefined` later in
+  // the loop or wait forever. Loud failure is better than mysterious one.
+  if (!Number.isInteger(opts.attempts) || opts.attempts < 1) {
+    throw new Error(`withRetry: attempts must be an integer >= 1 (got ${opts.attempts})`)
+  }
+  if (!Number.isFinite(opts.initialDelayMs) || opts.initialDelayMs < 0) {
+    throw new Error(
+      `withRetry: initialDelayMs must be a non-negative number (got ${opts.initialDelayMs})`,
+    )
+  }
+  if (!Number.isFinite(opts.factor) || opts.factor < 1) {
+    throw new Error(`withRetry: factor must be >= 1 (got ${opts.factor})`)
+  }
+
   let lastErr: unknown
   let delay = opts.initialDelayMs
   for (let i = 0; i < opts.attempts; i++) {
