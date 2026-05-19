@@ -97,9 +97,13 @@ refactor), it cannot be marked completed without a test that exercises it.
 - **All project endpoints go through `requireProjectAccess(event, projectId, min='viewer')`** in
   `server/lib/project-access.ts`. The third argument is the minimum project role required: `viewer`
   for reads, `editor` for tokens/publish/activate, `admin` for keys + members.
-- **Effective project role** = `max(org-role-mapped, direct-project-role)`. Org `owner`/`admin` →
-  project `admin`; org `member` → project `editor`. Direct project members get exactly the role they
-  were invited for. `getProjectRole` is the only place this mapping is allowed to live.
+- **Org roles** are Sentry-style 5-tier: `billing → member → admin → manager → owner`. Skaberen af
+  en org får `owner`. Org-level helpers (`canManageOrgMembers`, `canManageBilling`,
+  `canCreateProjects`) live in `useOrgRoles` (client) and `orgRoleHelpers` (server).
+- **Effective project role** = `max(org-role-mapped, direct-project-role)`. Org `owner`/`manager` →
+  project `admin`; org `admin`/`member` → project `viewer`; org `billing` → `null`. Direct project
+  members get exactly the role they were invited for. `getProjectRole` is the only place this
+  mapping is allowed to live.
 - **API keys: hash SHA-256 at rest, plaintext shown once.** Don't change the storage format.
 - **Storage paths:** `p/{projectId}/v{n}/tokens.{json,css}` are immutable;
   `p/{projectId}/current.{json,css}` is overwritten each publish.
