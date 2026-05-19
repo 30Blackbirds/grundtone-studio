@@ -2,6 +2,7 @@ import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -108,7 +109,11 @@ export default defineEventHandler(async (event) => {
       },
     })
 
-  // TODO #56: invalidate Bunny.net cache for /k/{anyKey}/* of this project
+  // ─── Phase E — purge Bunny.net edge cache so customers see new tokens ───
+  // Fire-and-forget; failures are logged but don't block the response. CDN
+  // would converge anyway within max-age=60, but we want sub-second
+  // staleness for "Publish" to feel instant.
+  await purgeProjectCdn(projectId)
 
   await recordAuditEvent(event, {
     organizationId: access.organization.id,
