@@ -18,8 +18,11 @@ describe('parseColor', () => {
     expect(parseColor('#abc')).toEqual({ r: 0xaa, g: 0xbb, b: 0xcc })
   })
 
-  it('drops the alpha channel from 8-digit hex', () => {
-    expect(parseColor('#4F46E580')).toEqual({ r: 0x4f, g: 0x46, b: 0xe5 })
+  it('rejects 8-digit hex with alpha (contrast against semi-transparent is undefined)', () => {
+    // Treating #RRGGBBAA as its opaque RGB silently produces a wrong ratio
+    // because the visible color depends on what's underneath. Surface as
+    // null so the UI shows a neutral "—" instead.
+    expect(parseColor('#4F46E580')).toBeNull()
   })
 
   it('returns null for non-hex colors (rgb, hsl, named, var)', () => {
@@ -63,7 +66,7 @@ describe('contrastRatio', () => {
     expect(contrastRatio({ r: 100, g: 100, b: 100 }, { r: 100, g: 100, b: 100 })).toBeCloseTo(1, 6)
   })
 
-  it('is symmetric — order doesnt matter', () => {
+  it("is symmetric — order doesn't matter", () => {
     const a = { r: 0x4f, g: 0x46, b: 0xe5 }
     const b = { r: 0xff, g: 0xff, b: 0xff }
     expect(contrastRatio(a, b)).toBeCloseTo(contrastRatio(b, a), 6)

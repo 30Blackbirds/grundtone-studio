@@ -35,6 +35,7 @@
     <span
       class="contrast-swatch"
       :style="{ background: bg ?? 'transparent', color: fg ?? 'inherit' }"
+      aria-hidden="true"
     >
       Aa
     </span>

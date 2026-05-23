@@ -135,7 +135,6 @@
           :label="t('contrast.pair.textTertiaryOnBackground')"
           :fg="colors.textTertiary"
           :bg="colors.background"
-          size="large"
         />
         <ContrastBadge
           :label="t('contrast.pair.onPrimaryOnPrimary')"

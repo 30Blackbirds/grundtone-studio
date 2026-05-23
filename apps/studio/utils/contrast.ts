@@ -16,14 +16,17 @@ export interface RGB {
 
 export type WcagLevel = 'AAA' | 'AA' | 'AA-large' | 'fail'
 
-const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
 /**
- * Parse a CSS color string into RGB. Currently handles hex (3/6/8 digit) —
- * the editor's <input type="color"> only emits 6-digit hex, so this covers
- * the realistic input. Returns null for unparseable values (rgb(), hsl(),
- * named colors, var(--token)) so callers can render a neutral "—" instead
- * of a false-negative ratio.
+ * Parse a CSS color string into RGB. Handles opaque hex (3 or 6 digit) only
+ * — the editor's <input type="color"> only emits 6-digit hex, so this covers
+ * the realistic input. Returns null for:
+ *   - unparseable values (rgb(), hsl(), named, var(--token))
+ *   - 8-digit hex with alpha — contrast against semi-transparent colors
+ *     depends on what's underneath, which we can't know here. Treating an
+ *     #RRGGBBAA as its opaque RGB silently produces wrong ratios, so we
+ *     surface a neutral "—" badge instead.
  */
 export function parseColor(input: string | undefined | null): RGB | null {
   if (!input) return null
@@ -36,9 +39,6 @@ export function parseColor(input: string | undefined | null): RGB | null {
       .split('')
       .map((c) => c + c)
       .join('')
-  } else if (hex.length === 8) {
-    // Drop alpha — contrast is computed against the visible RGB.
-    hex = hex.slice(0, 6)
   }
   const n = parseInt(hex, 16)
   return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff }
@@ -74,11 +74,22 @@ export interface WcagOptions {
 }
 
 /**
- * Bucket a contrast ratio into a WCAG level. Returns:
- *   - 'AAA'      — passes the highest threshold for the given size
- *   - 'AA'       — passes the AA-normal threshold (4.5)
- *   - 'AA-large' — passes only the AA-large / non-text threshold (3.0)
- *   - 'fail'     — below 3.0
+ * Bucket a contrast ratio into a WCAG level. Thresholds depend on `size`:
+ *
+ *   size = 'normal' (default):
+ *     - 'AAA'      — ratio ≥ 7  (enhanced, comfortable for body copy)
+ *     - 'AA'       — ratio ≥ 4.5 (legal minimum for normal text)
+ *     - 'AA-large' — ratio ≥ 3  (passes only the large-text / UI threshold)
+ *     - 'fail'     — ratio < 3
+ *
+ *   size = 'large' (≥ 18pt or ≥ 14pt bold, plus UI components per 1.4.11):
+ *     - 'AAA'      — ratio ≥ 4.5 (enhanced large-text threshold)
+ *     - 'AA'       — ratio ≥ 3  (legal minimum for large text)
+ *     - 'AA-large' — never returned in large mode
+ *     - 'fail'     — ratio < 3
+ *
+ * Use 'normal' for body, captions, labels; 'large' for headings and
+ * non-text UI components.
  */
 export function wcagLevel(ratio: number, opts: WcagOptions = {}): WcagLevel {
   const size = opts.size ?? 'normal'
