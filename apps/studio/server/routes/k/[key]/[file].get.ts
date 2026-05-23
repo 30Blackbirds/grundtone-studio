@@ -9,6 +9,10 @@ import { SlidingWindowRateLimiter } from '~~/server/lib/rate-limit'
 
 const VALID_FILES = new Set(['tokens.json', 'tokens.css'])
 
+// Plaintext API key in the URL is intentional — see docs/api/cdn-keys.md
+// for the full rationale (Stripe pk_live model: publishable keys with no
+// confidentiality value, scoped read-only access, hashed at rest).
+
 // In-memory caches scoped to this process. The CDN endpoint is on the hot
 // path — without these we'd round-trip the DB + S3 on every request.
 
