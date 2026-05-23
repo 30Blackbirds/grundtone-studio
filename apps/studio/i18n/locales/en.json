@@ -261,6 +261,7 @@
     "typography": "Typography",
     "radius": "Border radius",
     "spacing": "Spacing",
+    "spacingHint": "Base spacing scale used by gap, padding, and margin utilities. CSS length values (rem, px, em).",
     "contrast": "Contrast (WCAG 2.1)",
     "contrastHint": "Pairs below check against WCAG 2.1 — AAA for comfortable reading, AA for the legal minimum.",
     "color": {
