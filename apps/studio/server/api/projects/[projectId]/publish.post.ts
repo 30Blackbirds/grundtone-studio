@@ -110,10 +110,13 @@ export default defineEventHandler(async (event) => {
     })
 
   // ─── Phase E — purge Bunny.net edge cache so customers see new tokens ───
-  // Fire-and-forget; failures are logged but don't block the response. CDN
-  // would converge anyway within max-age=60, but we want sub-second
-  // staleness for "Publish" to feel instant.
-  await purgeProjectCdn(projectId)
+  // Truly fire-and-forget: dispatched via `void` so the publish response
+  // doesn't wait on the network RTT to Bunny. purgeProjectCdn handles its
+  // own errors internally; the .catch here is a final safety net. CDN
+  // converges within max-age=60 even if the purge silently fails.
+  void purgeProjectCdn(projectId).catch((err) =>
+    console.warn(`[publish] background purge crashed: ${(err as Error)?.message ?? String(err)}`),
+  )
 
   await recordAuditEvent(event, {
     organizationId: access.organization.id,

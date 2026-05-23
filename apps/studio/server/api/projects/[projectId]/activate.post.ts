@@ -73,8 +73,11 @@ export default defineEventHandler(async (event) => {
     })
 
   // Same rationale as publish: purge the CDN so the rolled-back tokens are
-  // served immediately rather than after the 60s max-age expires.
-  await purgeProjectCdn(projectId)
+  // served immediately rather than after the 60s max-age expires. Dispatched
+  // via `void` so the activate response doesn't wait on the network RTT.
+  void purgeProjectCdn(projectId).catch((err) =>
+    console.warn(`[activate] background purge crashed: ${(err as Error)?.message ?? String(err)}`),
+  )
 
   await recordAuditEvent(event, {
     organizationId: access.organization.id,
