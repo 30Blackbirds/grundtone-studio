@@ -8,6 +8,12 @@ import { generateApiKey } from '~~/server/lib/api-keys'
 const bodySchema = z.object({
   environment: z.enum(['live', 'test']).default('live'),
   allowedOrigins: z.array(z.string().min(1).max(200)).max(20).default([]),
+  // Per-key requests-per-minute cap enforced by the /k/[key] handler.
+  // Default matches the DB default (1000) so existing callers that omit
+  // the field stay on the same plan they had before this field was
+  // editable. Upper bound 1_000_000 is plenty of headroom without
+  // exposing us to integer-overflow surprises.
+  rateLimit: z.number().int().min(1).max(1_000_000).default(1000),
 })
 
 export default defineEventHandler(async (event) => {
@@ -32,6 +38,7 @@ export default defineEventHandler(async (event) => {
       keyType: 'publishable',
       environment: parsed.data.environment,
       allowedOrigins: parsed.data.allowedOrigins,
+      rateLimit: parsed.data.rateLimit,
       createdBy: access.userId,
     })
     .returning({
@@ -39,6 +46,7 @@ export default defineEventHandler(async (event) => {
       keyPrefix: apiKey.keyPrefix,
       environment: apiKey.environment,
       allowedOrigins: apiKey.allowedOrigins,
+      rateLimit: apiKey.rateLimit,
       createdAt: apiKey.createdAt,
     })
 
@@ -48,7 +56,11 @@ export default defineEventHandler(async (event) => {
     targetType: 'api_key',
     targetId: created.id,
     targetLabel: `${created.keyPrefix} (${access.project.name})`,
-    after: { environment: created.environment, allowedOrigins: created.allowedOrigins },
+    after: {
+      environment: created.environment,
+      allowedOrigins: created.allowedOrigins,
+      rateLimit: created.rateLimit,
+    },
   })
 
   return {

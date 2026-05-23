@@ -22,9 +22,16 @@
     { default: () => [] },
   )
 
+  const DEFAULT_INT_RATE_LIMIT = 1000
+  const DEFAULT_RATE_LIMIT = String(DEFAULT_INT_RATE_LIMIT)
+
   const showCreate = ref(false)
   const newEnv = ref<'live' | 'test'>('live')
   const newOrigins = ref('')
+  // GTInput's model is string-typed even for type="number". Store as string,
+  // parse to int at submit time. Default '1000' matches the DB-level default
+  // so a no-change user gets the same plan as before this field was editable.
+  const newRateLimit = ref<string>(DEFAULT_RATE_LIMIT)
   const creating = ref(false)
   const createError = ref<string | null>(null)
   const createdPlaintext = ref<string | null>(null)
@@ -44,12 +51,16 @@
               .split('\n')
               .map((s) => s.trim())
               .filter(Boolean),
+            // Server clamps to [1, 1_000_000] and defaults to 1000 if
+            // omitted; we pass through whatever the user entered.
+            rateLimit: Math.max(1, parseInt(newRateLimit.value, 10) || DEFAULT_INT_RATE_LIMIT),
           },
         },
       )
       createdPlaintext.value = res.plaintext
       newOrigins.value = ''
       newEnv.value = 'live'
+      newRateLimit.value = DEFAULT_RATE_LIMIT
       await refresh()
     } catch (err) {
       createError.value = (err as Error).message
@@ -137,6 +148,15 @@
         placeholder="acme.com&#10;*.acme.com"
         :rows="3"
       />
+      <GTInput
+        v-model="newRateLimit"
+        type="number"
+        :label="t('apiKeys.rateLimit')"
+        :help-text="t('apiKeys.rateLimitHelp')"
+        :min="1"
+        :max="1_000_000"
+        :step="100"
+      />
       <GTAlert v-if="createError" variant="error" :heading="createError" />
       <div class="flex gap-3 justify-end">
         <GTButton type="button" variant="secondary" @click="showCreate = false">
@@ -160,7 +180,8 @@
             <code class="font-mono text-sm">{{ k.keyPrefix }}…</code>
             <span class="text-tertiary text-sm">
               {{ t(`apiKeys.env${k.environment === 'live' ? 'Live' : 'Test'}`) }} ·
-              {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }}
+              {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }} ·
+              {{ t('apiKeys.rateLimitBadge', { n: k.rateLimit }) }}
             </span>
           </div>
           <GTButton v-if="canManage" variant="outlined" size="sm" @click="revoke(k.id)">
