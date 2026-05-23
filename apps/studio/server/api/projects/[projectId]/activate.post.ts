@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject, getObjectAsString } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -70,6 +71,13 @@ export default defineEventHandler(async (event) => {
         activatedBy: access.userId,
       },
     })
+
+  // Same rationale as publish: purge the CDN so the rolled-back tokens are
+  // served immediately rather than after the 60s max-age expires. Dispatched
+  // via `void` so the activate response doesn't wait on the network RTT.
+  void purgeProjectCdn(projectId).catch((err) =>
+    console.warn(`[activate] background purge crashed: ${(err as Error)?.message ?? String(err)}`),
+  )
 
   await recordAuditEvent(event, {
     organizationId: access.organization.id,

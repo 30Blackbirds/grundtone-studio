@@ -261,6 +261,8 @@
     "typography": "Typografi",
     "radius": "Border radius",
     "spacing": "Spacing",
+    "contrast": "Kontrast (WCAG 2.1)",
+    "contrastHint": "Parrene nedenfor tjekkes mod WCAG 2.1 — AAA for komfortabel læsning, AA for det lovmæssige minimum.",
     "color": {
       "primary": "Primær",
       "primaryLight": "Primær — lys",
@@ -280,6 +282,23 @@
       "heading": "Overskrift-skrifttype"
     }
   },
+  "contrast": {
+    "unparseable": "Kan ikke læse denne farve — brug #RRGGBB",
+    "level": {
+      "AAA": "AAA",
+      "AA": "AA",
+      "AA-large": "AA (kun store skrifttyper)",
+      "fail": "Fejl"
+    },
+    "pair": {
+      "textOnBackground": "Tekst på baggrund",
+      "textOnSurface": "Tekst på overflade",
+      "textSecondaryOnBackground": "Sekundær tekst på baggrund",
+      "textTertiaryOnBackground": "Tertiær tekst på baggrund",
+      "onPrimaryOnPrimary": "On-primær på primær",
+      "onPrimaryOnPrimaryDark": "On-primær på primær mørk"
+    }
+  },
   "apiKeys": {
     "title": "API-nøgler",
     "create": "Opret nøgle",
@@ -295,6 +314,9 @@
     "allowedOrigins": "Tilladte origins",
     "allowedOriginsHelp": "En per linje, fx 'acme.com' eller '*.acme.com'. Tom = alle origins tilladt.",
     "anyOrigin": "Alle origins",
+    "rateLimit": "Rate limit (requests / minut)",
+    "rateLimitHelp": "Loft per nøgle håndhævet af CDN-endpointet. 1000 dækker en typisk landingsside; sæt højere ved stor trafik.",
+    "rateLimitBadge": "{n} req/min",
     "shownOnce": "Kopiér nøglen nu — den vises kun denne ene gang",
     "shownOnceBody": "Vi gemmer kun et hash af nøglen. Tab den og du må generere en ny.",
     "copy": "Kopiér",
