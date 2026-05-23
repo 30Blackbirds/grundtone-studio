@@ -7,14 +7,38 @@
 
   const previewRoot = useTemplateRef<HTMLDivElement>('previewRoot')
 
-  watchEffect(() => {
+  // createTheme + applyThemeToDOM mutate dozens of CSS custom properties at
+  // once, so running them on every drag-pixel of a color picker is wasted
+  // work. We debounce to ~100ms — fast enough that the preview still feels
+  // live, slow enough that the editor doesn't repaint hundreds of times per
+  // second on a sustained drag. The first paint is forced through synchronously
+  // so the user never sees a blank preview at mount.
+  const DEBOUNCE_MS = 100
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  function applyNow(tokens: Tokens) {
     if (!previewRoot.value) return
     try {
-      const themes = createTheme({ light: props.tokens })
+      const themes = createTheme({ light: tokens })
       applyThemeToDOM(themes.light, previewRoot.value)
     } catch (err) {
       console.warn('Failed to apply preview theme', err)
     }
+  }
+
+  onMounted(() => applyNow(props.tokens))
+
+  watch(
+    () => props.tokens,
+    (tokens) => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => applyNow(tokens), DEBOUNCE_MS)
+    },
+    { deep: true },
+  )
+
+  onBeforeUnmount(() => {
+    if (timer) clearTimeout(timer)
   })
 </script>
 
