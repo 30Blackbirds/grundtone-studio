@@ -18,8 +18,8 @@ user-facing change rather than a single release tag. The companion SDK
 - **Privacy, DPA, sub-processors, integration guide** — public pages at `/privacy`, `/dpa`,
   `/sub-processors`, and `/docs/install`. Install guide carries copy-pasteable snippets for script
   tag, Vue, Nuxt, React, and Svelte. New footer links to all four. SDK bundles now emit SHA-384
-  Sub-Resource Integrity hashes alongside the `.js` files.
-- **"What is an API key?" tooltip** on the project's API-keys panel.
+  Subresource Integrity (SRI) hashes alongside the `.js` files.
+- **"What is an API key?" tooltip** on the project's API-key panel.
 - Auth + multi-tenant dashboard (Better Auth, organizations, invites, roles)
 - Token editor with live preview (colors, typography, radius)
 - API-key management with hash-at-rest and one-time plaintext display
