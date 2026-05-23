@@ -23,13 +23,25 @@
   )
 
   const DEFAULT_INT_RATE_LIMIT = 1000
+  const MAX_RATE_LIMIT = 1_000_000
   const DEFAULT_RATE_LIMIT = String(DEFAULT_INT_RATE_LIMIT)
+
+  // Coerce the user's input safely. parseInt('1e6') returns 1 (it stops at
+  // the 'e'), and the number input legitimately emits scientific notation
+  // for large values — so Number() handles that. NaN / Infinity fall back
+  // to the default. Result is clamped to [1, MAX] so out-of-range values
+  // never reach the server (which 400s on min/max violations).
+  function coerceRateLimit(v: string): number {
+    const n = Number(v)
+    if (!Number.isFinite(n)) return DEFAULT_INT_RATE_LIMIT
+    return Math.max(1, Math.min(MAX_RATE_LIMIT, Math.floor(n)))
+  }
 
   const showCreate = ref(false)
   const newEnv = ref<'live' | 'test'>('live')
   const newOrigins = ref('')
   // GTInput's model is string-typed even for type="number". Store as string,
-  // parse to int at submit time. Default '1000' matches the DB-level default
+  // coerce + clamp at submit time. Default '1000' matches the DB-level default
   // so a no-change user gets the same plan as before this field was editable.
   const newRateLimit = ref<string>(DEFAULT_RATE_LIMIT)
   const creating = ref(false)
@@ -51,9 +63,10 @@
               .split('\n')
               .map((s) => s.trim())
               .filter(Boolean),
-            // Server clamps to [1, 1_000_000] and defaults to 1000 if
-            // omitted; we pass through whatever the user entered.
-            rateLimit: Math.max(1, parseInt(newRateLimit.value, 10) || DEFAULT_INT_RATE_LIMIT),
+            // Server validates [1, 1_000_000] and 400s on violation; we
+            // coerce + clamp client-side so out-of-range values never round-
+            // trip. Also handles scientific notation from the number input.
+            rateLimit: coerceRateLimit(newRateLimit.value),
           },
         },
       )
