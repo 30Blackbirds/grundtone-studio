@@ -44,19 +44,25 @@ afterAll(() => {
 })
 
 describe('purgeProjectCdn', () => {
-  it('skips silently when BUNNY_PURGE_API_KEY is unset (dev env)', async () => {
+  it('logs an info line and skips the fetch when BUNNY_PURGE_API_KEY is unset (dev env)', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     delete process.env.BUNNY_PURGE_API_KEY
     expect(await purgeProjectCdn('p1', { keyPrefixes: ['pk_live_abc'] })).toBe(0)
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('purge skipped'))
+    infoSpy.mockRestore()
   })
 
-  it('skips silently when NUXT_PUBLIC_CDN_BASE is unset', async () => {
+  it('logs an info line and skips the fetch when NUXT_PUBLIC_CDN_BASE is unset', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     delete process.env.NUXT_PUBLIC_CDN_BASE
     expect(await purgeProjectCdn('p1', { keyPrefixes: ['pk_live_abc'] })).toBe(0)
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(infoSpy).toHaveBeenCalled()
+    infoSpy.mockRestore()
   })
 
-  it('returns 0 and skips fetch when the project has no active keys', async () => {
+  it('returns 0 without logging or fetching when the project has no active keys', async () => {
     apiKeyRows = []
     expect(await purgeProjectCdn('p1')).toBe(0)
     expect(fetchMock).not.toHaveBeenCalled()
@@ -113,5 +119,25 @@ describe('purgeProjectCdn', () => {
     expect(fetchMock.mock.calls[0][0]).toContain(
       encodeURIComponent('https://cdn.grundtone.io/k/pk_live_x*'),
     )
+  })
+
+  it('swallows DB-lookup failures so the caller (publish/activate) is unaffected', async () => {
+    // Make the keyless-args branch hit the DB, then force the select chain
+    // to throw — mirroring a real Postgres connection blip.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { db } = await import('../db')
+    const original = db.select
+    ;(db as { select: unknown }).select = () => ({
+      from: () => ({
+        where: () => Promise.reject(new Error('postgres connection refused')),
+      }),
+    })
+    try {
+      await expect(purgeProjectCdn('p1')).resolves.toBe(0)
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('purge crashed'))
+    } finally {
+      ;(db as { select: typeof original }).select = original
+      warnSpy.mockRestore()
+    }
   })
 })
