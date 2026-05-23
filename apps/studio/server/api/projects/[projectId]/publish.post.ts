@@ -2,6 +2,7 @@ import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -108,7 +109,14 @@ export default defineEventHandler(async (event) => {
       },
     })
 
-  // TODO #56: invalidate Bunny.net cache for /k/{anyKey}/* of this project
+  // ─── Phase E — purge Bunny.net edge cache so customers see new tokens ───
+  // Truly fire-and-forget: dispatched via `void` so the publish response
+  // doesn't wait on the network RTT to Bunny. purgeProjectCdn handles its
+  // own errors internally; the .catch here is a final safety net. CDN
+  // converges within max-age=60 even if the purge silently fails.
+  void purgeProjectCdn(projectId).catch((err) =>
+    console.warn(`[publish] background purge crashed: ${(err as Error)?.message ?? String(err)}`),
+  )
 
   await recordAuditEvent(event, {
     organizationId: access.organization.id,
