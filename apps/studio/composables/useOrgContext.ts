@@ -12,6 +12,18 @@ interface ProjectListItem {
   name: string
 }
 
+// Stable default factories. Defining these at module scope (instead of
+// inline `() => []` per useAsyncData call) means every consumer of
+// useOrgContext lands on the same identity-stable empty array while the
+// async fetch is pending — no extra reactive churn in downstream watchers
+// that compare by reference, and no hydration mismatches from differing
+// SSR / CSR allocations.
+const EMPTY_ORG_LIST: OrgListItem[] = []
+const EMPTY_PROJECT_LIST: ProjectListItem[] = []
+const noOrgList = () => EMPTY_ORG_LIST
+const noProjectList = () => EMPTY_PROJECT_LIST
+const noMember = () => null
+
 /**
  * Single source of truth for the user's organizations and the current org/project
  * context derived from the route. Used by layout chrome (org-switcher + sidebar).
@@ -37,7 +49,7 @@ export const useOrgContext = () => {
       })
       return (res.data ?? []) as OrgListItem[]
     },
-    { default: () => [] },
+    { default: noOrgList },
   )
 
   const activeOrg = computed(() =>
@@ -56,7 +68,7 @@ export const useOrgContext = () => {
         query: { organizationSlug: activeSlug.value },
       })
     },
-    { default: () => [], watch: [activeSlug] },
+    { default: noProjectList, watch: [activeSlug] },
   )
 
   const { data: activeMember, refresh: refreshActiveMember } = useAsyncData(
@@ -80,7 +92,7 @@ export const useOrgContext = () => {
         return null
       }
     },
-    { default: () => null, watch: [activeOrg] },
+    { default: noMember, watch: [activeOrg] },
   )
 
   // Sentry-style 5-tier org roles (see server/lib/project-access.ts for the
