@@ -2,7 +2,6 @@ import { eq, and, ne } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectMember, projectInvitation } from '~~/server/db/schema'
 import { member, user } from '~~/server/db/schema/auth'
-import { PROJECT_INVITATION_STATUS } from '~~/server/lib/constants'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
 export default defineEventHandler(async (event) => {
@@ -45,10 +44,7 @@ export default defineEventHandler(async (event) => {
     .select()
     .from(projectInvitation)
     .where(
-      and(
-        eq(projectInvitation.projectId, projectId),
-        ne(projectInvitation.status, PROJECT_INVITATION_STATUS.ACCEPTED),
-      ),
+      and(eq(projectInvitation.projectId, projectId), ne(projectInvitation.status, 'accepted')),
     )
 
   return { orgMembers, direct, pending }

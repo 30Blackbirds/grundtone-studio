@@ -3,7 +3,6 @@ import { db } from '~~/server/db'
 import { projectInvitation, projectMember } from '~~/server/db/schema'
 import { user as userTable } from '~~/server/db/schema/auth'
 import { auth } from '~~/server/lib/auth'
-import { PROJECT_INVITATION_STATUS } from '~~/server/lib/constants'
 
 export default defineEventHandler(async (event) => {
   const invitationId = getRouterParam(event, 'invitationId')
@@ -18,7 +17,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(projectInvitation.id, invitationId))
   if (!invite) throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })
 
-  if (invite.status !== PROJECT_INVITATION_STATUS.PENDING) {
+  if (invite.status !== 'pending') {
     throw createError({ statusCode: 409, statusMessage: `Invitation is ${invite.status}` })
   }
   if (invite.expiresAt < new Date()) {
@@ -51,7 +50,7 @@ export default defineEventHandler(async (event) => {
 
     await tx
       .update(projectInvitation)
-      .set({ status: PROJECT_INVITATION_STATUS.ACCEPTED })
+      .set({ status: 'accepted' })
       .where(eq(projectInvitation.id, invite.id))
 
     return { projectId: invite.projectId, role: invite.role }

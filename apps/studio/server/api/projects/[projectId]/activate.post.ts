@@ -4,7 +4,6 @@ import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
-import { CONFIG_VERSION_STATUS } from '~~/server/lib/constants'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject, getObjectAsString } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -29,7 +28,7 @@ export default defineEventHandler(async (event) => {
       and(
         eq(configVersion.id, parsed.data.versionId),
         eq(configVersion.projectId, projectId),
-        eq(configVersion.status, CONFIG_VERSION_STATUS.PUBLISHED),
+        eq(configVersion.status, 'published'),
       ),
     )
   if (!version) {

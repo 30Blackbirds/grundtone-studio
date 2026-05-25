@@ -3,7 +3,6 @@ import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
-import { CONFIG_VERSION_STATUS } from '~~/server/lib/constants'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
@@ -31,12 +30,7 @@ export default defineEventHandler(async (event) => {
   const [draft] = await db
     .select()
     .from(configVersion)
-    .where(
-      and(
-        eq(configVersion.projectId, projectId),
-        eq(configVersion.status, CONFIG_VERSION_STATUS.DRAFT),
-      ),
-    )
+    .where(and(eq(configVersion.projectId, projectId), eq(configVersion.status, 'draft')))
     .orderBy(desc(configVersion.createdAt))
     .limit(1)
 
@@ -52,12 +46,7 @@ export default defineEventHandler(async (event) => {
   const [{ value: maxVersion }] = await db
     .select({ value: max(configVersion.version) })
     .from(configVersion)
-    .where(
-      and(
-        eq(configVersion.projectId, projectId),
-        eq(configVersion.status, CONFIG_VERSION_STATUS.PUBLISHED),
-      ),
-    )
+    .where(and(eq(configVersion.projectId, projectId), eq(configVersion.status, 'published')))
   const nextVersion = (maxVersion ?? 0) + 1
 
   const p = paths(projectId)
@@ -68,7 +57,7 @@ export default defineEventHandler(async (event) => {
       .update(configVersion)
       .set({
         version: nextVersion,
-        status: CONFIG_VERSION_STATUS.PUBLISHED,
+        status: 'published',
         publishedAt: new Date(),
         publishedBy: access.userId,
       })

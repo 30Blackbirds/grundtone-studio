@@ -1,7 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectInvitation } from '~~/server/db/schema'
-import { PROJECT_INVITATION_STATUS } from '~~/server/lib/constants'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
 export default defineEventHandler(async (event) => {
@@ -15,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const [cancelled] = await db
     .update(projectInvitation)
-    .set({ status: PROJECT_INVITATION_STATUS.CANCELLED })
+    .set({ status: 'cancelled' })
     .where(and(eq(projectInvitation.id, invitationId), eq(projectInvitation.projectId, projectId)))
     .returning({ id: projectInvitation.id })
 

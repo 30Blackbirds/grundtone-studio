@@ -1,7 +1,6 @@
 import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { configVersion } from '~~/server/db/schema'
-import { CONFIG_VERSION_STATUS } from '~~/server/lib/constants'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { tokensSchema } from '~~/server/lib/tokens'
 
@@ -19,12 +18,7 @@ export default defineEventHandler(async (event) => {
   const [existing] = await db
     .select()
     .from(configVersion)
-    .where(
-      and(
-        eq(configVersion.projectId, projectId),
-        eq(configVersion.status, CONFIG_VERSION_STATUS.DRAFT),
-      ),
-    )
+    .where(and(eq(configVersion.projectId, projectId), eq(configVersion.status, 'draft')))
     .orderBy(desc(configVersion.createdAt))
     .limit(1)
 
@@ -48,7 +42,7 @@ export default defineEventHandler(async (event) => {
       projectId,
       version: (maxVersion ?? 0) + 1,
       tokensJson: parsed.data,
-      status: CONFIG_VERSION_STATUS.DRAFT,
+      status: 'draft',
       publishedBy: access.userId,
     })
     .returning()
