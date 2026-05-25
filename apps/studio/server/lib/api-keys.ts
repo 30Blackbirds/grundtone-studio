@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto'
+import type { ApiKeyEnvironment } from './constants'
 
-export type Environment = 'live' | 'test'
+// Kept as a local alias for backwards compatibility with existing imports —
+// see constants.ts for the canonical const tuple + type.
+export type Environment = ApiKeyEnvironment
 
 export interface GeneratedKey {
   plaintext: string

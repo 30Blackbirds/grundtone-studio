@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectInvitation } from '~~/server/db/schema'
+import { PROJECT_INVITATION_STATUS } from '~~/server/lib/constants'
 import { PROJECT_ROLES, requireProjectAccess } from '~~/server/lib/project-access'
 import { email } from '~~/server/lib/email'
 import { localeFromEvent, projectInviteEmail } from '~~/server/lib/email-templates'
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
       and(
         eq(projectInvitation.projectId, projectId),
         eq(projectInvitation.email, parsed.data.email),
-        eq(projectInvitation.status, 'pending'),
+        eq(projectInvitation.status, PROJECT_INVITATION_STATUS.PENDING),
       ),
     )
 
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
           projectId,
           email: parsed.data.email,
           role: parsed.data.role,
-          status: 'pending',
+          status: PROJECT_INVITATION_STATUS.PENDING,
           invitedBy: access.userId,
           expiresAt,
         })
