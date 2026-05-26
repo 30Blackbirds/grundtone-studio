@@ -1,0 +1,66 @@
+name: CodeQL
+
+# Security analysis runs on:
+#   - every PR into develop / main (catches issues before they land)
+#   - a weekly scheduled scan (catches issues in advisory databases that
+#     update after our last PR — drift detection)
+#
+# Findings surface in the GitHub Security tab. Critical / high alerts
+# block PRs once branch protection is configured to require the
+# code-scanning check.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths-ignore: ['**.md', 'docs/**']
+  push:
+    branches: [develop, main]
+    paths-ignore: ['**.md', 'docs/**']
+  schedule:
+    # Mondays at 06:00 UTC — outside business hours, before standup.
+    - cron: '0 6 * * 1'
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # security-events:write is the canonical permission for uploading
+      # SARIF results to the Security tab.
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # JavaScript covers both TS and the Vue SFC <script> blocks.
+        # Add 'actions' once GitHub finishes the Actions-language rollout
+        # so our workflow files themselves get linted.
+        language: ['javascript-typescript']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # `security-extended` adds queries beyond the default that catch
+          # things like prototype pollution, regex DoS, and path traversal.
+          # `security` alone is the baseline; `security-extended` is the
+          # recommended starting point for a new repo per GitHub's docs.
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

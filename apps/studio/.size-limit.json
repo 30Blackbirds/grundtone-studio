@@ -1,0 +1,35 @@
+{
+  "_doc": [
+    "Bundle size budgets for the studio app. Sums files under each `path`",
+    "(optionally filtered by include/exclude substrings) and fails CI if",
+    "the bucket exceeds maxBytes. Numbers are uncompressed on-disk sizes —",
+    "switch to gzip via size-limit if/when that's worth the extra dep.",
+    "",
+    "When a bucket goes red: either shrink the bundle (preferred) or bump",
+    "the threshold here with a rationale in the PR description. Don't",
+    "silently increase budgets without flagging why."
+  ],
+  "buckets": [
+    {
+      "name": "client JS",
+      "path": ".output/public/_nuxt",
+      "include": [".js", ".mjs"],
+      "exclude": [".map"],
+      "maxBytes": 6291456
+    },
+    {
+      "name": "client CSS",
+      "path": ".output/public/_nuxt",
+      "include": [".css"],
+      "exclude": [],
+      "maxBytes": 524288
+    },
+    {
+      "name": "server",
+      "path": ".output/server",
+      "include": [".mjs"],
+      "exclude": [".map"],
+      "maxBytes": 31457280
+    }
+  ]
+}
