@@ -261,6 +261,7 @@
     "typography": "Typografi",
     "radius": "Border radius",
     "spacing": "Spacing",
+    "spacingHint": "Basis-spacing-skala brugt af gap-, padding- og margin-utilities. CSS-længdeværdier (rem, px, em).",
     "contrast": "Kontrast (WCAG 2.1)",
     "contrastHint": "Parrene nedenfor tjekkes mod WCAG 2.1 — AAA for komfortabel læsning, AA for det lovmæssige minimum.",
     "color": {

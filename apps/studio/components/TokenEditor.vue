@@ -10,6 +10,7 @@
   type Colors = NonNullable<Tokens['colors']>
   type Typography = NonNullable<Tokens['typography']>
   type Radius = NonNullable<Tokens['radius']>
+  type Spacing = NonNullable<Tokens['spacing']>
   type FontFamily = NonNullable<Typography['fontFamily']>
 
   const colors = computed<Colors>({
@@ -24,6 +25,10 @@
     get: () => tokens.value.radius ?? {},
     set: (v) => (tokens.value = { ...tokens.value, radius: v }),
   })
+  const spacing = computed<Spacing>({
+    get: () => tokens.value.spacing ?? {},
+    set: (v) => (tokens.value = { ...tokens.value, spacing: v }),
+  })
 
   const fontFamily = computed<FontFamily>({
     get: () => typography.value.fontFamily ?? {},
@@ -35,6 +40,9 @@
   }
   function updateRadius(key: keyof NonNullable<Tokens['radius']>, value: string) {
     radius.value = { ...radius.value, [key]: value }
+  }
+  function updateSpacing(key: keyof NonNullable<Tokens['spacing']>, value: string) {
+    spacing.value = { ...spacing.value, [key]: value }
   }
   function updateFont(key: 'base' | 'heading' | 'mono', value: string) {
     fontFamily.value = { ...fontFamily.value, [key]: value }
@@ -193,6 +201,31 @@
           label="xl"
           placeholder="1rem"
           @update:model-value="(v) => updateRadius('xl', String(v))"
+        />
+      </div>
+    </section>
+
+    <section>
+      <h3 class="mt-0 mb-3">{{ t('tokens.spacing') }}</h3>
+      <p class="text-tertiary text-sm mt-0 mb-3">{{ t('tokens.spacingHint') }}</p>
+      <div class="grid grid-cols-3 gap-4">
+        <GTInput
+          :model-value="spacing.sm"
+          label="sm"
+          placeholder="0.5rem"
+          @update:model-value="(v) => updateSpacing('sm', String(v))"
+        />
+        <GTInput
+          :model-value="spacing.md"
+          label="md"
+          placeholder="1rem"
+          @update:model-value="(v) => updateSpacing('md', String(v))"
+        />
+        <GTInput
+          :model-value="spacing.lg"
+          label="lg"
+          placeholder="1.5rem"
+          @update:model-value="(v) => updateSpacing('lg', String(v))"
         />
       </div>
     </section>
