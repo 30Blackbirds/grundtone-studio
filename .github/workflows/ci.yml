@@ -101,8 +101,8 @@ jobs:
         # Hard-fail on high or critical CVEs in the production dep tree.
         # If a transitive dep has a real advisory, the right answer is to
         # bump it (or pnpm.overrides it) rather than restoring `|| true`.
-        # Moderate and low advisories still pass — surface them in the
-        # weekly CodeQL run instead.
+        # Moderate and low advisories still pass — Dependabot surfaces
+        # them as separate PRs when fixes are available.
 
       - name: Build
         run: pnpm build

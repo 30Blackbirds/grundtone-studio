@@ -2,8 +2,10 @@ name: CodeQL
 
 # Security analysis runs on:
 #   - every PR into develop / main (catches issues before they land)
-#   - a weekly scheduled scan (catches issues in advisory databases that
-#     update after our last PR — drift detection)
+#   - a weekly scheduled re-scan so existing code is re-evaluated against
+#     updated CodeQL queries + extractor versions GitHub ships in between
+#     our PRs (drift detection — Dependabot handles dep-advisory drift
+#     separately)
 #
 # Findings surface in the GitHub Security tab. Critical / high alerts
 # block PRs once branch protection is configured to require the

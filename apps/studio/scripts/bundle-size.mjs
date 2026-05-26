@@ -6,21 +6,17 @@
 // Intentionally simple — no extra dependency. If we ever need gzip /
 // brotli reporting per chunk, switch to `size-limit` proper.
 
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 const STUDIO = resolve(import.meta.dirname, '..')
-const OUTPUT = resolve(STUDIO, '.output')
 const CONFIG = resolve(STUDIO, '.size-limit.json')
 
+// Throw instead of swallowing ENOENT — a missing bucket root (typo in
+// .size-limit.json, or .output/ that didn't get built) used to silently
+// report 0 B and pass every budget, masking the real misconfiguration.
 async function* walk(dir) {
-  let entries
-  try {
-    entries = await readdir(dir, { withFileTypes: true })
-  } catch (err) {
-    if (err.code === 'ENOENT') return
-    throw err
-  }
+  const entries = await readdir(dir, { withFileTypes: true })
   for (const entry of entries) {
     const full = join(dir, entry.name)
     if (entry.isDirectory()) {
@@ -32,6 +28,10 @@ async function* walk(dir) {
 }
 
 async function bucketSize(root, filter) {
+  // Verify the bucket root exists up front so the "0 B / passes" silent
+  // failure is impossible — anyone wiring a new bucket gets a clear
+  // ENOENT pointing at the offending path.
+  await access(root)
   let total = 0
   for await (const file of walk(root)) {
     if (filter && !filter(file)) continue
