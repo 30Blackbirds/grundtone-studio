@@ -18,8 +18,14 @@ interface ProjectListItem {
 // async fetch is pending — no extra reactive churn in downstream watchers
 // that compare by reference, and no hydration mismatches from differing
 // SSR / CSR allocations.
-const EMPTY_ORG_LIST: OrgListItem[] = []
-const EMPTY_PROJECT_LIST: ProjectListItem[] = []
+//
+// Object.freeze prevents the shared instance from being mutated in place
+// (push/sort/etc.). Without the freeze, an unsuspecting consumer could
+// corrupt every other consumer's view and on SSR potentially leak across
+// concurrent requests. The cast restores the mutable element type to
+// satisfy useAsyncData's default-factory signature — treat as read-only.
+const EMPTY_ORG_LIST = Object.freeze<OrgListItem[]>([]) as OrgListItem[]
+const EMPTY_PROJECT_LIST = Object.freeze<ProjectListItem[]>([]) as ProjectListItem[]
 const noOrgList = () => EMPTY_ORG_LIST
 const noProjectList = () => EMPTY_PROJECT_LIST
 const noMember = () => null
