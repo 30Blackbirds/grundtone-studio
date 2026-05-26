@@ -107,8 +107,8 @@ refactor), it cannot be marked completed without a test that exercises it.
 - **API keys: hash SHA-256 at rest, plaintext shown once.** Don't change the storage format.
 - **Storage paths:** `p/{projectId}/v{n}/tokens.{json,css}` are immutable;
   `p/{projectId}/current.{json,css}` is overwritten each publish.
-- **CDN endpoint path:** `/k/{plaintext_key}/{file}` — plaintext key lives in URL by design (same
-  model as Stripe `pk_live_` keys).
+- **CDN endpoint path:** `/k/{plaintext_key}/{file}` — plaintext key lives in URL by design (full
+  rationale in `docs/api/cdn-keys.md`; same model as Stripe `pk_live_` keys).
 
 ## i18n
 
