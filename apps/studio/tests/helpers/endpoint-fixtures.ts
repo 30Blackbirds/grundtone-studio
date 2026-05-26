@@ -22,9 +22,9 @@ export interface FakeSession {
   user: { id: string; email: string }
 }
 
-// Stable fake values reused across tests. Override fields per-test via
-// the seed* helpers — they return mutable copies so a test can edit them
-// without leaking into the next.
+// Stable fake values reused across tests. Tests that need to mutate
+// fields should spread into a fresh object (`{ ...PROJECT, name: '…' }`)
+// rather than touching these constants directly.
 export const ORG: FakeOrg = { id: 'org-1', slug: 'acme', name: 'Acme Corp' }
 export const PROJECT: FakeProject = {
   id: '00000000-0000-0000-0000-000000000001',
