@@ -2,11 +2,12 @@ import { z } from 'zod'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
-import { requireProjectAccess } from '~~/server/lib/project-access'
 import { generateApiKey } from '~~/server/lib/api-keys'
+import { API_KEY_ENVIRONMENTS } from '~~/server/lib/constants'
+import { requireProjectAccess } from '~~/server/lib/project-access'
 
 const bodySchema = z.object({
-  environment: z.enum(['live', 'test']).default('live'),
+  environment: z.enum(API_KEY_ENVIRONMENTS).default(API_KEY_ENVIRONMENTS[0]),
   allowedOrigins: z.array(z.string().min(1).max(200)).max(20).default([]),
   // Per-key requests-per-minute cap enforced by the /k/[key] handler.
   // Default matches the DB default (1000) so existing callers that omit
