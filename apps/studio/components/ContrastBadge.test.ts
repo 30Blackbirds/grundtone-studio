@@ -1,37 +1,20 @@
 // @vitest-environment happy-dom
 
-// Pattern for Vue component tests in the studio app. Test files for
-// non-trivial components (TokenEditor, ApiKeyManager, VersionHistory)
-// follow this same setup — vi.mock the grundtone-vue surface so we don't
-// need a real component library boot, then mount the SFC and assert
+// Pattern for Vue component tests in the studio app. Larger components
+// (TokenEditor, ApiKeyManager, VersionHistory) follow this same setup:
+// mount the SFC, register GT* stubs via global.components, and assert
 // against rendered output.
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 
 import ContrastBadge from './ContrastBadge.vue'
 
-// Stub the grundtone-vue components the SFC imports as auto-globals.
-// Each stub renders a recognisable element so we can query for it
-// without pulling in the real implementation.
-vi.mock('@grundtone/vue', () => ({
-  GTBadge: defineComponent({
-    name: 'GTBadge',
-    props: ['variant'],
-    setup(props, { slots }) {
-      return () =>
-        h('span', { 'data-test': 'gt-badge', 'data-variant': props.variant }, slots.default?.())
-    },
-  }),
-}))
-
-// useI18n autoimport — return the key verbatim so assertions are stable.
-vi.stubGlobal('useI18n', () => ({ t: (k: string) => k }))
-
-// The SFC also auto-resolves <GTBadge> via Nuxt's component resolution.
+// ContrastBadge auto-resolves <GTBadge> via Nuxt's component resolution.
 // vue-test-utils doesn't run that resolver, so we provide it as a global
-// component alias on mount. The same applies to any other GT* auto-import.
+// component alias on mount. The same pattern works for any other GT*
+// auto-import a component pulls in.
 const global = {
   components: {
     GTBadge: defineComponent({

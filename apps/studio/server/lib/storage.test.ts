@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { paths } from './storage'
 
-// Pure-function tests for the storage path helpers. The S3 client + putObject
-// / getObjectAsString round-trip needs a live MinIO container — that's
-// integration territory (queued behind the publish/activate e2e in #70).
-// Here we lock down the *path-shape contract* so a refactor of the helper
-// can't silently relocate blobs.
+// Pure-function tests for the storage path helpers. The S3 client +
+// putObject / getObjectAsString round-trip needs a live MinIO container,
+// which belongs in the e2e suite, not here. This file just locks down
+// the *path-shape contract* so a refactor of the helper can't silently
+// relocate blobs.
 
 describe('paths', () => {
   const PROJECT = '00000000-0000-0000-0000-000000000abc'
@@ -18,7 +18,7 @@ describe('paths', () => {
     expect(p.versionedCss(1)).toBe(`p/${PROJECT}/v1/tokens.css`)
   })
 
-  it('versionedJson/Css build the same path regardless of version number', () => {
+  it('versionedJson/Css embed the version number verbatim in the path', () => {
     const p = paths(PROJECT)
     expect(p.versionedJson(42)).toBe(`p/${PROJECT}/v42/tokens.json`)
     expect(p.versionedCss(999)).toBe(`p/${PROJECT}/v999/tokens.css`)

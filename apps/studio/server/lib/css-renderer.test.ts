@@ -67,14 +67,14 @@ describe('publish round-trip safety', () => {
   })
 
   it('renderTokensCss is idempotent across two parse-stringify cycles', () => {
-    // Same tokens object should emit the same CSS even if it's been
-    // round-tripped through JSON twice — neutralizes key-ordering and
-    // any subtle JS object identity assumptions.
+    // Same tokens object should emit the same CSS even after the tokens
+    // have been round-tripped through JSON — neutralises key-ordering
+    // and subtle JS object-identity assumptions.
+    const once = JSON.parse(JSON.stringify(DEFAULT_TOKENS)) as Tokens
+    const twice = JSON.parse(JSON.stringify(once)) as Tokens
     const a = renderTokensCss(DEFAULT_TOKENS)
-    const b = renderTokensCss(JSON.parse(JSON.stringify(DEFAULT_TOKENS)) as Tokens)
-    const c = renderTokensCss(
-      JSON.parse(JSON.stringify(b ? DEFAULT_TOKENS : DEFAULT_TOKENS)) as Tokens,
-    )
+    const b = renderTokensCss(once)
+    const c = renderTokensCss(twice)
     expect(a).toBe(b)
     expect(a).toBe(c)
   })
