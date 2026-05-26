@@ -62,8 +62,10 @@ Honest enumeration so reviewers aren't surprised later:
   Mitigation: per-key rate limit, allowed-origins allowlist (see `api_key.allowedOrigins`),
   revocation flow in Studio.
 - **High-volume hotlinking**: an attacker uses a customer's key on their own site to serve tokens
-  from our bandwidth. Mitigation: allowed-origins enforces a `Referer`/`Origin` check on the CDN
-  handler.
+  from our bandwidth. Mitigation: allowed-origins enforces an `Origin` header check on the CDN
+  handler when the header is present (browsers always send it on cross-origin requests). Server-
+  to-server callers that omit the header bypass the check by design — they're outside the threat
+  model.
 - **Key reuse across customer environments**: a leaked test key works on the customer's test
   project. Mitigation: separate `pk_test_` / `pk_live_` keys, customer is responsible for not
   committing `pk_live_` to a public repo.
