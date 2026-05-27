@@ -7,9 +7,14 @@
 // Runs in CI but also locally via `pnpm i18n:check`.
 
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const LOCALES_DIR = resolve(process.cwd(), 'apps/studio/i18n/locales')
+// Resolve relative to the script itself so the check works regardless of the
+// CWD it's invoked from — `pnpm i18n:check` from the repo root, a CI job with
+// an explicit `working-directory`, or a developer running `node` directly.
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const LOCALES_DIR = resolve(SCRIPT_DIR, '..', 'apps/studio/i18n/locales')
 const FILES = ['da.json', 'en.json']
 
 function load(file) {
