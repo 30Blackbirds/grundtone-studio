@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { createError, defineEventHandler, getRouterParam, setHeader } from 'h3'
 
 // Maps dev CDN-style URLs to the local saas-client build output. In production
 // these files are uploaded to Bunny.net during release; here we serve them
