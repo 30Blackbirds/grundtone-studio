@@ -202,7 +202,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      # Maintained third-party wrapper around rhysd/actionlint. Pinned to the
-      # v2 major; Dependabot will surface updates. Avoids piping a network
-      # script straight into bash.
+      # raven-actions/actionlint shells out to `npm install` from the repo
+      # root, which reads our package.json `engines: { node: ">=24" }` and
+      # rejects the default runner Node (22). setup-node bumps the runner to
+      # the pinned version before the actionlint action runs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: raven-actions/actionlint@v2
