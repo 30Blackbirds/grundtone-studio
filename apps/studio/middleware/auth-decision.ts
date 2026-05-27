@@ -3,10 +3,6 @@
 // Nuxt-specific side effects (session fetch + navigateTo); this function
 // just answers "given the current path, fullPath, and auth state, what
 // should happen?".
-//
-// Three outcomes:
-//   - 'allow'              — middleware lets the navigation through
-//   - { redirect: '/x' }   — middleware should call navigateTo('/x')
 
 const AUTH_PATHS: ReadonlySet<string> = new Set(['/login', '/signup'])
 
@@ -23,10 +19,9 @@ const PUBLIC_PATHS: ReadonlySet<string> = new Set([
 // invite-accept landings work unauthed) or /docs/ (any docs sub-page).
 const PUBLIC_PREFIXES: readonly string[] = ['/invitations/', '/docs/']
 
-export interface AuthDecision {
-  type: 'allow' | 'redirect'
-  to?: string
-}
+// Discriminated union so TypeScript narrows `to` to string in the
+// 'redirect' branch — callers don't need an `&& decision.to` guard.
+export type AuthDecision = { type: 'allow' } | { type: 'redirect'; to: string }
 
 const ALLOW: AuthDecision = { type: 'allow' }
 

@@ -13,7 +13,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     authed,
   })
 
-  if (decision.type === 'redirect' && decision.to) {
+  if (decision.type === 'redirect') {
     return navigateTo(decision.to)
   }
 })

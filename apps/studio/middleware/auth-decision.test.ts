@@ -67,10 +67,10 @@ describe('resolveAuthAction — unauthenticated', () => {
       fullPath: '/orgs/acme/projects/main?tab=tokens#section-2',
       authed,
     })
-    expect(decision.type).toBe('redirect')
-    expect(decision.to).toBe(
-      '/login?redirect=%2Forgs%2Facme%2Fprojects%2Fmain%3Ftab%3Dtokens%23section-2',
-    )
+    expect(decision).toEqual({
+      type: 'redirect',
+      to: '/login?redirect=%2Forgs%2Facme%2Fprojects%2Fmain%3Ftab%3Dtokens%23section-2',
+    })
   })
 
   it('escapes any characters that would break ?redirect= parsing', () => {
@@ -81,7 +81,7 @@ describe('resolveAuthAction — unauthenticated', () => {
       fullPath: '/orgs/a&b',
       authed,
     })
-    expect(decision.to).toBe('/login?redirect=%2Forgs%2Fa%26b')
+    expect(decision).toEqual({ type: 'redirect', to: '/login?redirect=%2Forgs%2Fa%26b' })
   })
 })
 

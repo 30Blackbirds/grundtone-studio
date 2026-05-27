@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Minimal inline event + h3 mock — duplicating the helper from
-// tests/helpers/endpoint-fixtures.ts deliberately because that file
-// lives on the parallel PR #33. Once #33 merges this can be swapped to
-// the import-from-helper variant.
+// Minimal inline event + h3 mock. The full helper in
+// tests/helpers/endpoint-fixtures.ts is the long-term home; this file
+// inlines the surface we actually need so the test stays loadable even
+// before that helper exists on the branch.
 interface FakeEvent {
   params: Record<string, string>
   body: unknown
@@ -47,18 +47,30 @@ const memberInserts: Array<{ projectId: string; userId: string; role: string }> 
 const inviteStatusUpdates: Array<{ inviteId: string; status: string }> = []
 
 vi.mock('h3', () => mockH3())
-vi.mock('drizzle-orm', () => ({ eq: () => null }))
+// eq(col, value) → object stashing the value so the db mock's
+// where() can read it back and filter against fixtures.
+vi.mock('drizzle-orm', () => ({ eq: (_col: unknown, value: string) => ({ value }) }))
+
+// Capture the id passed to the most recent invite where(eq(...)) so the
+// mock filters like the real query — guards against a regression where
+// the handler queries by the wrong column or skips the predicate.
+let lastQueriedInviteId: string | null = null
 
 const dbMock = {
   select: (cols?: Record<string, unknown>) => {
     const isUserQuery = cols && 'email' in cols
     return {
       from: () => ({
-        where: () => {
+        where: (predicate: { value?: string } | null) => {
           if (isUserQuery) {
             return Promise.resolve(signedInEmail ? [{ email: signedInEmail }] : [])
           }
-          return Promise.resolve(invites.slice(0, 1))
+          // The handler calls `where(eq(projectInvitation.id, invitationId))`.
+          // Our eq() mock below stashes the value on the returned object so
+          // we can filter accurately here.
+          const queriedId = predicate?.value ?? null
+          lastQueriedInviteId = queriedId
+          return Promise.resolve(invites.filter((inv) => inv.id === queriedId))
         },
       }),
     }
@@ -120,6 +132,7 @@ beforeEach(() => {
   memberInserts.length = 0
   inviteStatusUpdates.length = 0
   signedInEmail = null
+  lastQueriedInviteId = null
   getSession.mockReset()
 })
 
@@ -138,6 +151,18 @@ describe('POST /api/invitations/project/[invitationId]/accept', () => {
   it('404 when the invitation does not exist', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
     invites.length = 0
+    await expect(
+      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
+    ).rejects.toMatchObject({ statusCode: 404 })
+    // Sanity-check that the handler did query by the invitationId we passed.
+    expect(lastQueriedInviteId).toBe(VALID_INVITE_ID)
+  })
+
+  it('404 when an invite exists but for a different id', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
+    // An invite exists under a different id — the where(eq(id, …)) filter
+    // must reject the lookup, not blindly return the first row.
+    invites.push(freshInvite({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }))
     await expect(
       handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
     ).rejects.toMatchObject({ statusCode: 404 })
