@@ -47,6 +47,11 @@ jobs:
       S3_ACCESS_KEY_ID: ci
       S3_SECRET_ACCESS_KEY: ci-secret
       TURBO_TELEMETRY_DISABLED: 1
+      # Turbo remote cache. Both vars come from repo secrets; if unset
+      # (e.g. on PRs from forks), Turbo silently falls back to the local
+      # cache and CI still works — just slower on cold runs.
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
     steps:
       - uses: actions/checkout@v4
@@ -91,10 +96,20 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Audit dependencies (high+)
-        run: pnpm audit --prod --audit-level=high || true
-        # Soft-fail today: too many transitive advisories from old packages.
-        # Flip to a hard fail once we've cleaned house (TODO #58 batch).
+      - name: Audit production dependencies (high + critical)
+        run: pnpm audit --prod --audit-level=high
+        # Hard-fail on high or critical CVEs in the production dep tree.
+        # If a transitive dep has a real advisory, the right answer is to
+        # bump it (or pnpm.overrides it) rather than restoring `|| true`.
+        # Moderate and low advisories still pass — Dependabot surfaces
+        # them as separate PRs when fixes are available.
 
       - name: Build
         run: pnpm build
+
+      - name: Bundle size check
+        run: pnpm --filter @grundtone-studio/studio bundle:size
+        # Reads .output/public/ + .output/server/ from the build above,
+        # compares against thresholds in apps/studio/.size-limit.json,
+        # and fails the run if any chunk exceeds its budget. Keeps us
+        # from accidentally regressing the SDK or studio chunks.
