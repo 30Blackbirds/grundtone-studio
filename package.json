@@ -21,6 +21,7 @@
     "db:migrate:local": "pnpm --filter @grundtone-studio/studio db:migrate:local",
     "db:studio": "pnpm --filter @grundtone-studio/studio db:studio",
     "db:seed": "pnpm --filter @grundtone-studio/studio db:seed",
+    "i18n:check": "node scripts/check-i18n-parity.mjs",
     "changeset": "changeset",
     "release:sdk": "pnpm --filter @grundtone/saas-client build && changeset tag",
     "prepare": "husky"
