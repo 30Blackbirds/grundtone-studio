@@ -202,9 +202,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Install and run actionlint
-        # Canonical install script from upstream (rhysd/actionlint). Pinned to
-        # the main branch's installer; the binary itself reports its version.
-        run: |
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          ./actionlint -color
+      # Maintained third-party wrapper around rhysd/actionlint. Pinned to the
+      # v2 major; Dependabot will surface updates. Avoids piping a network
+      # script straight into bash.
+      - uses: raven-actions/actionlint@v2
