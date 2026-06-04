@@ -160,3 +160,53 @@ jobs:
         # compares against thresholds in apps/studio/.size-limit.json, and
         # fails the run if any chunk exceeds its budget.
         run: pnpm --filter @grundtone-studio/studio bundle:size
+
+  migration-drift:
+    name: Migration drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # drizzle-kit generate doesn't talk to the DB, but the config still
+      # reads DATABASE_URL at module-load time. Any well-formed URL works.
+      DATABASE_URL: postgresql://grundtone:drift@127.0.0.1:5432/grundtone_studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Generate migrations from schema
+        run: pnpm db:generate
+      - name: Fail if generated files differ from committed
+        run: |
+          if [[ -n "$(git status --porcelain apps/studio/server/db/migrations)" ]]; then
+            echo "::error::Schema changed without a regenerated migration. Run \`pnpm db:generate\` locally and commit the result."
+            git status apps/studio/server/db/migrations
+            git --no-pager diff apps/studio/server/db/migrations
+            exit 1
+          fi
+          echo "✓ migrations are in sync with schema"
+
+  i18n-parity:
+    name: i18n parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # No pnpm install needed — the script is plain Node + node:fs.
+      - run: node scripts/check-i18n-parity.mjs
+
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # raven-actions/actionlint shells out to `npm install` from the repo
+      # root, which reads our package.json `engines: { node: ">=24" }` and
+      # rejects the default runner Node (22). setup-node bumps the runner to
+      # the pinned version before the actionlint action runs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: raven-actions/actionlint@v2
