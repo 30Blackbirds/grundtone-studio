@@ -190,7 +190,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
       # No pnpm install needed — the script is plain Node + node:fs.
@@ -206,7 +206,7 @@ jobs:
       # root, which reads our package.json `engines: { node: ">=24" }` and
       # rejects the default runner Node (22). setup-node bumps the runner to
       # the pinned version before the actionlint action runs.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
       - uses: raven-actions/actionlint@v2
