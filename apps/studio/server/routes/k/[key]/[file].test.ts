@@ -1,0 +1,199 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
+
+// Each test sets up the rows it wants the handler to see. The db mock is the
+// same shape as the real Drizzle chain — select().from().innerJoin().where()
+// resolves to whatever the current test pushed in.
+interface KeyRow {
+  projectId: string
+  allowedOrigins: string[]
+  rateLimit: number
+}
+let nextDbRows: KeyRow[] = []
+
+// Storage map: tests pre-set the bytes that getObjectAsString should return
+// for each blob key. Missing key → null (handler returns 404).
+const storage = new Map<string, string>()
+
+vi.mock('h3', () => mockH3())
+vi.mock('drizzle-orm', () => ({
+  and: () => null,
+  eq: () => null,
+  isNull: () => null,
+}))
+vi.mock('~~/server/db', () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        innerJoin: () => ({
+          where: () => Promise.resolve(nextDbRows),
+        }),
+      }),
+    }),
+  },
+}))
+vi.mock('~~/server/db/schema', () => ({
+  apiKey: {
+    projectId: 'project_id',
+    allowedOrigins: 'allowed_origins',
+    rateLimit: 'rate_limit',
+    keyHash: 'key_hash',
+    revokedAt: 'revoked_at',
+  },
+  project: { id: 'id' },
+}))
+vi.mock('~~/server/lib/storage', () => ({
+  paths: (projectId: string) => ({
+    currentJson: `p/${projectId}/current.json`,
+    currentCss: `p/${projectId}/current.css`,
+  }),
+  getObjectAsString: (key: string) => Promise.resolve(storage.get(key) ?? null),
+}))
+
+const handler = (await import('./[file].get')).default as unknown as (
+  event: FakeEvent,
+) => Promise<unknown>
+
+// Distinct key + projectId per test isolates the module-scoped TTLCache +
+// sliding-window rate limiter that the handler stitches across calls.
+let testCounter = 0
+function fresh(opts: Partial<KeyRow> = {}): { key: string; projectId: string; row: KeyRow } {
+  testCounter += 1
+  const key = `pk_test_${testCounter.toString().padStart(4, '0')}`
+  const projectId = `proj-${testCounter}`
+  const row: KeyRow = {
+    projectId,
+    allowedOrigins: opts.allowedOrigins ?? [],
+    rateLimit: opts.rateLimit ?? 1000,
+  }
+  return { key, projectId, row }
+}
+
+beforeEach(() => {
+  nextDbRows = []
+  storage.clear()
+})
+
+describe('GET /k/[key]/[file]', () => {
+  it('404s when key or file is missing', async () => {
+    await expect(handler(fakeEvent({ params: {} }))).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('404s on a file name outside the allowlist', async () => {
+    await expect(
+      handler(fakeEvent({ params: { key: 'pk_test_x', file: 'evil.js' } })),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('401s when the API key hash does not resolve to a row', async () => {
+    nextDbRows = [] // no matching row → 401
+    await expect(
+      handler(fakeEvent({ params: { key: 'pk_test_unknown', file: 'tokens.json' } })),
+    ).rejects.toMatchObject({ statusCode: 401 })
+  })
+
+  it('404s when the storage blob is missing (project not published yet)', async () => {
+    const { key, row } = fresh()
+    nextDbRows = [row]
+    await expect(
+      handler(fakeEvent({ params: { key, file: 'tokens.json' } })),
+    ).rejects.toMatchObject({ statusCode: 404, message: expect.stringContaining('Not published') })
+  })
+
+  it('returns tokens.json with content-type, cache-control, CORS and an ETag', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{"colors":{"primary":"#000"}}')
+    const event = fakeEvent({ params: { key, file: 'tokens.json' } })
+    const body = await handler(event)
+    expect(body).toBe('{"colors":{"primary":"#000"}}')
+    expect(event.responseHeaders['content-type']).toBe('application/json')
+    expect(event.responseHeaders['cache-control']).toBe('public, max-age=60, must-revalidate')
+    expect(event.responseHeaders['access-control-allow-origin']).toBe('*')
+    expect(event.responseHeaders.etag).toMatch(/^"[a-f0-9]{16}"$/)
+  })
+
+  it('returns tokens.css with the CSS content-type', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.css`, ':root{--color-primary:#000}')
+    const event = fakeEvent({ params: { key, file: 'tokens.css' } })
+    await handler(event)
+    expect(event.responseHeaders['content-type']).toBe('text/css')
+  })
+
+  it('reflects the request Origin into the CORS header and Vary: Origin', async () => {
+    const { key, projectId, row } = fresh({ allowedOrigins: ['acme.com'] })
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    const event = fakeEvent({
+      params: { key, file: 'tokens.json' },
+      headers: { origin: 'https://acme.com' },
+    })
+    await handler(event)
+    expect(event.responseHeaders['access-control-allow-origin']).toBe('https://acme.com')
+    expect(event.responseHeaders.vary).toBe('Origin')
+  })
+
+  it('responds 304 when If-None-Match matches the served ETag', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{"v":1}')
+
+    // First call: populate caches and capture the ETag we'll echo back.
+    const first = fakeEvent({ params: { key, file: 'tokens.json' } })
+    await handler(first)
+    const etag = first.responseHeaders.etag
+    expect(etag).toBeTruthy()
+
+    // Second call with the same ETag should short-circuit to 304 + empty body.
+    const second = fakeEvent({
+      params: { key, file: 'tokens.json' },
+      headers: { 'if-none-match': etag },
+    })
+    const body = await handler(second)
+    expect(body).toBe('')
+    expect(second.responseStatus).toBe(304)
+  })
+
+  it('403s when the request Origin is not in the allowlist', async () => {
+    const { key, projectId, row } = fresh({ allowedOrigins: ['acme.com'] })
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    await expect(
+      handler(
+        fakeEvent({
+          params: { key, file: 'tokens.json' },
+          headers: { origin: 'https://evil.example' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  it('accepts wildcard subdomains via *.host patterns', async () => {
+    const { key, projectId, row } = fresh({ allowedOrigins: ['*.acme.com'] })
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    const event = fakeEvent({
+      params: { key, file: 'tokens.json' },
+      headers: { origin: 'https://studio.acme.com' },
+    })
+    await expect(handler(event)).resolves.toBeTruthy()
+  })
+
+  it('429s after the per-key rate limit is exceeded', async () => {
+    const { key, projectId, row } = fresh({ rateLimit: 2 })
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{}')
+
+    // Two requests inside the limit succeed.
+    await handler(fakeEvent({ params: { key, file: 'tokens.json' } }))
+    await handler(fakeEvent({ params: { key, file: 'tokens.json' } }))
+
+    // Third request trips the sliding window — handler raises 429 with a
+    // Retry-After header so a well-behaved client can back off.
+    const overLimit = fakeEvent({ params: { key, file: 'tokens.json' } })
+    await expect(handler(overLimit)).rejects.toMatchObject({ statusCode: 429 })
+    expect(overLimit.responseHeaders['retry-after']).toMatch(/^\d+$/)
+  })
+})

@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto'
 import { eq, isNull, and } from 'drizzle-orm'
+import {
+  createError,
+  defineEventHandler,
+  getRequestHeader,
+  getRouterParam,
+  setHeader,
+  setResponseStatus,
+} from 'h3'
 import { db } from '~~/server/db'
 import { apiKey, project } from '~~/server/db/schema'
 import { hashApiKey } from '~~/server/lib/api-keys'
