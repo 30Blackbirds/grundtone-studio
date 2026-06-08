@@ -24,7 +24,7 @@
     "bundle:size": "node scripts/bundle-size.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1061.0",
+    "@aws-sdk/client-s3": "^3.1063.0",
     "@grundtone/core": "^2.22.0",
     "@grundtone/nuxt": "^2.23.3",
     "@grundtone/vue": "^2.23.3",
@@ -33,7 +33,7 @@
     "better-auth": "^1.6.14",
     "drizzle-orm": "^0.45.2",
     "h3": "^1.15.11",
-    "marked": "^18.0.4",
+    "marked": "^18.0.5",
     "nodemailer": "^8.0.10",
     "postgres": "^3.4.9",
     "tsx": "^4.22.4",
