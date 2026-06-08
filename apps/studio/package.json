@@ -46,7 +46,7 @@
     "@types/nodemailer": "^8.0.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vitest/coverage-v8": "^4.1.8",
-    "@vue/test-utils": "^2.4.10",
+    "@vue/test-utils": "^2.4.11",
     "drizzle-kit": "^0.31.10",
     "happy-dom": "^20.10.1",
     "nuxt": "^3.19.2",
