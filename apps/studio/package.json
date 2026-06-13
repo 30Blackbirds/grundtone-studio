@@ -48,7 +48,7 @@
     "@vitest/coverage-v8": "^4.1.8",
     "@vue/test-utils": "^2.4.10",
     "drizzle-kit": "^0.31.10",
-    "happy-dom": "^20.10.1",
+    "happy-dom": "^20.10.3",
     "nuxt": "^3.19.2",
     "sass": "^1.100.0",
     "typescript": "^5.8.3",
