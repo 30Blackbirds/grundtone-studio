@@ -9,7 +9,7 @@ export default {
     'scope-enum': [
       2,
       'always',
-      ['auth', 'db', 'dashboard', 'api', 'ui', 'deps', 'config', 'ci', 'docs', 'deploy'],
+      ['auth', 'db', 'dashboard', 'api', 'ui', 'deps', 'deps-dev', 'config', 'ci', 'docs', 'deploy'],
     ],
     'scope-empty': [0],
     'subject-case': [2, 'never', ['start-case', 'pascal-case', 'upper-case']],

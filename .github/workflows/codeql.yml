@@ -64,5 +64,13 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
+        # Upload to the Security tab requires GitHub Advanced Security on
+        # this private repo. Without GHAS the upload returns "Code Security
+        # must be enabled" and turns the check red on every PR — yet the
+        # analysis itself runs fine and would still surface real config
+        # errors in the workflow logs. Soft-fail this step so CI is clean;
+        # remove `continue-on-error` the moment GHAS is enabled and we
+        # actually start ingesting SARIF results.
+        continue-on-error: true
         with:
           category: '/language:${{ matrix.language }}'
