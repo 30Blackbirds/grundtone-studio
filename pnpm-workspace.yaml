@@ -1,3 +1,23 @@
 packages:
   - apps/*
   - packages/*
+
+# Force-bump transitive deps that have a high-severity advisory the upstream
+# owner hasn't picked up yet. Each override needs a justification line — re-
+# evaluate periodically and remove once the natural tree resolves to the same
+# or newer version.
+#
+# Note: migrated here from package.json's pnpm.overrides because pnpm 10
+# ignores that field (warns: "no longer read by pnpm").
+overrides:
+  # GHSA-77vg-94rm-hx3p — DoS via sparse-array deserialization in 5.6.3–5.8.0.
+  # Pulled in by @nuxtjs/i18n; remove when that package bumps.
+  devalue: ^5.8.1
+  # GHSA-w7jw-789q-3m8p — critical: shell-quote quote() does not escape
+  # newlines in object .op values; patched in 1.8.4. Pulled in by
+  # @nuxt/devtools > launch-editor (transitive through @sentry/nuxt > nuxt).
+  shell-quote: ^1.8.4
+  # GHSA-gv7w-rqvm-qjhr — high: esbuild missing binary integrity verification
+  # in Deno module enables RCE via NPM_CONFIG_REGISTRY; patched in 0.28.1.
+  # Pulled in by @nuxtjs/i18n + nitropack + sentry chain.
+  esbuild: ^0.28.1
