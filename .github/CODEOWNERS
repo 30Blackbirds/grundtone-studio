@@ -1,0 +1,17 @@
+# grundtone-studio ejes af [grundtone]-tab per Beslutning I.
+# Allan = code-owner i single-committer-fasen.
+
+*                       @allanasp
+
+# Quality + workflow konfig — særligt følsomt for systemisk drift
+.github/                @allanasp
+.husky/                 @allanasp
+
+# Studio web-app — Nuxt + BetterAuth + Drizzle
+apps/studio/            @allanasp
+
+# Runtime SDK (CDN bundle + private npm)
+packages/saas-client/   @allanasp
+
+# Quality-config consumption
+commitlint.config.js    @allanasp
