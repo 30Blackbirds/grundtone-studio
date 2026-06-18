@@ -3,7 +3,7 @@
   const { t } = useI18n()
 
   const runtimeConfig = useRuntimeConfig()
-  const cdnBase = computed(() => runtimeConfig.public.cdnBase || 'https://cdn.grundtone.io')
+  const cdnBase = computed(() => runtimeConfig.public.cdnBase || 'https://cdn.grundtone.com')
   const sampleKey = 'pk_live_<your-key>'
 
   // Concatenate `<` + `/script>` so the literal closing tag doesn't appear in
@@ -85,7 +85,7 @@ loadByApiKey({ apiKey: '${sampleKey}' })`,
         class="m-0 p-3 bg-surface border rounded font-mono text-sm overflow-x-auto"
       ><code>&lt;script
   src="{{ cdnBase }}/client/v1.0.0.js"
-  integrity="sha384-&lt;hash from cdn.grundtone.io/client/v1.0.0.js.sri&gt;"
+  integrity="sha384-&lt;hash from cdn.grundtone.com/client/v1.0.0.js.sri&gt;"
   crossorigin="anonymous"
   data-api-key="{{ sampleKey }}"&gt;&lt;/script&gt;</code></pre>
     </section>

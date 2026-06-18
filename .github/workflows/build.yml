@@ -134,7 +134,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: https://studio.grundtone.io
+      url: https://studio.grundtone.com
 
     steps:
       - name: Snapshot before deploy
@@ -167,7 +167,7 @@ jobs:
       - name: Smoke test
         run: |
           for i in $(seq 1 30); do
-            if curl -sf https://studio.grundtone.io/api/healthz > /dev/null; then
+            if curl -sf https://studio.grundtone.com/api/healthz > /dev/null; then
               echo "✓ production is responding"
               exit 0
             fi

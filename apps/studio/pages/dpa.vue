@@ -12,7 +12,7 @@
 
     <GTAlert variant="info" :heading="t('dpa.intakeHeading')">
       {{ t('dpa.intakeBody') }}
-      <a href="mailto:legal@grundtone.io" class="text-primary">legal@grundtone.io</a>
+      <a href="mailto:legal@grundtone.com" class="text-primary">legal@grundtone.com</a>
     </GTAlert>
 
     <p>{{ t('dpa.intro') }}</p>

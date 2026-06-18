@@ -48,7 +48,7 @@
 
     <h2 class="font-heading text-2xl mt-6 mb-3">{{ t('privacy.contactHeading') }}</h2>
     <p>
-      <a href="mailto:privacy@grundtone.io" class="text-primary">privacy@grundtone.io</a>
+      <a href="mailto:privacy@grundtone.com" class="text-primary">privacy@grundtone.com</a>
     </p>
   </article>
 </template>

@@ -12,7 +12,7 @@
 //   import { grundtone } from '@grundtone/saas-client'
 //   app.use(grundtone, { apiKey: 'pk_live_...' })
 //
-//   <script src="https://cdn.grundtone.io/client/v1.js"
+//   <script src="https://cdn.grundtone.com/client/v1.js"
 //           data-api-key="pk_live_..."></script>
 
 import { createTheme } from '@grundtone/core'
@@ -20,7 +20,7 @@ import { applyThemeToDOM } from './applyThemeToDOM'
 
 export interface GrundtoneOptions {
   apiKey: string
-  /** Override the CDN base (e.g. for self-hosted Studio). Default: https://cdn.grundtone.io */
+  /** Override the CDN base (e.g. for self-hosted Studio). Default: https://cdn.grundtone.com */
   cdnBase?: string
   /** 'light' (default), 'dark', or 'auto' to follow prefers-color-scheme. */
   mode?: 'light' | 'dark' | 'auto'
@@ -32,7 +32,7 @@ export interface GrundtoneOptions {
   onError?: (err: unknown) => void
 }
 
-const DEFAULT_CDN = 'https://cdn.grundtone.io'
+const DEFAULT_CDN = 'https://cdn.grundtone.com'
 export const VERSION = '0.0.1'
 
 function detectMode(): 'light' | 'dark' {

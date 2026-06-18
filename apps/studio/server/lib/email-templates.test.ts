@@ -26,7 +26,7 @@ describe('localeFromCookieHeader', () => {
 })
 
 describe('magicLinkEmail', () => {
-  const args = { url: 'https://studio.grundtone.io/magic/abc' }
+  const args = { url: 'https://studio.grundtone.com/magic/abc' }
 
   it('renders Danish by default', () => {
     const m = magicLinkEmail(args)
@@ -46,7 +46,7 @@ describe('orgInviteEmail', () => {
   it('escapes user-controlled strings in HTML', () => {
     const m = orgInviteEmail(
       {
-        acceptUrl: 'https://studio.grundtone.io/invitations/1',
+        acceptUrl: 'https://studio.grundtone.com/invitations/1',
         orgName: 'Acme <script>alert(1)</script>',
         inviterDisplay: 'Bobby "Tables" Drop',
       },
@@ -61,7 +61,7 @@ describe('orgInviteEmail', () => {
 })
 
 describe('verifyEmailEmail', () => {
-  const args = { url: 'https://studio.grundtone.io/api/auth/verify-email?token=xyz' }
+  const args = { url: 'https://studio.grundtone.com/api/auth/verify-email?token=xyz' }
 
   it('renders Danish by default with personalized greeting when name is given', () => {
     const m = verifyEmailEmail({ ...args, name: 'Allan' })
@@ -92,7 +92,7 @@ describe('verifyEmailEmail', () => {
     // signup form, url is constructed by Better Auth but contains a token
     // we don't validate. Treat both as untrusted in the HTML body.
     const unsafeUrl =
-      'https://studio.grundtone.io/api/auth/verify-email?token=xyz&next=" onclick="alert(1)'
+      'https://studio.grundtone.com/api/auth/verify-email?token=xyz&next=" onclick="alert(1)'
     const m = verifyEmailEmail({ url: unsafeUrl, name: 'Allan <script>alert(1)</script>' }, 'en')
     expect(m.html).not.toContain('<script>alert(1)</script>')
     expect(m.html).toContain('&lt;script&gt;')
@@ -109,7 +109,7 @@ describe('verifyEmailEmail', () => {
 
 describe('projectInviteEmail', () => {
   const args = {
-    acceptUrl: 'https://studio.grundtone.io/invitations/project/1',
+    acceptUrl: 'https://studio.grundtone.com/invitations/project/1',
     projectName: 'Main',
     orgName: 'Acme',
     role: 'editor' as const,

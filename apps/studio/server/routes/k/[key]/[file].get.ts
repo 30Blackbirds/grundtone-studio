@@ -55,7 +55,7 @@ function buildEtag(body: string): string {
 
 /**
  * Public CDN-style endpoint mirroring the production URL pattern
- *   cdn.grundtone.io/k/<pk_live_...>/tokens.json
+ *   cdn.grundtone.com/k/<pk_live_...>/tokens.json
  *
  * Pipeline:
  *   1. Resolve API key → project (in-memory cache, DB on miss)
