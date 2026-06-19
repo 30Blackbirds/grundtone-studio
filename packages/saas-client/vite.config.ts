@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
  * Emit a SHA-384 hash file next to every output bundle, so consumers can
  * pin the script-tag with a Sub-Resource Integrity attribute.
  *
- *   <script src="cdn.grundtone.io/client/v1.0.0.js"
+ *   <script src="cdn.grundtone.com/client/v1.0.0.js"
  *           integrity="sha384-<hash from v1.0.0.js.sri>"
  *           crossorigin="anonymous"></script>
  *

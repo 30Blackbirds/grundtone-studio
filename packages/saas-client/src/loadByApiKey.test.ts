@@ -59,7 +59,7 @@ describe('loadByApiKey', () => {
     await loadByApiKey({ apiKey: 'pk_live_abc/with spaces' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://cdn.grundtone.io/k/pk_live_abc%2Fwith%20spaces/tokens.json')
+    expect(url).toBe('https://cdn.grundtone.com/k/pk_live_abc%2Fwith%20spaces/tokens.json')
     expect((init as RequestInit).headers).toMatchObject({ Accept: 'application/json' })
   })
 

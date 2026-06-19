@@ -15,7 +15,7 @@ import { apiKey } from '../db/schema'
 //   BUNNY_PURGE_API_KEY  — account-level Account API key from Bunny dashboard
 //                          (Account Settings → API). NOT the storage-zone
 //                          password used by upload-sdk-to-bunny.sh.
-//   NUXT_PUBLIC_CDN_BASE — the CDN host (e.g. https://cdn.grundtone.io).
+//   NUXT_PUBLIC_CDN_BASE — the CDN host (e.g. https://cdn.grundtone.com).
 //
 // If either is unset the function logs a single line and exits — that's the
 // dev path where we don't have a real CDN to purge. Production deploys must

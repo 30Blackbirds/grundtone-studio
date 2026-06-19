@@ -105,11 +105,11 @@ describe('recordAuditEvent', () => {
       organizationId: ORG_ID,
       action: 'member.invited',
       actorUserId: 'system-1',
-      actorEmail: 'system@grundtone.io',
+      actorEmail: 'system@grundtone.com',
     })
     expect(inserts[0]).toMatchObject({
       actorUserId: 'system-1',
-      actorEmail: 'system@grundtone.io',
+      actorEmail: 'system@grundtone.com',
     })
   })
 

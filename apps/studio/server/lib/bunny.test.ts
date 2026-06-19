@@ -33,7 +33,7 @@ beforeEach(() => {
   fetchMock.mockReset()
   globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
   process.env.BUNNY_PURGE_API_KEY = 'test-bunny-key'
-  process.env.NUXT_PUBLIC_CDN_BASE = 'https://cdn.grundtone.io'
+  process.env.NUXT_PUBLIC_CDN_BASE = 'https://cdn.grundtone.com'
 })
 
 const originalFetch = globalThis.fetch
@@ -75,8 +75,8 @@ describe('purgeProjectCdn', () => {
     expect(count).toBe(2)
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const urls = fetchMock.mock.calls.map(([url]) => url as string)
-    expect(urls[0]).toContain(encodeURIComponent('https://cdn.grundtone.io/k/pk_live_aaaaaaaa*'))
-    expect(urls[1]).toContain(encodeURIComponent('https://cdn.grundtone.io/k/pk_test_bbbbbbbb*'))
+    expect(urls[0]).toContain(encodeURIComponent('https://cdn.grundtone.com/k/pk_live_aaaaaaaa*'))
+    expect(urls[1]).toContain(encodeURIComponent('https://cdn.grundtone.com/k/pk_test_bbbbbbbb*'))
   })
 
   it('passes the API key as AccessKey header (Bunny convention)', async () => {
@@ -114,10 +114,10 @@ describe('purgeProjectCdn', () => {
 
   it('strips trailing slash on the CDN base before composing the purge URL', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }))
-    process.env.NUXT_PUBLIC_CDN_BASE = 'https://cdn.grundtone.io/'
+    process.env.NUXT_PUBLIC_CDN_BASE = 'https://cdn.grundtone.com/'
     await purgeProjectCdn('p1', { keyPrefixes: ['pk_live_x'] })
     expect(fetchMock.mock.calls[0][0]).toContain(
-      encodeURIComponent('https://cdn.grundtone.io/k/pk_live_x*'),
+      encodeURIComponent('https://cdn.grundtone.com/k/pk_live_x*'),
     )
   })
 
