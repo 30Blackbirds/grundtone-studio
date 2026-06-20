@@ -27,11 +27,15 @@ ENV NITRO_HOST=0.0.0.0
 
 RUN addgroup -S app && adduser -S app -G app
 
-# Nitro produces a self-contained .output bundle — no extra node_modules needed
+# Nitro produces a self-contained .output bundle — no extra node_modules needed for serving
 COPY --from=builder --chown=app:app /app/apps/studio/.output ./.output
 # Drizzle migrations + entrypoint for runtime db:migrate
 COPY --from=builder --chown=app:app /app/apps/studio/server/db ./server/db
 COPY --from=builder --chown=app:app /app/apps/studio/package.json ./package.json
+# Runtime needs tsx + drizzle-orm/kit + pg-driver for entrypoint.sh's migrate step.
+# Studio-workspace's node_modules has alle bin-scripts (tsx) + lokale deps.
+# Mountes som /app/node_modules så entrypoint.sh's cwd-relative path virker.
+COPY --from=builder --chown=app:app /app/apps/studio/node_modules ./node_modules
 # Changelog files read by /api/changelog/[source] at runtime
 COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
 COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md
