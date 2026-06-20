@@ -19,6 +19,11 @@ COPY . .
 RUN pnpm --filter @grundtone/saas-client build && \
     pnpm --filter @grundtone-studio/studio build
 
+# pnpm deploy bygger en self-contained prod-bundle for studio-workspace.
+# Erstatter manuel node_modules-copy som brækker pga. pnpm-workspace-symlinks
+# der peger på .pnpm/-store i workspace-root.
+RUN pnpm --filter @grundtone-studio/studio deploy --prod --legacy /deploy
+
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -27,15 +32,10 @@ ENV NITRO_HOST=0.0.0.0
 
 RUN addgroup -S app && adduser -S app -G app
 
-# Nitro produces a self-contained .output bundle — no extra node_modules needed for serving
-COPY --from=builder --chown=app:app /app/apps/studio/.output ./.output
-# Drizzle migrations + entrypoint for runtime db:migrate
-COPY --from=builder --chown=app:app /app/apps/studio/server/db ./server/db
-COPY --from=builder --chown=app:app /app/apps/studio/package.json ./package.json
-# Runtime needs tsx + drizzle-orm/kit + pg-driver for entrypoint.sh's migrate step.
-# Studio-workspace's node_modules has alle bin-scripts (tsx) + lokale deps.
-# Mountes som /app/node_modules så entrypoint.sh's cwd-relative path virker.
-COPY --from=builder --chown=app:app /app/apps/studio/node_modules ./node_modules
+# pnpm-deploy-bundle: self-contained med Nitro-.output + node_modules
+# (resolved symlinks, prod-only). Kopierer hele /deploy som indeholder
+# .output, server/db, package.json, node_modules — alt klar til runtime.
+COPY --from=builder --chown=app:app /deploy ./
 # Changelog files read by /api/changelog/[source] at runtime
 COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
 COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md
