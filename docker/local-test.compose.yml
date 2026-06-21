@@ -1,0 +1,43 @@
+# Local-test stack — Postgres + app fra GHCR (samme image som prod).
+# Bruger til at validere runtime-config + entrypoint-bugs uden at burne prod-tags.
+#
+# Køre:
+#   docker login ghcr.io -u <din-bruger>   # PAT med read:packages
+#   docker compose -f docker/local-test.compose.yml --env-file docker/local-test.env up -d
+#   curl http://localhost:3000/api/healthz   # forventet 200 efter migrations
+#
+# Iterer entrypoint/migration-bugs:
+#   docker compose -f docker/local-test.compose.yml --env-file docker/local-test.env logs -f app
+#   # ret entrypoint.sh / docker-compose / .env, restart:
+#   docker compose -f docker/local-test.compose.yml --env-file docker/local-test.env up -d --force-recreate app
+#
+# Når kode-changes kræver build: kør 'docker build -t grundtone-studio:local .' fra repo-root,
+# skift app.image til 'grundtone-studio:local' og restart.
+#
+# Stop + ryd:
+#   docker compose -f docker/local-test.compose.yml down -v
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: grundtone_studio
+      POSTGRES_USER: studio_app
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U studio_app -d grundtone_studio']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: ghcr.io/klanghaus/grundtone-studio:${IMAGE_TAG:-0.1.2}
+    env_file:
+      - local-test.env
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
