@@ -1,0 +1,53 @@
+# Tilt compose-fragment for grundtone-studio (Nuxt 3 + BetterAuth embedded).
+# Auto-loaded af KlangHaus/infra/tilt/Tiltfile når repoet ligger som sibling
+# (~/repos/klanghaus/grundtone-studio/). Studio er customer-facing men loades
+# her for at give workers et samlet end-til-end-test-miljø.
+
+name: klanghaus-local
+
+services:
+  grundtone-studio:
+    image: ghcr.io/klanghaus/grundtone-studio:local
+    build:
+      context: ../../grundtone-studio
+      dockerfile: ../../grundtone-studio/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NITRO_PORT: '3000'
+      NITRO_HOST: 0.0.0.0
+      # Egen dedikeret database i samme Postgres-instans
+      DATABASE_URL: postgres://klanghaus:localdev@postgres:5432/grundtone_studio
+      # BetterAuth dev-secret (embedded auth indtil evt. pivot til central [auth])
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-32byte-secret-only-for-tilt-local}
+      BETTER_AUTH_URL: http://localhost:3000
+      # S3 → MinIO i backing-infra
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: grundtone-studio-local
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Email via Mailpit (lokal SMTP-catcher)
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      SMTP_SECURE: 'false'
+      EMAIL_FROM: 'Grundtone Studio <noreply@grundtone.local>'
+      # Nuxt public — host's view (browser laver requests fra host, så bruger localhost)
+      NUXT_PUBLIC_APP_URL: http://localhost:3000
+      NUXT_PUBLIC_CDN_BASE: http://localhost:3000
+      SENTRY_DSN: ''
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/api/auth/session']
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 5
