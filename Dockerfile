@@ -19,10 +19,13 @@ COPY . .
 RUN pnpm --filter @grundtone/saas-client build && \
     pnpm --filter @grundtone-studio/studio build
 
-# pnpm deploy bygger en self-contained prod-bundle for studio-workspace.
-# Erstatter manuel node_modules-copy som brækker pga. pnpm-workspace-symlinks
-# der peger på .pnpm/-store i workspace-root.
-RUN pnpm --filter @grundtone-studio/studio deploy --prod --legacy /deploy
+# pnpm deploy bygger en self-contained bundle for studio-workspace.
+# OBS: vi inkluderer dev-deps fordi Nitro's .output bundle'r packages
+# (unhead, vue, vue-router, hookable, ...) der opfattes som dev men er
+# nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
+# på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
+# konfigureres til fully-inline output (nitro.rollupConfig.external = []).
+RUN pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
 
 FROM node:24-alpine AS runner
 WORKDIR /app
