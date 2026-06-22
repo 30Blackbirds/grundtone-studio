@@ -1,9 +1,17 @@
-node_modules
-.nuxt
-.nitro
-.output
-dist
-coverage
+# Dir-patterns SKAL være rekursive (**/): i en pnpm-workspace ligger
+# node_modules + build-output også nested under apps/* og packages/*. Et bart
+# `node_modules` matcher kun context-roden i Docker, så de nested host-mapper
+# leaker ind via `COPY . .` og overskriver deps-stagens korrekte pnpm-symlinks
+# → ERR_MODULE_NOT_FOUND (fx vite) ved build. CI rammer det ikke (clean checkout
+# har ingen nested node_modules); lokal Tilt-build gør.
+**/node_modules
+**/.nuxt
+**/.nitro
+**/.output
+**/dist
+**/coverage
+**/*.log
+**/.DS_Store
 .git
 .github
 .husky
@@ -12,7 +20,6 @@ coverage
 .env
 .env.local
 .env.*.local
-*.log
-.DS_Store
 docker-compose.yml
 docker-compose.production.yml
+docker-compose.tilt.yml
