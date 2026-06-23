@@ -1,0 +1,29 @@
+# Gitleaks configuration — extends the default ruleset.
+# Loaded automatically by `gitleaks detect` from the repo root.
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Documentation/install-snippet API keys are illustrative placeholders, not real
+secrets:
+  - docs/MVP.md uses a short fake publishable key (pk_live_7a3f9c2e8b1d) in
+    copy-paste install examples. Publishable keys are public by design and a
+    real one is ~99 chars; this is clearly a sample. The file is historical
+    (not on main) so it can only be suppressed via allowlist.
+  - apps/studio/components/InstallSnippet.vue and apps/studio/pages/docs/
+    install.vue render the key as a runtime-interpolated Vue placeholder
+    (${sampleKey} / ${sampleKey.value}), generated client-side.
+The default generic-api-key rule matches these. Real keys never live here.
+"""
+regexes = [
+  # docs/MVP.md placeholder publishable key
+  '''pk_live_7a3f9c2e8b1d''',
+  # studio install-snippet runtime interpolation (captured secret value)
+  '''\$\{sampleKey(\.value)?\}''',
+]
+paths = [
+  '''docs/MVP\.md''',
+  '''apps/studio/components/InstallSnippet\.vue''',
+  '''apps/studio/pages/docs/install\.vue''',
+]
