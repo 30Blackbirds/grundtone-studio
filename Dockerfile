@@ -19,6 +19,14 @@ COPY . .
 RUN pnpm --filter @grundtone/saas-client build && \
     pnpm --filter @grundtone-studio/studio build
 
+# pnpm deploy bygger en self-contained bundle for studio-workspace.
+# OBS: vi inkluderer dev-deps fordi Nitro's .output bundle'r packages
+# (unhead, vue, vue-router, hookable, ...) der opfattes som dev men er
+# nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
+# på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
+# konfigureres til fully-inline output (nitro.rollupConfig.external = []).
+RUN pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -27,11 +35,10 @@ ENV NITRO_HOST=0.0.0.0
 
 RUN addgroup -S app && adduser -S app -G app
 
-# Nitro produces a self-contained .output bundle — no extra node_modules needed
-COPY --from=builder --chown=app:app /app/apps/studio/.output ./.output
-# Drizzle migrations + entrypoint for runtime db:migrate
-COPY --from=builder --chown=app:app /app/apps/studio/server/db ./server/db
-COPY --from=builder --chown=app:app /app/apps/studio/package.json ./package.json
+# pnpm-deploy-bundle: self-contained med Nitro-.output + node_modules
+# (resolved symlinks, prod-only). Kopierer hele /deploy som indeholder
+# .output, server/db, package.json, node_modules — alt klar til runtime.
+COPY --from=builder --chown=app:app /deploy ./
 # Changelog files read by /api/changelog/[source] at runtime
 COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
 COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md

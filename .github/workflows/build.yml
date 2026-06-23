@@ -59,11 +59,15 @@ jobs:
 
       - name: Pick the canonical deploy tag
         id: tag
-        # Tag pushes deploy the semver tag (vX.Y.Z); branch pushes use the
+        # Tag pushes deploy the semver tag (X.Y.Z); branch pushes use the
         # short SHA so each commit is independently rollback-able.
+        # OBS: vi STRIPPER 'v'-prefiks fra ref_name fordi docker/metadata-action
+        # publisher imaget som '0.1.3', ikke 'v0.1.3' (default semver-pattern).
+        # Hvis vi ikke stripper, fejler deploy-job med "manifest unknown".
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            REF="${{ github.ref_name }}"
+            echo "value=${REF#v}" >> "$GITHUB_OUTPUT"
           else
             echo "value=sha-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
           fi
@@ -106,8 +110,8 @@ jobs:
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose --env-file .env.production -f docker-compose.production.yml pull
+            docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
             docker image prune -f
 
       - name: Smoke test
@@ -160,8 +164,8 @@ jobs:
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose --env-file .env.production -f docker-compose.production.yml pull
+            docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
             docker image prune -f
 
       - name: Smoke test
