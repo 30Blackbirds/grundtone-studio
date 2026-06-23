@@ -1,0 +1,23 @@
+# Gitleaks configuration — extends the default ruleset.
+# Loaded automatically by `gitleaks detect` from the repo root.
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+The studio install-snippet UI (apps/studio/components/InstallSnippet.vue and
+apps/studio/pages/docs/install.vue) renders copy-paste install examples where
+the API key is a runtime-interpolated Vue placeholder (${sampleKey} /
+${sampleKey.value}), generated client-side — not a real or committed secret.
+The default generic-api-key rule matches the quoted apiKey: '...' shape, so
+allowlist that specific placeholder interpolation. Real keys never appear here.
+"""
+regexes = [
+  # gitleaks matches allowlist regexes against the captured secret, which for
+  # generic-api-key is the value inside the quotes — i.e. the Vue interpolation.
+  '''\$\{sampleKey(\.value)?\}''',
+]
+paths = [
+  '''apps/studio/components/InstallSnippet\.vue''',
+  '''apps/studio/pages/docs/install\.vue''',
+]

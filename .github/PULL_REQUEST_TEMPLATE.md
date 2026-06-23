@@ -7,7 +7,8 @@
 - [ ] Issue linket (`Closes #N`)
 - [ ] Tests added/updated
 - [ ] Coverage holder baseline (branch, ikke line — se `QUALITY-GATES.md` L2)
-- [ ] Typecheck/lint grøn lokalt (`pnpm lint && pnpm typecheck` / `golangci-lint run && go vet ./...`)
+- [ ] Typecheck/lint grøn lokalt (`pnpm lint && pnpm typecheck` /
+      `golangci-lint run && go vet ./...`)
 - [ ] Docs opdateret (hvis API/kontrakt ændret)
 - [ ] Breaking change → changeset eller CHANGELOG-note
 - [ ] Ingen secrets/keys i diff
