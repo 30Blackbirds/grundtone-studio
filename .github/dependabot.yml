@@ -55,4 +55,5 @@ updates:
       interval: monthly
     labels: [dependencies, automated, docker]
     commit-message:
-      prefix: deploy
+      prefix: build
+      include: scope
