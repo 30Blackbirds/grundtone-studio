@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM node:24-alpine AS base
 RUN corepack enable pnpm
 
@@ -7,7 +8,10 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/studio/package.json ./apps/studio/
 COPY packages/saas-client/package.json ./packages/saas-client/
-RUN pnpm install --frozen-lockfile --prod=false
+# .npmrc auth'er @klanghaus-scope (privat GitHub Packages: auth-jwt + permissions-client)
+# — token som BuildKit-secret (samme mønster som auth-repoet).
+RUN --mount=type=secret,id=node_auth_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 WORKDIR /app

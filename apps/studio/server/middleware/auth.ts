@@ -33,6 +33,15 @@ const SESSION_COOKIE_SECURE = '__Secure-better-auth.session_token'
 // missing env var surfaces on first authenticated request rather than at import.
 let verifier: ReturnType<typeof createJwtVerifier> | null = null
 
+// The `iss` claim equals the auth service's browser-facing base URL (e.g.
+// http://localhost:3002 in local Tilt). Inside a container that host is
+// unreachable, so JWKS-fetch + token-exchange use AUTH_INTERNAL_URL (the
+// container address, e.g. http://auth:3000) when set; in prod where the two
+// coincide it falls back to AUTH_ISSUER.
+function internalAuthUrl(): string | undefined {
+  return process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
+}
+
 function getVerifier(): ReturnType<typeof createJwtVerifier> {
   if (verifier) return verifier
   const issuer = process.env.AUTH_ISSUER
@@ -40,7 +49,13 @@ function getVerifier(): ReturnType<typeof createJwtVerifier> {
   if (!issuer || !audience) {
     throw new Error('AUTH_ISSUER and AUTH_AUDIENCE must be set')
   }
-  verifier = createJwtVerifier({ issuer, audience })
+  // Validate `iss` against the public issuer, but fetch keys from the reachable
+  // internal URL.
+  verifier = createJwtVerifier({
+    issuer,
+    audience,
+    jwksUrl: `${internalAuthUrl()}/.well-known/jwks.json`,
+  })
   return verifier
 }
 
@@ -49,8 +64,8 @@ function readSessionCookie(event: H3Event): string | null {
 }
 
 async function exchangeCookieForToken(event: H3Event): Promise<string | null> {
-  const issuer = process.env.AUTH_ISSUER
-  if (!issuer) return null
+  const authUrl = internalAuthUrl()
+  if (!authUrl) return null
 
   // Forward the raw Cookie header so the auth service sees the same session the
   // browser holds. We don't reconstruct it from individual cookies — the auth
@@ -59,7 +74,7 @@ async function exchangeCookieForToken(event: H3Event): Promise<string | null> {
   if (!cookieHeader || !readSessionCookie(event)) return null
 
   try {
-    const res = await $fetch<{ token?: string }>(`${issuer}/api/auth/token`, {
+    const res = await $fetch<{ token?: string }>(`${authUrl}/api/auth/token`, {
       headers: { cookie: cookieHeader },
     })
     return res.token ?? null
