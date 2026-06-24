@@ -29,7 +29,11 @@ RUN pnpm --filter @grundtone/saas-client build && \
 # nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
 # på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
 # konfigureres til fully-inline output (nitro.rollupConfig.external = []).
-RUN pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+# deploy re-resolver workspace-deps inkl. private @klanghaus-pakker → samme
+# build-secret som deps-stagen (ellers falder den tilbage til npmjs.org → 404).
+RUN --mount=type=secret,id=node_auth_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
+    pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
 
 FROM node:24-alpine AS runner
 WORKDIR /app
