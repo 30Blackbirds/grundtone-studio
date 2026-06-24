@@ -65,6 +65,16 @@ function buildEtag(body: string): string {
  *   5. Compare If-None-Match → 304 if client already has the bytes
  *   6. Stream body with ETag + Cache-Control + permissive CORS
  */
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Offentligt CDN-endpoint: API-nøgle → projekt, rate-limit + origin-allowlist + ETag, serverer tokens.json/tokens.css.',
+    description:
+      'Offentligt CDN-endpoint. Oversætter plaintext-API-nøgle til projekt, håndhæver rate-limit, origin-allowlist og ETag, og serverer tokens.json/tokens.css.',
+    tags: ['CDN'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const key = getRouterParam(event, 'key')
   const file = getRouterParam(event, 'file')

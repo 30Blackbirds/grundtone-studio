@@ -4,6 +4,14 @@ import { apiKey } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Tilbagekalder (soft-revoke) en API-nøgle; kræver projekt-admin.',
+    description: 'Soft-revoker en API-nøgle, så den ikke længere kan bruges. Kræver projekt-admin.',
+    tags: ['API-keys'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   const keyId = getRouterParam(event, 'keyId')

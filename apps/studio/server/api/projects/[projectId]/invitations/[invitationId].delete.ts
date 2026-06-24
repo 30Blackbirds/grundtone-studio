@@ -3,6 +3,15 @@ import { db } from '~~/server/db'
 import { projectInvitation } from '~~/server/db/schema'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Annullerer en pending projekt-invitation; kræver projekt-admin.',
+    description:
+      'Annullerer en pending projekt-invitation, så den ikke længere kan accepteres. Kræver projekt-admin.',
+    tags: ['Invitations'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   const invitationId = getRouterParam(event, 'invitationId')

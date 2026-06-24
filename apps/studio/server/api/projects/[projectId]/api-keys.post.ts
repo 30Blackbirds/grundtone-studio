@@ -17,6 +17,16 @@ const bodySchema = z.object({
   rateLimit: z.number().int().min(1).max(1_000_000).default(1000),
 })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Genererer en ny publishable API-nøgle (returnerer plaintext én gang); kræver projekt-admin.',
+    description:
+      'Genererer en ny publishable API-nøgle og returnerer plaintext-værdien én gang (kun hash gemmes). Kræver projekt-admin.',
+    tags: ['API-keys'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

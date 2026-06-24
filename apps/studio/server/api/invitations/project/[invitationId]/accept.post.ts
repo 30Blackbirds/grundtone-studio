@@ -9,6 +9,16 @@ function asProjectRole(role: string): ProjectRole {
   return (PROJECT_ROLES as readonly string[]).includes(role) ? (role as ProjectRole) : 'viewer'
 }
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      "Accepterer en projekt-invitation: matcher JWT-email mod invitee, grant'er rolle i PDP og indsætter projektmedlem.",
+    description:
+      "Accepterer en projekt-invitation. Matcher den signed-in brugers JWT-email mod invitee, grant'er rollen i PDP og indsætter projektmedlemmet.",
+    tags: ['Invitations'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const invitationId = getRouterParam(event, 'invitationId')
   if (!invitationId) throw createError({ statusCode: 400 })

@@ -3,6 +3,16 @@ import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Lister projekter for en org (slug→id via central auth, scoped til kalderens medlemskab).',
+    description:
+      'Lister projekter for en org. Slug oversættes til org-id via den centrale auth-org-API og er scoped til kalderens medlemskab.',
+    tags: ['Projects'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const actor = event.context.auth
   if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })

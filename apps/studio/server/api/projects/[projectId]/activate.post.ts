@@ -11,6 +11,16 @@ import { renderTokensCss } from '~~/server/lib/css-renderer'
 
 const bodySchema = z.object({ versionId: z.uuid() })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Aktiverer (ruller tilbage til) en tidligere publiceret version: genskriver current-blobs og purger CDN.',
+    description:
+      'Aktiverer en tidligere publiceret version (rollback). Genskriver current-blobs fra den valgte version og purger CDN. Kræver editor.',
+    tags: ['Versions'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

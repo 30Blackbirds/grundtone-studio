@@ -13,6 +13,16 @@ const bodySchema = z.object({
   role: z.enum(PROJECT_ROLES),
 })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Inviterer (idempotent) et projektmedlem via email og sender invite-mail; kræver projekt-admin.',
+    description:
+      'Inviterer idempotent et projektmedlem via email og sender en invite-mail. Kræver projekt-admin.',
+    tags: ['Members'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

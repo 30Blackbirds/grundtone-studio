@@ -3,6 +3,15 @@ import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Lister versionshistorik + id på aktiv version.',
+    description:
+      "Returnerer projektets versionshistorik sammen med id'et på den aktuelt aktive version.",
+    tags: ['Versions'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

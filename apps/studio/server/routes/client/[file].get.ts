@@ -22,6 +22,16 @@ const FILE_MAP: Record<string, { source: string; contentType: string }> = {
   'v1.mjs.sri': { source: 'index.mjs.sri', contentType: 'text/plain' },
 }
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      "Dev-CDN-genvej der serverer saas-client-buildet (v1.js/.mjs/.map/.sri) som CDN'en gør i prod.",
+    description:
+      'Dev-genvej der serverer saas-client-buildet (v1.js/.mjs/.map/.sri) direkte fra workspace-pakken, så install-snippets virker end-to-end uden CDN.',
+    tags: ['CDN'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const file = getRouterParam(event, 'file')
   const mapping = file ? FILE_MAP[file] : undefined

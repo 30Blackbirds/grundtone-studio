@@ -4,6 +4,15 @@ import { projectMember } from '~~/server/db/schema'
 import { revokeProjectRole } from '~~/server/lib/pdp'
 import { PROJECT_ROLES, requireProjectAccess, type ProjectRole } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Fjerner et direkte projektmedlem og revoker grant i PDP; kræver projekt-admin.',
+    description:
+      'Fjerner et direkte projektmedlem og revoker den tilhørende grant i PDP. Kræver projekt-admin.',
+    tags: ['Members'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   const memberId = getRouterParam(event, 'memberId')

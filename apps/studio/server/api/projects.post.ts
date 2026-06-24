@@ -16,6 +16,16 @@ const bodySchema = z.object({
   organizationSlug: z.string().min(1),
 })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Opretter et projekt, linker det til org i PDP og gør opretteren til projekt-admin (rollback ved PDP-fejl).',
+    description:
+      'Opretter et projekt, linker det til org i PDP og gør opretteren til projekt-admin. Ruller DB-indsættelsen tilbage ved PDP-fejl.',
+    tags: ['Projects'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const actor = event.context.auth
   if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })

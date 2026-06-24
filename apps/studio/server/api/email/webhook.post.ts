@@ -44,6 +44,16 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Modtager Postmark delivery/bounce/spam/open/click-events (Basic-Auth) og persisterer dem i email_event.',
+    description:
+      'Webhook-modtager for Postmark. Validerer Basic-Auth, persisterer delivery/bounce/spam/open/click-events i email_event og svarer 200.',
+    tags: ['Webhooks'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const expectedUser = process.env.POSTMARK_WEBHOOK_USER
   const expectedPass = process.env.POSTMARK_WEBHOOK_PASS

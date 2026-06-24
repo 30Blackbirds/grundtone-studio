@@ -4,6 +4,16 @@ import { projectInvitation, projectMember } from '~~/server/db/schema'
 import { lookupOrgById } from '~~/server/lib/org-lookup'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Returnerer org-medlemmer (fra central auth) + direkte projektmedlemmer + pending invitationer.',
+    description:
+      'Samler org-medlemmer (fra den centrale auth) sammen med direkte projektmedlemmer og pending invitationer for projektet.',
+    tags: ['Members'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

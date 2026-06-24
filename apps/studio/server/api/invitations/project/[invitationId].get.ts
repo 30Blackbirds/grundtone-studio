@@ -9,6 +9,16 @@ import { project, projectInvitation } from '~~/server/db/schema'
 // identity now lives in the central auth service which we can only query with a
 // session cookie. The preview shows the project name (studio-owned); the org
 // context is conveyed in the invite email itself.
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Offentlig preview af en projekt-invitation (status/rolle/projektnavn) før login; forbruger ikke invitationen.',
+    description:
+      'Uautentificeret opslag der lader invitee se status, rolle og projektnavn for en invitation før login. Forbruger ikke invitationen.',
+    tags: ['Invitations'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const invitationId = getRouterParam(event, 'invitationId')
   if (!invitationId) throw createError({ statusCode: 400 })
