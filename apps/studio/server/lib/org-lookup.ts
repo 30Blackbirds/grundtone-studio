@@ -16,9 +16,12 @@ export interface FullOrg {
 }
 
 function authBase(): string {
-  const issuer = process.env.AUTH_ISSUER
-  if (!issuer) throw new Error('AUTH_ISSUER must be set')
-  return issuer
+  // Server-side kald til auth → brug container-intern adresse (auth:3000) når
+  // sat; iss-claim-URL'en (AUTH_ISSUER = browser-vendt localhost:3002) er ikke
+  // nåbar inde fra studios container.
+  const base = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
+  if (!base) throw new Error('AUTH_INTERNAL_URL or AUTH_ISSUER must be set')
+  return base
 }
 
 async function fetchFullOrg(
