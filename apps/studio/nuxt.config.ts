@@ -2,6 +2,14 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
   devtools: { enabled: true },
+  // The authenticated app section is client-rendered. It has no SEO value behind
+  // login, and direct/SSR loads of pages whose composables run after their data
+  // awaits (e.g. the project token editor → useProjectRole/useAsyncData) fail
+  // with "[nuxt] instance unavailable". Client rendering sidesteps that class;
+  // /api/* stays protected by the Nitro auth middleware regardless.
+  routeRules: {
+    '/orgs/**': { ssr: false },
+  },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
   i18n: {

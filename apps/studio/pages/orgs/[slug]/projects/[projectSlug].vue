@@ -3,16 +3,14 @@
 
   definePageMeta({ layout: 'app' })
 
+  // Client-rendered (see routeRules `/orgs/**` ssr:false in nuxt.config): this is
+  // an authenticated, interactive token editor with no SEO value, and direct/SSR
+  // loads hit "[nuxt] instance unavailable" from composables that run after the
+  // data awaits below. Rendering on the client sidesteps that class entirely.
   const { t } = useI18n()
   const route = useRoute()
   const slug = computed(() => route.params.slug as string)
   const projectSlug = computed(() => route.params.projectSlug as string)
-
-  // Composables called AFTER an await below (useProjectRole, the config
-  // useAsyncData) lose the Nuxt instance during a direct/SSR page load
-  // ("[nuxt] instance unavailable"). Capturing nuxtApp here lets us restore the
-  // context with runWithContext() for those post-await calls.
-  const nuxtApp = useNuxtApp()
 
   interface ProjectRow {
     id: string
@@ -37,11 +35,7 @@
   // org billing → no access. Direct project members get exactly the role they
   // were invited for, and the effective role is max(org-mapped, direct).
   const projectId = computed(() => project.value?.id ?? null)
-  // runWithContext is typed `T | Promise<T>`; useProjectRole is synchronous, so
-  // the sync return type is the correct narrowing.
-  const { canEdit, canManage } = nuxtApp.runWithContext(() =>
-    useProjectRole(projectId),
-  ) as ReturnType<typeof useProjectRole>
+  const { canEdit, canManage } = useProjectRole(projectId)
 
   interface ConfigResponse {
     draft: { id: string; version: number; tokens: Tokens } | null
@@ -49,16 +43,14 @@
     defaults: Tokens
   }
 
-  const { data: config, refresh: refreshConfig } = await nuxtApp.runWithContext(() =>
-    useAsyncData<ConfigResponse | null>(
-      () => `config-${project.value?.id ?? 'none'}`,
-      async () => {
-        if (!project.value?.id) return null
-        return await $fetch<ConfigResponse>(`/api/projects/${project.value.id}/config`, {
-          headers: useRequestHeaders(['cookie']),
-        })
-      },
-    ),
+  const { data: config, refresh: refreshConfig } = await useAsyncData<ConfigResponse | null>(
+    () => `config-${project.value?.id ?? 'none'}`,
+    async () => {
+      if (!project.value?.id) return null
+      return await $fetch<ConfigResponse>(`/api/projects/${project.value.id}/config`, {
+        headers: useRequestHeaders(['cookie']),
+      })
+    },
   )
 
   const tokens = ref<Tokens>(
