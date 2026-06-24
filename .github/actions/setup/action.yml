@@ -14,3 +14,9 @@ runs:
     - name: Install dependencies
       shell: bash
       run: pnpm install --frozen-lockfile
+      # Studio konsumerer private @klanghaus-pakker (auth-jwt + permissions-client)
+      # fra GitHub Packages — .npmrc auth'er @klanghaus-scope via NODE_AUTH_TOKEN.
+      # github.token (workflow-GITHUB_TOKEN) har read:packages når pakken giver
+      # dette repo Actions-adgang (samme mønster som auth/quality-config).
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
