@@ -126,12 +126,16 @@ export async function requireOrgRole(
   const actor = event.context.auth
   if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 
-  const allowed = await checkOrg(event, organizationId, min)
-  if (!allowed) {
+  // Resolve the highest-held org role, then compare RANK against the minimum.
+  // Checking the exact `min` relation would wrongly deny higher roles: the PDP
+  // models owner/manager/admin/member/billing as SEPARATE direct relations
+  // (owner does not imply manager), so an owner fails a raw `manager` Check
+  // despite outranking it. ORG_ROLES is rank-ordered (index = rank).
+  const role = await resolveOrgRole(event, organizationId)
+  if (!role || ORG_ROLES.indexOf(role) < ORG_ROLES.indexOf(min)) {
     throw createError({ statusCode: 403, statusMessage: `Requires org:${min}` })
   }
 
-  const role = (await resolveOrgRole(event, organizationId)) ?? min
   return { userId: actor.sub, organizationId, role }
 }
 
