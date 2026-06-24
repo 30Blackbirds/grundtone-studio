@@ -175,7 +175,7 @@
   },
   "projectInvitation": {
     "title": "You're invited",
-    "body": "{email} was invited to the project \"{project}\" in {org} as {role}.",
+    "body": "{email} was invited to the project \"{project}\" as {role}.",
     "expired": "This invitation has expired — ask the sender to issue a new one."
   },
   "onboarding": {

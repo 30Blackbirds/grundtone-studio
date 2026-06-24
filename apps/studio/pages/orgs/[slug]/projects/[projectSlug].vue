@@ -3,6 +3,10 @@
 
   definePageMeta({ layout: 'app' })
 
+  // Client-rendered (see routeRules `/orgs/**` ssr:false in nuxt.config): this is
+  // an authenticated, interactive token editor with no SEO value, and direct/SSR
+  // loads hit "[nuxt] instance unavailable" from composables that run after the
+  // data awaits below. Rendering on the client sidesteps that class entirely.
   const { t } = useI18n()
   const route = useRoute()
   const slug = computed(() => route.params.slug as string)

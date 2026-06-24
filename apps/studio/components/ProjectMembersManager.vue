@@ -9,14 +9,16 @@
     userId: string
     role: string
     name: string | null
-    email: string
+    // Email/name come from the central auth org payload and may be absent if
+    // the org API doesn't embed the user object; the UI falls back accordingly.
+    email: string | null
   }
   interface DirectMember {
     id: string
     userId: string
     role: ProjectRole
     name: string | null
-    email: string
+    email: string | null
     createdAt: string
   }
   interface PendingInvitation {

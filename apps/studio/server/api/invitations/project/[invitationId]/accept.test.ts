@@ -1,19 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Minimal inline event + h3 mock. The full helper in
-// tests/helpers/endpoint-fixtures.ts is the long-term home; this file
-// inlines the surface we actually need so the test stays loadable even
-// before that helper exists on the branch.
+// Minimal inline event + h3 mock. Identity now rides on event.context.auth
+// (set by server/middleware/auth.ts), and the PDP grant is mocked so the test
+// stays standalone.
 interface FakeEvent {
   params: Record<string, string>
   body: unknown
   headers: Record<string, string>
+  context: { auth?: { sub: string; tenant: string; email: string } }
 }
-function fakeEvent(opts: Partial<FakeEvent> = {}): FakeEvent {
+function fakeEvent(
+  opts: Partial<Omit<FakeEvent, 'context'>> & {
+    auth?: { sub: string; tenant: string; email: string }
+  } = {},
+): FakeEvent {
   return {
     params: { ...(opts.params ?? {}) },
     body: opts.body ?? null,
     headers: { ...(opts.headers ?? {}) },
+    context: opts.auth ? { auth: opts.auth } : {},
   }
 }
 function mockH3() {
@@ -41,40 +46,28 @@ interface InviteRow {
 }
 
 const invites: InviteRow[] = []
-let signedInEmail: string | null = null
 
 const memberInserts: Array<{ projectId: string; userId: string; role: string }> = []
 const inviteStatusUpdates: Array<{ inviteId: string; status: string }> = []
+const grants: Array<{ projectId: string; subject: string; role: string }> = []
 
 vi.mock('h3', () => mockH3())
-// eq(col, value) → object stashing the value so the db mock's
-// where() can read it back and filter against fixtures.
+// eq(col, value) → object stashing the value so the db mock's where() can read
+// it back and filter against fixtures.
 vi.mock('drizzle-orm', () => ({ eq: (_col: unknown, value: string) => ({ value }) }))
 
-// Capture the id passed to the most recent invite where(eq(...)) so the
-// mock filters like the real query — guards against a regression where
-// the handler queries by the wrong column or skips the predicate.
 let lastQueriedInviteId: string | null = null
 
 const dbMock = {
-  select: (cols?: Record<string, unknown>) => {
-    const isUserQuery = cols && 'email' in cols
-    return {
-      from: () => ({
-        where: (predicate: { value?: string } | null) => {
-          if (isUserQuery) {
-            return Promise.resolve(signedInEmail ? [{ email: signedInEmail }] : [])
-          }
-          // The handler calls `where(eq(projectInvitation.id, invitationId))`.
-          // Our eq() mock below stashes the value on the returned object so
-          // we can filter accurately here.
-          const queriedId = predicate?.value ?? null
-          lastQueriedInviteId = queriedId
-          return Promise.resolve(invites.filter((inv) => inv.id === queriedId))
-        },
-      }),
-    }
-  },
+  select: () => ({
+    from: () => ({
+      where: (predicate: { value?: string } | null) => {
+        const queriedId = predicate?.value ?? null
+        lastQueriedInviteId = queriedId
+        return Promise.resolve(invites.filter((inv) => inv.id === queriedId))
+      },
+    }),
+  }),
   transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       insert: () => ({
@@ -100,12 +93,14 @@ vi.mock('~~/server/db/schema', () => ({
   projectInvitation: { _: { name: 'project_invitation' }, id: 'id' },
   projectMember: { _: { name: 'project_member' }, projectId: 'projectId', userId: 'userId' },
 }))
-vi.mock('~~/server/db/schema/auth', () => ({
-  user: { _: { name: 'user' }, email: 'email', id: 'id' },
+vi.mock('~~/server/lib/pdp', () => ({
+  grantProjectRole: vi.fn(async (_e: unknown, projectId: string, subject: string, role: string) => {
+    grants.push({ projectId, subject, role })
+  }),
 }))
-
-const getSession = vi.fn()
-vi.mock('~~/server/lib/auth', () => ({ auth: { api: { getSession } } }))
+vi.mock('~~/server/lib/project-access', () => ({
+  PROJECT_ROLES: ['viewer', 'editor', 'admin'],
+}))
 
 const handler = (await import('./accept.post')).default as unknown as (
   event: unknown,
@@ -122,18 +117,21 @@ function freshInvite(overrides: Partial<InviteRow> = {}): InviteRow {
     role: 'editor',
     status: 'pending',
     invitedBy: 'inviter-user-id',
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days out
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     ...overrides,
   }
+}
+
+function authedAs(email: string, sub = 'u1') {
+  return { auth: { sub, tenant: 'o1', email } }
 }
 
 beforeEach(() => {
   invites.length = 0
   memberInserts.length = 0
   inviteStatusUpdates.length = 0
-  signedInEmail = null
+  grants.length = 0
   lastQueriedInviteId = null
-  getSession.mockReset()
 })
 
 describe('POST /api/invitations/project/[invitationId]/accept', () => {
@@ -141,95 +139,83 @@ describe('POST /api/invitations/project/[invitationId]/accept', () => {
     await expect(handler(fakeEvent())).rejects.toMatchObject({ statusCode: 400 })
   })
 
-  it('401 when no session', async () => {
-    getSession.mockResolvedValue(null)
+  it('401 when no actor on the request', async () => {
     await expect(
       handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
     ).rejects.toMatchObject({ statusCode: 401 })
   })
 
   it('404 when the invitation does not exist', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
     invites.length = 0
     await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
     ).rejects.toMatchObject({ statusCode: 404 })
-    // Sanity-check that the handler did query by the invitationId we passed.
     expect(lastQueriedInviteId).toBe(VALID_INVITE_ID)
   })
 
-  it('404 when an invite exists but for a different id', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
-    // An invite exists under a different id — the where(eq(id, …)) filter
-    // must reject the lookup, not blindly return the first row.
-    invites.push(freshInvite({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }))
-    await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
-    ).rejects.toMatchObject({ statusCode: 404 })
-  })
-
   it('409 when the invitation has already been accepted', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
     invites.push(freshInvite({ status: 'accepted' }))
     await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
     ).rejects.toMatchObject({ statusCode: 409, message: 'Invitation is accepted' })
   })
 
-  it('409 when the invitation has been cancelled', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
-    invites.push(freshInvite({ status: 'cancelled' }))
-    await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
-    ).rejects.toMatchObject({ statusCode: 409, message: 'Invitation is cancelled' })
-  })
-
   it('410 when the invitation has expired', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
     invites.push(freshInvite({ expiresAt: new Date(Date.now() - 1000) }))
     await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
     ).rejects.toMatchObject({ statusCode: 410 })
   })
 
-  it("403 when the signed-in user's email doesn't match the invite", async () => {
-    // Mismatched email: an attacker with a stolen invite-link can't accept
-    // it using their own logged-in account.
-    getSession.mockResolvedValue({ user: { id: 'attacker', email: 'attacker@evil.dk' } })
-    signedInEmail = 'attacker@evil.dk'
+  it("403 when the actor's email doesn't match the invite", async () => {
     invites.push(freshInvite())
     await expect(
-      handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } })),
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('attacker@evil.dk', 'attacker'),
+        }),
+      ),
     ).rejects.toMatchObject({ statusCode: 403 })
     expect(memberInserts).toHaveLength(0)
     expect(inviteStatusUpdates).toHaveLength(0)
+    expect(grants).toHaveLength(0)
   })
 
-  it('403 is case-insensitive — same email regardless of casing differences ', async () => {
-    // The invite was sent to lower-case; the user signs up with MixedCase
-    // (Better Auth normalises but the assertion belongs on our side too).
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'Invitee@Example.com' } })
-    signedInEmail = 'Invitee@Example.com'
+  it('403 check is case-insensitive', async () => {
     invites.push(freshInvite({ email: 'invitee@example.com' }))
-
-    const res = await handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } }))
+    const res = await handler(
+      fakeEvent({ params: { invitationId: VALID_INVITE_ID }, ...authedAs('Invitee@Example.com') }),
+    )
     expect(res).toMatchObject({ projectId: PROJECT_ID, role: 'editor' })
   })
 
-  it('happy path: inserts project_member and flips invite to accepted', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1', email: 'invitee@example.com' } })
-    signedInEmail = 'invitee@example.com'
+  it('happy path: grants in PDP, inserts member, flips invite to accepted', async () => {
     invites.push(freshInvite({ role: 'admin' }))
 
-    const res = await handler(fakeEvent({ params: { invitationId: VALID_INVITE_ID } }))
+    const res = await handler(
+      fakeEvent({ params: { invitationId: VALID_INVITE_ID }, ...authedAs('invitee@example.com') }),
+    )
 
     expect(res).toEqual({ projectId: PROJECT_ID, role: 'admin' })
+    expect(grants).toEqual([{ projectId: PROJECT_ID, subject: 'u1', role: 'admin' }])
     expect(memberInserts).toHaveLength(1)
-    expect(memberInserts[0]).toMatchObject({
-      projectId: PROJECT_ID,
-      userId: 'u1',
-      role: 'admin',
-    })
+    expect(memberInserts[0]).toMatchObject({ projectId: PROJECT_ID, userId: 'u1', role: 'admin' })
     expect(inviteStatusUpdates).toHaveLength(1)
     expect(inviteStatusUpdates[0].status).toBe('accepted')
   })

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM node:24-alpine AS base
 RUN corepack enable pnpm
 
@@ -7,7 +8,10 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/studio/package.json ./apps/studio/
 COPY packages/saas-client/package.json ./packages/saas-client/
-RUN pnpm install --frozen-lockfile --prod=false
+# .npmrc auth'er @klanghaus-scope (privat GitHub Packages: auth-jwt + permissions-client)
+# — token som BuildKit-secret (samme mønster som auth-repoet).
+RUN --mount=type=secret,id=node_auth_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 WORKDIR /app
@@ -25,7 +29,19 @@ RUN pnpm --filter @grundtone/saas-client build && \
 # nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
 # på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
 # konfigureres til fully-inline output (nitro.rollupConfig.external = []).
-RUN pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+# deploy re-resolver workspace-deps inkl. private @klanghaus-pakker → samme
+# build-secret som deps-stagen (ellers falder den tilbage til npmjs.org → 404).
+RUN --mount=type=secret,id=node_auth_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
+    pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+
+# Nitro beholder `unhead` som external men dens trace misser den transitive
+# `hookable`-dep (under pnpm er den ikke top-level-hoisted), så runtime kaster
+# ERR_MODULE_NOT_FOUND. Kopiér hookable ind dér hvor unhead resolver den.
+RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*hookable@6*/node_modules/hookable' | head -1)" \
+ && echo "hookable kilde: $HOOKABLE_SRC" \
+ && cp -r "$HOOKABLE_SRC" /deploy/.output/server/node_modules/hookable \
+ && test -f /deploy/.output/server/node_modules/hookable/package.json
 
 FROM node:24-alpine AS runner
 WORKDIR /app

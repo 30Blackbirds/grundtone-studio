@@ -1,7 +1,10 @@
-# Tilt compose-fragment for grundtone-studio (Nuxt 3 + BetterAuth embedded).
+# Tilt compose-fragment for grundtone-studio (Nuxt 3, central auth + permissions).
 # Auto-loaded af KlangHaus/infra/tilt/Tiltfile når repoet ligger som sibling
 # (~/repos/klanghaus/grundtone-studio/). Studio er customer-facing men loades
 # her for at give workers et samlet end-til-end-test-miljø.
+#
+# Auth: studio er nu ren consumer af central [auth] (JWT/JWKS) + [permissions]-PDP.
+# Port-kanon: studio=3000, auth host=3002→container=3000, permissions=3001.
 
 name: klanghaus-local
 
@@ -18,9 +21,16 @@ services:
       NITRO_HOST: 0.0.0.0
       # Egen dedikeret database i samme Postgres-instans
       DATABASE_URL: postgres://klanghaus:localdev@postgres:5432/grundtone_studio
-      # BetterAuth dev-secret (embedded auth indtil evt. pivot til central [auth])
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-32byte-secret-only-for-tilt-local}
-      BETTER_AUTH_URL: http://localhost:3000
+      # Central auth (Beslutning D) via API-gateway'en (lokal api.klanghaus.dk-
+      # stand-in, http://localhost:8000). iss/aud-claim + browser-auth-client
+      # peger på gateway-origin; studios server henter JWKS + token-exchange via
+      # den interne container-adresse (auth:3000) — server-til-server, ingen CORS.
+      AUTH_ISSUER: http://localhost:8000
+      AUTH_AUDIENCE: http://localhost:8000
+      AUTH_INTERNAL_URL: http://auth:3000
+      NUXT_PUBLIC_AUTH_URL: http://localhost:8000
+      # Central permissions PDP (Connect-RPC, container-intern)
+      PERMISSIONS_URL: http://permissions:3001
       # S3 → MinIO i backing-infra
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
@@ -45,8 +55,14 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      auth:
+        condition: service_healthy
+      permissions:
+        condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/api/auth/session']
+      # /login er en public Nuxt-side (auth-decision public paths) — studio ejer
+      # ikke længere /api/auth/* (central auth gør).
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/login']
       interval: 15s
       timeout: 3s
       start_period: 30s

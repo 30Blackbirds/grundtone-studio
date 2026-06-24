@@ -5,6 +5,15 @@ import { configVersion } from '~~/server/db/schema'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { tokensSchema } from '~~/server/lib/tokens'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Gemmer tokens som draft-version (upsert af eksisterende draft); kræver editor.',
+    description:
+      "Gemmer tokens som draft config-version og upsert'er en eksisterende draft, hvis der findes en. Kræver editor.",
+    tags: ['Config'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

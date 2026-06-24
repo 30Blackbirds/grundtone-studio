@@ -2,6 +2,23 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
   devtools: { enabled: true },
+  // The authenticated app section is client-rendered. It has no SEO value behind
+  // login, and direct/SSR loads of pages whose composables run after their data
+  // awaits (e.g. the project token editor → useProjectRole/useAsyncData) fail
+  // with "[nuxt] instance unavailable". Client rendering sidesteps that class;
+  // /api/* stays protected by the Nitro auth middleware regardless.
+  routeRules: {
+    '/orgs/**': { ssr: false },
+  },
+  nitro: {
+    // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
+    // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
+    // (api.klanghaus.dk/docs / lokal localhost:8000/docs). `production: 'runtime'`
+    // kræves for at specet også serveres i den byggede .output (experimental-
+    // flaget alene er dev-only).
+    experimental: { openAPI: true },
+    openAPI: { production: 'runtime' },
+  },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
   i18n: {
@@ -29,7 +46,10 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     databaseUrl: '',
-    betterAuthSecret: '',
+    // Central auth + PDP server-side endpoints are read from bare process.env
+    // (AUTH_ISSUER, AUTH_AUDIENCE, PERMISSIONS_URL) in server/middleware/auth.ts,
+    // server/lib/pdp.ts and server/lib/org-lookup.ts — kept off runtimeConfig so
+    // the env contract matches what [auth]/[infra] provision verbatim.
     s3Endpoint: '',
     s3Region: '',
     s3Bucket: '',
@@ -38,6 +58,10 @@ export default defineNuxtConfig({
     public: {
       appUrl: '',
       cdnBase: '',
+      // Browser-facing base URL of the central auth service. The Better Auth
+      // client (lib/auth-client.ts) points its baseURL here for sign-in,
+      // session, magic-link, and organization endpoints.
+      authUrl: '',
       sentryDsn: '',
       sentryEnvironment: '',
     },

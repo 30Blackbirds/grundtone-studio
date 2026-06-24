@@ -58,3 +58,10 @@ for (const [name, fn] of Object.entries(VUE_AUTO_IMPORTS)) {
 // per-file via their own vi.stubGlobal('useI18n', ...). Returns the key
 // verbatim so test assertions stay stable.
 vi.stubGlobal('useI18n', () => ({ t: (k: string) => k, d: (v: unknown) => String(v) }))
+
+// defineRouteMeta is a Nitro build-time macro that attaches OpenAPI metadata to
+// a route. Nitro auto-imports + compiles it away in the real build, but server-
+// handler tests import the handler module directly with no Nitro resolver, so
+// the bare top-level call would throw "defineRouteMeta is not defined". It has
+// no runtime effect, so a no-op global is the correct test stub.
+vi.stubGlobal('defineRouteMeta', () => undefined)

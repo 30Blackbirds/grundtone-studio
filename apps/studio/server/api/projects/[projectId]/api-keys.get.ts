@@ -3,6 +3,15 @@ import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Lister projektets API-nøgler (metadata, ikke plaintext); kræver projekt-admin.',
+    description:
+      'Returnerer metadata for projektets API-nøgler (aldrig plaintext). Kræver projekt-admin.',
+    tags: ['API-keys'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
@@ -21,6 +30,7 @@ export default defineEventHandler(async (event) => {
       revokedAt: apiKey.revokedAt,
       createdAt: apiKey.createdAt,
       createdBy: apiKey.createdBy,
+      createdByEmail: apiKey.createdByEmail,
     })
     .from(apiKey)
     .where(eq(apiKey.projectId, projectId))

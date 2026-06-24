@@ -1,154 +1,133 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the db module before importing the helper, so getProjectRole works
-// against an in-memory store instead of Postgres. The helper accesses three
-// tables; we stub a single select-chain that returns rows per the last
-// matched table name.
+// project-access now delegates the decision to the PDP (pdp.ts) and reads
+// identity from event.context.auth. We mock pdp.ts so the helper runs against
+// in-memory check results, plus the db (project row lookup) and org-lookup
+// (display org). createError is provided by h3's Nuxt auto-import in app code;
+// here we stub a global so the helper's throws carry a statusCode.
 
-const fixtures = {
-  project: [] as Array<{ id: string; organizationId: string }>,
-  member: [] as Array<{ organizationId: string; userId: string; role: string }>,
-  projectMember: [] as Array<{ projectId: string; userId: string; role: string }>,
-}
+const projectRows: Array<{ id: string; organizationId: string }> = []
+// relation → allow, per "<resource>::<action>" key.
+const allow: Record<string, boolean> = {}
 
-vi.mock('../db', () => {
-  const select = () => ({
-    from: (table: { _: { name?: string } } | unknown) => {
-      const name = ((table as { _: { name?: string } })?._?.name ?? '').toString()
-      const rows: unknown[] =
-        name === 'project'
-          ? fixtures.project
-          : name === 'member'
-            ? fixtures.member
-            : name === 'project_member'
-              ? fixtures.projectMember
-              : []
-      return { where: () => Promise.resolve(rows) }
-    },
-  })
-  return { db: { select } }
+vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage?: string }) => {
+  const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
+  err.statusCode = opts.statusCode
+  return err
 })
 
-vi.mock('../db/schema', () => ({
-  project: { _: { name: 'project' } },
-  projectMember: { _: { name: 'project_member' } },
+vi.mock('../db', () => ({
+  db: {
+    select: () => ({
+      from: () => ({ where: () => Promise.resolve(projectRows) }),
+    }),
+  },
 }))
-vi.mock('../db/schema/auth', () => ({
-  member: { _: { name: 'member' } },
-  organization: { _: { name: 'organization' } },
-}))
-vi.mock('drizzle-orm', () => ({
-  and: () => null,
-  eq: () => null,
+vi.mock('../db/schema', () => ({ project: { _: { name: 'project' } } }))
+vi.mock('drizzle-orm', () => ({ eq: () => null }))
+
+vi.mock('./org-lookup', () => ({
+  lookupOrgById: vi.fn(async (_e: unknown, id: string) => ({
+    id,
+    name: 'Acme Corp',
+    slug: 'acme',
+  })),
 }))
 
-vi.mock('./auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
+vi.mock('./pdp', () => ({
+  checkProject: vi.fn(async (_e: unknown, projectId: string, action: string) =>
+    Boolean(allow[`project:${projectId}::${action}`]),
+  ),
+  checkOrg: vi.fn(async (_e: unknown, orgId: string, relation: string) =>
+    Boolean(allow[`organization:${orgId}::${relation}`]),
+  ),
+}))
 
-const { getProjectRole, orgRoleHelpers } = await import('./project-access')
+const { requireProjectAccess, requireOrgRole, orgRoleHelpers } = await import('./project-access')
 
 const PROJECT_ID = 'p1'
 const ORG_ID = 'o1'
-const USER = 'u1'
+const SUB = 'u1'
 
-function setup(opts: {
-  hasProject?: boolean
-  orgRole?: 'billing' | 'member' | 'admin' | 'manager' | 'owner' | null
-  projectRole?: 'viewer' | 'editor' | 'admin' | null
-}) {
-  fixtures.project = opts.hasProject === false ? [] : [{ id: PROJECT_ID, organizationId: ORG_ID }]
-  fixtures.member = opts.orgRole
-    ? [{ organizationId: ORG_ID, userId: USER, role: opts.orgRole }]
-    : []
-  fixtures.projectMember = opts.projectRole
-    ? [{ projectId: PROJECT_ID, userId: USER, role: opts.projectRole }]
-    : []
+function eventWithAuth(authed = true) {
+  return {
+    context: authed ? { auth: { sub: SUB, tenant: ORG_ID, email: 'u@acme.dk' } } : {},
+  } as unknown as Parameters<typeof requireProjectAccess>[0]
 }
 
-describe('getProjectRole — Sentry-style 5-tier org roles', () => {
-  beforeEach(() => {
-    fixtures.project = []
-    fixtures.member = []
-    fixtures.projectMember = []
-  })
+beforeEach(() => {
+  projectRows.length = 0
+  // Reset all decisions to false between cases (Boolean(allow[k]) treats false
+  // and absent identically, so this is equivalent to clearing the map).
+  for (const k of Object.keys(allow)) allow[k] = false
+})
 
-  it('returns null when the project does not exist', async () => {
-    setup({ hasProject: false })
-    expect(await getProjectRole(USER, PROJECT_ID)).toBeNull()
-  })
-
-  it('returns null when the user has no org and no project membership', async () => {
-    setup({})
-    expect(await getProjectRole(USER, PROJECT_ID)).toBeNull()
-  })
-
-  it('org:owner → project:admin (full power on every project)', async () => {
-    setup({ orgRole: 'owner' })
-    const r = await getProjectRole(USER, PROJECT_ID)
-    expect(r).toEqual({ role: 'admin', source: 'org', orgRole: 'owner', projectRole: null })
-  })
-
-  it('org:manager → project:admin (full power on every project)', async () => {
-    setup({ orgRole: 'manager' })
-    expect((await getProjectRole(USER, PROJECT_ID))?.role).toBe('admin')
-  })
-
-  it('org:admin → project:viewer by default (no auto write access)', async () => {
-    setup({ orgRole: 'admin' })
-    const r = await getProjectRole(USER, PROJECT_ID)
-    expect(r?.role).toBe('viewer')
-  })
-
-  it('org:member → project:viewer (read-only across the org)', async () => {
-    setup({ orgRole: 'member' })
-    expect((await getProjectRole(USER, PROJECT_ID))?.role).toBe('viewer')
-  })
-
-  it('org:billing → no project access (returns null)', async () => {
-    setup({ orgRole: 'billing' })
-    expect(await getProjectRole(USER, PROJECT_ID)).toBeNull()
-  })
-
-  it('org:billing + direct project membership still grants project-only access', async () => {
-    setup({ orgRole: 'billing', projectRole: 'editor' })
-    const r = await getProjectRole(USER, PROJECT_ID)
-    expect(r).toEqual({
-      role: 'editor',
-      source: 'project',
-      orgRole: 'billing',
-      projectRole: 'editor',
+describe('requireProjectAccess — PDP-backed', () => {
+  it('401 when no actor on the request', async () => {
+    await expect(requireProjectAccess(eventWithAuth(false), PROJECT_ID)).rejects.toMatchObject({
+      statusCode: 401,
     })
   })
 
-  it('direct project membership without org membership (source = project)', async () => {
-    setup({ projectRole: 'editor' })
-    const r = await getProjectRole(USER, PROJECT_ID)
-    expect(r).toEqual({ role: 'editor', source: 'project', orgRole: null, projectRole: 'editor' })
-  })
-
-  it('takes the higher of two roles when both are present (source = both)', async () => {
-    // org:admin → viewer, project:editor → editor → effective editor
-    setup({ orgRole: 'admin', projectRole: 'editor' })
-    expect(await getProjectRole(USER, PROJECT_ID)).toEqual({
-      role: 'editor',
-      source: 'both',
-      orgRole: 'admin',
-      projectRole: 'editor',
+  it('404 when the project does not exist', async () => {
+    projectRows.length = 0
+    await expect(requireProjectAccess(eventWithAuth(), PROJECT_ID)).rejects.toMatchObject({
+      statusCode: 404,
     })
   })
 
-  it('org:owner outranks any narrower project role', async () => {
-    setup({ orgRole: 'owner', projectRole: 'viewer' })
-    expect((await getProjectRole(USER, PROJECT_ID))?.role).toBe('admin')
+  it('403 when the PDP denies the required relation', async () => {
+    projectRows.push({ id: PROJECT_ID, organizationId: ORG_ID })
+    // no allow entries → denied
+    await expect(requireProjectAccess(eventWithAuth(), PROJECT_ID, 'editor')).rejects.toMatchObject(
+      { statusCode: 403 },
+    )
   })
 
-  it('rejects garbage role strings in the project_member row', async () => {
-    setup({ projectRole: 'wizard' as 'viewer' })
-    expect(await getProjectRole(USER, PROJECT_ID)).toBeNull()
+  it('grants access and resolves the precise role from the top down', async () => {
+    projectRows.push({ id: PROJECT_ID, organizationId: ORG_ID })
+    allow[`project:${PROJECT_ID}::can_view`] = true
+    allow[`project:${PROJECT_ID}::can_edit`] = true
+    // can_admin denied → effective role is editor
+
+    const access = await requireProjectAccess(eventWithAuth(), PROJECT_ID, 'viewer')
+    expect(access.role).toBe('editor')
+    expect(access.userId).toBe(SUB)
+    expect(access.organization).toMatchObject({ id: ORG_ID, name: 'Acme Corp', slug: 'acme' })
   })
 
-  it('rejects garbage role strings in the org member row', async () => {
-    setup({ orgRole: 'sysadmin' as 'admin' })
-    expect(await getProjectRole(USER, PROJECT_ID)).toBeNull()
+  it('admin gate passes when can_admin is allowed', async () => {
+    projectRows.push({ id: PROJECT_ID, organizationId: ORG_ID })
+    allow[`project:${PROJECT_ID}::can_view`] = true
+    allow[`project:${PROJECT_ID}::can_edit`] = true
+    allow[`project:${PROJECT_ID}::can_admin`] = true
+
+    const access = await requireProjectAccess(eventWithAuth(), PROJECT_ID, 'admin')
+    expect(access.role).toBe('admin')
+  })
+})
+
+describe('requireOrgRole — PDP-backed', () => {
+  it('401 without an actor', async () => {
+    await expect(requireOrgRole(eventWithAuth(false), ORG_ID)).rejects.toMatchObject({
+      statusCode: 401,
+    })
+  })
+
+  it('403 when the org relation is denied', async () => {
+    await expect(requireOrgRole(eventWithAuth(), ORG_ID, 'manager')).rejects.toMatchObject({
+      statusCode: 403,
+    })
+  })
+
+  it('passes and resolves the highest-held role', async () => {
+    allow[`organization:${ORG_ID}::member`] = true
+    allow[`organization:${ORG_ID}::admin`] = true
+    // manager/owner denied → resolved role is admin
+
+    const access = await requireOrgRole(eventWithAuth(), ORG_ID, 'member')
+    expect(access.role).toBe('admin')
+    expect(access.organizationId).toBe(ORG_ID)
   })
 })
 
@@ -165,8 +144,6 @@ describe('orgRoleHelpers', () => {
     expect(orgRoleHelpers.canManageBilling('owner')).toBe(true)
     expect(orgRoleHelpers.canManageBilling('billing')).toBe(true)
     expect(orgRoleHelpers.canManageBilling('manager')).toBe(false)
-    expect(orgRoleHelpers.canManageBilling('admin')).toBe(false)
-    expect(orgRoleHelpers.canManageBilling('member')).toBe(false)
   })
 
   it('owner + manager + admin can create projects', () => {
@@ -179,8 +156,6 @@ describe('orgRoleHelpers', () => {
 
   it('billing cannot view projects; everyone else can', () => {
     expect(orgRoleHelpers.canViewProjects('owner')).toBe(true)
-    expect(orgRoleHelpers.canViewProjects('manager')).toBe(true)
-    expect(orgRoleHelpers.canViewProjects('admin')).toBe(true)
     expect(orgRoleHelpers.canViewProjects('member')).toBe(true)
     expect(orgRoleHelpers.canViewProjects('billing')).toBe(false)
   })

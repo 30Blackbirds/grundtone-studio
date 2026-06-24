@@ -5,6 +5,15 @@ import { activeVersion, configVersion } from '~~/server/db/schema'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { DEFAULT_TOKENS, type Tokens } from '~~/server/lib/tokens'
 
+defineRouteMeta({
+  openAPI: {
+    summary: 'Henter draft + aktiv config-version + default-tokens for token-editoren.',
+    description:
+      'Returnerer draft-config, den aktive config-version og default-tokens, som token-editoren har brug for.',
+    tags: ['Config'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })

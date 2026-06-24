@@ -19,7 +19,6 @@
     expired: boolean
     projectId: string
     projectName: string
-    organizationName: string
   }
 
   const { data: invitation, error: loadError } = await useAsyncData(
@@ -66,7 +65,6 @@
           t('projectInvitation.body', {
             email: invitation.email,
             project: invitation.projectName,
-            org: invitation.organizationName,
             role: t(`projectMembers.roles.${invitation.role}`),
           })
         }}

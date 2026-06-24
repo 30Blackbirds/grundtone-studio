@@ -6,6 +6,15 @@ import { requireOrgRole } from '~~/server/lib/project-access'
 // Direct project memberships for a specific user within a specific org.
 // Used by the org member detail page to show which projects they're a
 // direct member of (in addition to whatever their org role grants).
+defineRouteMeta({
+  openAPI: {
+    summary: 'Lister hvilke projekter en bestemt bruger er direkte medlem af i en org.',
+    description:
+      'Returnerer de projekter, en bestemt bruger er direkte medlem af i en org. Bruges af org-medlem-detaljesiden.',
+    tags: ['Org'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, 'orgId')
   const userId = getRouterParam(event, 'userId')

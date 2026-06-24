@@ -13,6 +13,16 @@ const bodySchema = z.object({
   role: z.enum(PROJECT_ROLES),
 })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Inviterer (idempotent) et projektmedlem via email og sender invite-mail; kræver projekt-admin.',
+    description:
+      'Inviterer idempotent et projektmedlem via email og sender en invite-mail. Kræver projekt-admin.',
+    tags: ['Members'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
@@ -53,11 +63,14 @@ export default defineEventHandler(async (event) => {
           role: parsed.data.role,
           status: 'pending',
           invitedBy: access.userId,
+          invitedByEmail: event.context.auth?.email ?? null,
           expiresAt,
         })
         .returning()
 
-  const baseUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
+  // Studio's own public URL (BETTER_AUTH_URL is gone — studio no longer runs
+  // auth). The invite link lands on studio's accept page.
+  const baseUrl = useRuntimeConfig(event).public.appUrl || 'http://localhost:3000'
   const acceptUrl = `${baseUrl}/invitations/project/${row.id}`
 
   await email.send({

@@ -22,6 +22,16 @@ import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
 // update; customers keep seeing the previous version on the CDN. A periodic
 // reaper can drop status='published' rows with no active_version reference.
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Publicerer draft → ny version (DB → versioned blobs → current blobs → active-pointer → CDN-purge); kræver editor.',
+    description:
+      'Publicerer den aktuelle draft som en ny version: reserverer version i DB, skriver versioned blobs, overskriver current blobs, flytter active-pointer og purger CDN. Kræver editor.',
+    tags: ['Publishing'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
@@ -61,6 +71,7 @@ export default defineEventHandler(async (event) => {
         status: 'published',
         publishedAt: new Date(),
         publishedBy: access.userId,
+        publishedByEmail: event.context.auth?.email ?? null,
       })
       .where(eq(configVersion.id, draft.id))
       .returning()
@@ -100,6 +111,7 @@ export default defineEventHandler(async (event) => {
       projectId,
       configVersionId: promoted.id,
       activatedBy: access.userId,
+      activatedByEmail: event.context.auth?.email ?? null,
     })
     .onConflictDoUpdate({
       target: activeVersion.projectId,
@@ -107,6 +119,7 @@ export default defineEventHandler(async (event) => {
         configVersionId: promoted.id,
         activatedAt: new Date(),
         activatedBy: access.userId,
+        activatedByEmail: event.context.auth?.email ?? null,
       },
     })
 

@@ -39,6 +39,16 @@ renderer.link = ({ href, tokens }) =>
   `<a href="${href}" class="text-primary">${renderer.parser.parseInline(tokens)}</a>`
 renderer.hr = () => `<hr class="my-6 border-t" />`
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Henter CHANGELOG.md (studio eller sdk) og returnerer renderet HTML + rå markdown til changelog-siden.',
+    description:
+      'Læser CHANGELOG.md for den valgte kilde (studio eller sdk) og returnerer både renderet HTML og rå markdown til changelog-siden.',
+    tags: ['System'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const source = getRouterParam(event, 'source') as Source | undefined
   if (!source || !(source in SOURCES)) {

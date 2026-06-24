@@ -1,10 +1,24 @@
 import { eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { project, projectInvitation } from '~~/server/db/schema'
-import { organization } from '~~/server/db/schema/auth'
 
 // Public lookup so the invitee can preview the invite before signing in.
 // Status-checked but does NOT consume the invitation.
+//
+// Org name is intentionally omitted: this endpoint is unauthenticated, and org
+// identity now lives in the central auth service which we can only query with a
+// session cookie. The preview shows the project name (studio-owned); the org
+// context is conveyed in the invite email itself.
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Offentlig preview af en projekt-invitation (status/rolle/projektnavn) før login; forbruger ikke invitationen.',
+    description:
+      'Uautentificeret opslag der lader invitee se status, rolle og projektnavn for en invitation før login. Forbruger ikke invitationen.',
+    tags: ['Invitations'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const invitationId = getRouterParam(event, 'invitationId')
   if (!invitationId) throw createError({ statusCode: 400 })
@@ -18,11 +32,9 @@ export default defineEventHandler(async (event) => {
       expiresAt: projectInvitation.expiresAt,
       projectId: projectInvitation.projectId,
       projectName: project.name,
-      organizationName: organization.name,
     })
     .from(projectInvitation)
     .innerJoin(project, eq(project.id, projectInvitation.projectId))
-    .innerJoin(organization, eq(organization.id, project.organizationId))
     .where(eq(projectInvitation.id, invitationId))
 
   if (!row) throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })

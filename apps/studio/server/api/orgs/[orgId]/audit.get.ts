@@ -22,6 +22,16 @@ const querySchema = z.object({
   beforeId: z.uuid().optional(),
 })
 
+defineRouteMeta({
+  openAPI: {
+    summary:
+      'Cursor-pagineret audit-log for org (kun manager/owner); filtrerbar på action og actor.',
+    description:
+      'Returnerer en cursor-pagineret audit-log for en org. Kræver manager- eller owner-rolle og kan filtreres på action og actor.',
+    tags: ['Org'],
+  },
+})
+
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, 'orgId')
   if (!orgId) throw createError({ statusCode: 400 })
