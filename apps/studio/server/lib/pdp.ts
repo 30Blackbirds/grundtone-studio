@@ -50,11 +50,13 @@ async function getToken(event: H3Event): Promise<string | null> {
   // PDP call. The auth middleware already verified the session for this request,
   // but the PDP needs the raw bearer token (it re-verifies + reads the org
   // claim), so we fetch it here rather than smuggling it through context.
-  const issuer = process.env.AUTH_ISSUER
+  // Server-side → container-intern auth-adresse (AUTH_INTERNAL_URL), ikke den
+  // browser-vendte AUTH_ISSUER (localhost:3002 er ikke nåbar fra containeren).
+  const authUrl = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
   const cookieHeader = event.node.req.headers.cookie
-  if (!issuer || !cookieHeader) return null
+  if (!authUrl || !cookieHeader) return null
   try {
-    const res = await $fetch<{ token?: string }>(`${issuer}/api/auth/token`, {
+    const res = await $fetch<{ token?: string }>(`${authUrl}/api/auth/token`, {
       headers: { cookie: cookieHeader },
     })
     return res.token ?? null
