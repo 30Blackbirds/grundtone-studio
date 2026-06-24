@@ -10,6 +10,12 @@ export default defineNuxtConfig({
   routeRules: {
     '/orgs/**': { ssr: false },
   },
+  nitro: {
+    // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
+    // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
+    // (api.klanghaus.dk/docs / lokal localhost:8000/docs).
+    experimental: { openAPI: true },
+  },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
   i18n: {
