@@ -10,8 +10,14 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-// Better Auth owns the `organization` and `member` tables via its plugin.
-// We reference organization.id via text (Better Auth uses text IDs).
+// Identity (user / organization / member / invitation) lives in the CENTRAL
+// auth service's database — studio no longer hosts those tables. Studio tables
+// reference the central user id (= JWT `sub`) and org id (= JWT `org`/tenant)
+// as plain text, and DENORMALIZE the actor's email at write-time so audit /
+// member / key / version views survive without a cross-service join back to
+// auth. The `*Email` columns are captured from event.context.auth when the row
+// is written and are intentionally nullable for legacy rows written before this
+// refactor.
 
 export const project = pgTable(
   'project',
@@ -44,7 +50,10 @@ export const apiKey = pgTable(
     rateLimit: integer().notNull().default(1000),
     lastUsedAt: timestamp({ withTimezone: true }),
     revokedAt: timestamp({ withTimezone: true }),
+    // Central user id (= JWT sub) of the creator, plus their email captured at
+    // write-time so the keys list can attribute without an auth round-trip.
     createdBy: text().notNull(),
+    createdByEmail: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('api_key_hash_idx').on(t.keyHash)],
@@ -62,6 +71,7 @@ export const configVersion = pgTable(
     status: text().notNull().default('draft'),
     publishedAt: timestamp({ withTimezone: true }),
     publishedBy: text(),
+    publishedByEmail: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('config_version_project_version_idx').on(t.projectId, t.version)],
@@ -76,6 +86,7 @@ export const activeVersion = pgTable('active_version', {
     .references(() => configVersion.id, { onDelete: 'restrict' }),
   activatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   activatedBy: text().notNull(),
+  activatedByEmail: text(),
 })
 
 // Per-project membership for users who shouldn't see the whole org but need
@@ -88,7 +99,12 @@ export const projectMember = pgTable(
     projectId: uuid()
       .notNull()
       .references(() => project.id, { onDelete: 'cascade' }),
+    // Central user id (= JWT sub). Denormalized email/name captured when the
+    // membership row is written (invite accept), so the members list renders
+    // without joining auth's user table.
     userId: text().notNull(),
+    memberEmail: text(),
+    memberName: text(),
     role: text().notNull(),
     invitedBy: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -174,6 +190,7 @@ export const projectInvitation = pgTable(
     role: text().notNull(),
     status: text().notNull().default('pending'),
     invitedBy: text().notNull(),
+    invitedByEmail: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

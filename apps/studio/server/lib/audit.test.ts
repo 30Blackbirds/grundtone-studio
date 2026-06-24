@@ -16,9 +16,6 @@ vi.mock('../db', () => {
 })
 vi.mock('../db/schema', () => ({ auditLog: {} }))
 
-const getSession = vi.fn()
-vi.mock('./auth', () => ({ auth: { api: { getSession } } }))
-
 // h3 is a transitive dep via Nuxt — vitest's resolver can't find it directly.
 // Stub the helpers we use so the test runs standalone.
 vi.mock('h3', () => ({
@@ -33,12 +30,11 @@ vi.mock('h3', () => ({
 const { recordAuditEvent } = await import('./audit')
 
 const ORG_ID = 'org-1'
-const ACTOR = { id: 'user-1', email: 'allan@example.com' }
+const ACTOR = { sub: 'user-1', tenant: ORG_ID, email: 'allan@example.com' }
 
 describe('recordAuditEvent', () => {
   beforeEach(() => {
     inserts.length = 0
-    getSession.mockReset()
   })
 
   it('persists a minimal event with no event handle', async () => {
@@ -63,12 +59,12 @@ describe('recordAuditEvent', () => {
     })
   })
 
-  it('captures actor + IP + UA from the H3 event when present', async () => {
-    getSession.mockResolvedValue({ user: ACTOR })
-    // Minimal H3-like event with the headers proxy and node primitives the
-    // helper accesses. getRequestIP/getRequestHeader read from event.node.req.
+  it('captures actor + IP + UA from event.context.auth when present', async () => {
+    // Identity comes from the JWT-derived actor on event.context.auth.
+    // getRequestIP/getRequestHeader read from event.node.req.
     const fakeEvent = {
       headers: new Headers(),
+      context: { auth: ACTOR },
       node: {
         req: {
           headers: {
@@ -88,17 +84,17 @@ describe('recordAuditEvent', () => {
     expect(inserts[0]).toMatchObject({
       organizationId: ORG_ID,
       action: 'api_key.created',
-      actorUserId: ACTOR.id,
+      actorUserId: ACTOR.sub,
       actorEmail: ACTOR.email,
       ipAddress: '203.0.113.7',
       userAgent: 'curl/7.88',
     })
   })
 
-  it('explicit actor fields win over session-derived ones', async () => {
-    getSession.mockResolvedValue({ user: ACTOR })
+  it('explicit actor fields win over context-derived ones', async () => {
     const fakeEvent = {
       headers: new Headers(),
+      context: { auth: ACTOR },
       node: { req: { headers: {}, socket: { remoteAddress: '127.0.0.1' } } },
     } as unknown as Parameters<typeof recordAuditEvent>[0]
     await recordAuditEvent(fakeEvent, {
@@ -128,9 +124,10 @@ describe('recordAuditEvent', () => {
     errSpy.mockRestore()
   })
 
-  it('does not call getSession when actor fields are already supplied', async () => {
+  it('ignores event.context.auth when actor fields are already supplied', async () => {
     const fakeEvent = {
       headers: new Headers(),
+      context: { auth: ACTOR },
       node: { req: { headers: {}, socket: { remoteAddress: '127.0.0.1' } } },
     } as unknown as Parameters<typeof recordAuditEvent>[0]
     await recordAuditEvent(fakeEvent, {
@@ -139,6 +136,9 @@ describe('recordAuditEvent', () => {
       actorUserId: 'pre-known',
       actorEmail: 'pre-known@example.com',
     })
-    expect(getSession).not.toHaveBeenCalled()
+    expect(inserts[0]).toMatchObject({
+      actorUserId: 'pre-known',
+      actorEmail: 'pre-known@example.com',
+    })
   })
 })

@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
       revokedAt: apiKey.revokedAt,
       createdAt: apiKey.createdAt,
       createdBy: apiKey.createdBy,
+      createdByEmail: apiKey.createdByEmail,
     })
     .from(apiKey)
     .where(eq(apiKey.projectId, projectId))

@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
       status: configVersion.status,
       publishedAt: configVersion.publishedAt,
       publishedBy: configVersion.publishedBy,
+      publishedByEmail: configVersion.publishedByEmail,
       createdAt: configVersion.createdAt,
     })
     .from(configVersion)

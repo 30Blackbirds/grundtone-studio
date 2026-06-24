@@ -29,7 +29,10 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     databaseUrl: '',
-    betterAuthSecret: '',
+    // Central auth + PDP server-side endpoints are read from bare process.env
+    // (AUTH_ISSUER, AUTH_AUDIENCE, PERMISSIONS_URL) in server/middleware/auth.ts,
+    // server/lib/pdp.ts and server/lib/org-lookup.ts — kept off runtimeConfig so
+    // the env contract matches what [auth]/[infra] provision verbatim.
     s3Endpoint: '',
     s3Region: '',
     s3Bucket: '',
@@ -38,6 +41,10 @@ export default defineNuxtConfig({
     public: {
       appUrl: '',
       cdnBase: '',
+      // Browser-facing base URL of the central auth service. The Better Auth
+      // client (lib/auth-client.ts) points its baseURL here for sign-in,
+      // session, magic-link, and organization endpoints.
+      authUrl: '',
       sentryDsn: '',
       sentryEnvironment: '',
     },

@@ -1,7 +1,6 @@
 import { getRequestHeader, getRequestIP, type H3Event } from 'h3'
 import { db } from '../db'
 import { auditLog } from '../db/schema'
-import { auth } from './auth'
 
 // Canonical action names. Add new ones at the bottom — these strings appear
 // in the database forever, so renames require a data migration.
@@ -78,10 +77,12 @@ export async function recordAuditEvent(
 
     if (event) {
       if (!actorUserId || !actorEmail) {
-        const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
-        if (session?.user) {
-          actorUserId ??= session.user.id
-          actorEmail ??= session.user.email
+        // Identity now comes from the JWT-derived actor on event.context.auth,
+        // populated by server/middleware/auth.ts. No DB/session round-trip.
+        const actor = event.context.auth
+        if (actor) {
+          actorUserId ??= actor.sub
+          actorEmail ??= actor.email ?? null
         }
       }
       ipAddress ??= getRequestIP(event, { xForwardedFor: true }) ?? null

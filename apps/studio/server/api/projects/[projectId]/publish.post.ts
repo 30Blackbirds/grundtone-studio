@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
         status: 'published',
         publishedAt: new Date(),
         publishedBy: access.userId,
+        publishedByEmail: event.context.auth?.email ?? null,
       })
       .where(eq(configVersion.id, draft.id))
       .returning()
@@ -100,6 +101,7 @@ export default defineEventHandler(async (event) => {
       projectId,
       configVersionId: promoted.id,
       activatedBy: access.userId,
+      activatedByEmail: event.context.auth?.email ?? null,
     })
     .onConflictDoUpdate({
       target: activeVersion.projectId,
@@ -107,6 +109,7 @@ export default defineEventHandler(async (event) => {
         configVersionId: promoted.id,
         activatedAt: new Date(),
         activatedBy: access.userId,
+        activatedByEmail: event.context.auth?.email ?? null,
       },
     })
 

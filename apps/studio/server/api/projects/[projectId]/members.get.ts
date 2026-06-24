@@ -1,7 +1,7 @@
-import { eq, and, ne } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { db } from '~~/server/db'
-import { projectMember, projectInvitation } from '~~/server/db/schema'
-import { member, user } from '~~/server/db/schema/auth'
+import { projectInvitation, projectMember } from '~~/server/db/schema'
+import { lookupOrgById } from '~~/server/lib/org-lookup'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
 export default defineEventHandler(async (event) => {
@@ -10,22 +10,21 @@ export default defineEventHandler(async (event) => {
 
   const access = await requireProjectAccess(event, projectId)
 
-  // Inherited: every org-member of the project's parent org sees the project
-  // via their org role.
-  const orgMembers = await db
-    .select({
-      id: member.id,
-      userId: member.userId,
-      role: member.role,
-      name: user.name,
-      email: user.email,
-      createdAt: member.createdAt,
-    })
-    .from(member)
-    .innerJoin(user, eq(user.id, member.userId))
-    .where(eq(member.organizationId, access.organization.id))
+  // Inherited org members come from the central auth org API (Better Auth's
+  // organization plugin) — studio no longer hosts the member/user tables. The
+  // org API returns userId + role; name/email are only present if auth includes
+  // them in the membership payload.
+  const fullOrg = await lookupOrgById(event, access.organization.id)
+  const orgMembers = (fullOrg?.members ?? []).map((m) => ({
+    id: m.id,
+    userId: m.userId,
+    role: m.role,
+    name: (m as { user?: { name?: string } }).user?.name ?? null,
+    email: (m as { user?: { email?: string } }).user?.email ?? null,
+  }))
 
-  // Direct: scoped to the project itself.
+  // Direct project members live in studio's own table, with identity
+  // denormalized at invite-accept time.
   const direct = await db
     .select({
       id: projectMember.id,
@@ -33,11 +32,10 @@ export default defineEventHandler(async (event) => {
       role: projectMember.role,
       invitedBy: projectMember.invitedBy,
       createdAt: projectMember.createdAt,
-      name: user.name,
-      email: user.email,
+      name: projectMember.memberName,
+      email: projectMember.memberEmail,
     })
     .from(projectMember)
-    .innerJoin(user, eq(user.id, projectMember.userId))
     .where(eq(projectMember.projectId, projectId))
 
   const pending = await db

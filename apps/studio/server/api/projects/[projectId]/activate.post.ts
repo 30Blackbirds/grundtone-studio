@@ -63,6 +63,7 @@ export default defineEventHandler(async (event) => {
       projectId,
       configVersionId: version.id,
       activatedBy: access.userId,
+      activatedByEmail: event.context.auth?.email ?? null,
     })
     .onConflictDoUpdate({
       target: activeVersion.projectId,
@@ -70,6 +71,7 @@ export default defineEventHandler(async (event) => {
         configVersionId: version.id,
         activatedAt: new Date(),
         activatedBy: access.userId,
+        activatedByEmail: event.context.auth?.email ?? null,
       },
     })
 

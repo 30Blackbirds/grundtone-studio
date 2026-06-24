@@ -46,10 +46,18 @@ export const SESSION: FakeSession = {
 //
 // h3 itself is also mocked in each test file so the helpers above resolve.
 
+export interface FakeAuthActor {
+  sub: string
+  tenant: string
+  email: string
+}
+
 export interface FakeEvent {
   params: Record<string, string>
   body: unknown
   headers: Record<string, string>
+  // Mirrors H3EventContext; handlers read event.context.auth for the JWT actor.
+  context: { auth?: FakeAuthActor }
   responseHeaders: Record<string, string>
   responseStatus?: number
 }
@@ -59,6 +67,9 @@ export function fakeEvent(opts: Partial<FakeEvent> = {}): FakeEvent {
     params: { ...(opts.params ?? {}) },
     body: opts.body ?? null,
     headers: { ...(opts.headers ?? {}) },
+    context: opts.context ?? {
+      auth: { sub: SESSION.user.id, tenant: ORG.id, email: SESSION.user.email },
+    },
     responseHeaders: {},
     responseStatus: undefined,
   }

@@ -41,6 +41,7 @@ export default defineEventHandler(async (event) => {
       allowedOrigins: parsed.data.allowedOrigins,
       rateLimit: parsed.data.rateLimit,
       createdBy: access.userId,
+      createdByEmail: event.context.auth?.email ?? null,
     })
     .returning({
       id: apiKey.id,
