@@ -21,13 +21,14 @@ services:
       NITRO_HOST: 0.0.0.0
       # Egen dedikeret database i samme Postgres-instans
       DATABASE_URL: postgres://klanghaus:localdev@postgres:5432/grundtone_studio
-      # Central auth (Beslutning D). iss-claim = auth's browser-URL (host :3002);
-      # studios server henter JWKS + token-exchange via container-adressen
-      # (auth:3000, intern). Browser bruger NUXT_PUBLIC_AUTH_URL (host :3002).
-      AUTH_ISSUER: http://localhost:3002
-      AUTH_AUDIENCE: http://localhost:3002
+      # Central auth (Beslutning D) via API-gateway'en (lokal api.klanghaus.dk-
+      # stand-in, http://localhost:8000). iss/aud-claim + browser-auth-client
+      # peger på gateway-origin; studios server henter JWKS + token-exchange via
+      # den interne container-adresse (auth:3000) — server-til-server, ingen CORS.
+      AUTH_ISSUER: http://localhost:8000
+      AUTH_AUDIENCE: http://localhost:8000
       AUTH_INTERNAL_URL: http://auth:3000
-      NUXT_PUBLIC_AUTH_URL: http://localhost:3002
+      NUXT_PUBLIC_AUTH_URL: http://localhost:8000
       # Central permissions PDP (Connect-RPC, container-intern)
       PERMISSIONS_URL: http://permissions:3001
       # S3 → MinIO i backing-infra
