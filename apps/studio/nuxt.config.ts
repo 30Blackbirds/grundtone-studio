@@ -13,8 +13,11 @@ export default defineNuxtConfig({
   nitro: {
     // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
     // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
-    // (api.klanghaus.dk/docs / lokal localhost:8000/docs).
+    // (api.klanghaus.dk/docs / lokal localhost:8000/docs). `production: 'runtime'`
+    // kræves for at specet også serveres i den byggede .output (experimental-
+    // flaget alene er dev-only).
     experimental: { openAPI: true },
+    openAPI: { production: 'runtime' },
   },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
