@@ -83,6 +83,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+          # Privat @klanghaus-pakke-adgang: Dockerfile'en mounter dette som
+          # `--mount=type=secret,id=node_auth_token`. Uden det fejler pnpm install
+          # med 401 på @klanghaus/auth-jwt m.fl. GITHUB_TOKEN har packages:read i
+          # org (kræver at de pakker grant'er denne repo Actions-adgang).
+          secrets: |
+            node_auth_token=${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
