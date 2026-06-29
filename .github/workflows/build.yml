@@ -101,7 +101,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: staging
-      url: https://studio-staging.klanghaus.com
+      url: https://studio.staging.grundtone.com
 
     steps:
       - name: Deploy via SSH
@@ -123,7 +123,7 @@ jobs:
       - name: Smoke test
         run: |
           for i in $(seq 1 30); do
-            if curl -sf https://studio-staging.klanghaus.com/api/healthz > /dev/null; then
+            if curl -sf https://studio.staging.grundtone.com/api/healthz > /dev/null; then
               echo "✓ staging is responding"
               exit 0
             fi

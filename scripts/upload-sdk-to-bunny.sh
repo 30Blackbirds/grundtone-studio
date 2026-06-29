@@ -63,12 +63,12 @@ echo "→ purge v${MAJOR} aliases"
 curl --fail --silent --show-error \
   -X POST \
   -H "AccessKey: ${BUNNY_API_KEY}" \
-  "https://api.bunny.net/pullzone/purge?url=https://cdn.grundtone.io/client/v${MAJOR}.js" \
+  "https://api.bunny.net/pullzone/purge?url=https://cdn.grundtone.com/client/v${MAJOR}.js" \
   || true
 curl --fail --silent --show-error \
   -X POST \
   -H "AccessKey: ${BUNNY_API_KEY}" \
-  "https://api.bunny.net/pullzone/purge?url=https://cdn.grundtone.io/client/v${MAJOR}.mjs" \
+  "https://api.bunny.net/pullzone/purge?url=https://cdn.grundtone.com/client/v${MAJOR}.mjs" \
   || true
 
 echo "✓ uploaded @grundtone/saas-client@${VERSION} to Bunny.net"
