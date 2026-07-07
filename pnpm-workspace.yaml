@@ -21,3 +21,11 @@ overrides:
   # in Deno module enables RCE via NPM_CONFIG_REGISTRY; patched in 0.28.1.
   # Pulled in by @nuxtjs/i18n + nitropack + sentry chain.
   esbuild: ^0.28.1
+  # GHSA-c76h-2ccp-4975 — high: undici unbounded memory consumption in WebSocket
+  # permessage-deflate decompression; patched in 6.24.0. Pulled in (prod) by
+  # @connectrpc/connect-node@1.7.0, which pins ^5.28.4 — its 1.x line never bumps
+  # past undici 5, and connect-node 2.x needs @klanghaus/permissions-client
+  # regenerated for connect/protobuf 2.x first. Studio's PDP client uses HTTP/2
+  # (Node http2, not undici), so this only silences the audit path. Remove once
+  # the connect stack moves to 2.x.
+  undici: ^6.24.0
