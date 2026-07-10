@@ -4,6 +4,7 @@ import {
   magicLinkEmail,
   orgInviteEmail,
   projectInviteEmail,
+  resetPasswordEmail,
   verifyEmailEmail,
 } from './email-templates'
 
@@ -104,6 +105,23 @@ describe('verifyEmailEmail', () => {
     // Subject is plaintext — no HTML, no escape needed; should NOT contain
     // entities (we don't want users seeing '&lt;script&gt;' in their inbox).
     expect(m.subject).not.toContain('&lt;')
+  })
+})
+
+describe('resetPasswordEmail', () => {
+  const args = { url: 'https://studio.grundtone.com/reset-password?token=abc' }
+
+  it('renders Danish by default', () => {
+    const m = resetPasswordEmail({ ...args, name: 'Allan' })
+    expect(m.subject).toBe('Nulstil din adgangskode til Grundtone Studio')
+    expect(m.text).toContain('Hej Allan,')
+    expect(m.html).toContain(`href="${args.url}"`)
+  })
+
+  it('renders English when locale is en', () => {
+    const m = resetPasswordEmail(args, 'en')
+    expect(m.subject).toBe('Reset your Grundtone Studio password')
+    expect(m.text).toContain('1 hour')
   })
 })
 

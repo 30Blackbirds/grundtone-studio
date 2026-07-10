@@ -5,6 +5,7 @@
 
   const isMembersActive = computed(() => route.path.startsWith(`/orgs/${activeSlug.value}/members`))
   const isAuditActive = computed(() => route.path === `/orgs/${activeSlug.value}/audit`)
+  const isSettingsActive = computed(() => route.path === `/orgs/${activeSlug.value}/settings`)
 </script>
 
 <template>
@@ -41,6 +42,15 @@
             :class="{ 'bg-surface-raised font-bold': isMembersActive }"
           >
             {{ $t('members.title') }}
+          </NuxtLink>
+        </li>
+        <li v-if="canManageOrgMembers">
+          <NuxtLink
+            :to="`/orgs/${activeSlug}/settings`"
+            class="block p-2 rounded text-sm no-underline text-inherit hover:bg-surface-raised"
+            :class="{ 'bg-surface-raised font-bold': isSettingsActive }"
+          >
+            {{ $t('orgSettings.title') }}
           </NuxtLink>
         </li>
         <li v-if="canManageOrgMembers">

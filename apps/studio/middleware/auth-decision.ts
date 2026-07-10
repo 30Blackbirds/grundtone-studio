@@ -9,6 +9,8 @@ const AUTH_PATHS: ReadonlySet<string> = new Set(['/login', '/signup'])
 const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   ...AUTH_PATHS,
   '/verify-email',
+  '/forgot-password',
+  '/reset-password',
   '/privacy',
   '/dpa',
   '/sub-processors',

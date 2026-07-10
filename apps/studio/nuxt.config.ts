@@ -9,6 +9,7 @@ export default defineNuxtConfig({
   // /api/* stays protected by the Nitro auth middleware regardless.
   routeRules: {
     '/orgs/**': { ssr: false },
+    '/account': { ssr: false },
   },
   nitro: {
     // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
@@ -57,6 +58,7 @@ export default defineNuxtConfig({
     s3SecretAccessKey: '',
     public: {
       appUrl: '',
+      recaptchaSiteKey: '',
       cdnBase: '',
       // Browser-facing base URL of the central auth service. The Better Auth
       // client (lib/auth-client.ts) points its baseURL here for sign-in,

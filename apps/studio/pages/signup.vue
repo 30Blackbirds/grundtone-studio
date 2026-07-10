@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { signUp } from '~~/lib/auth-client'
+  import { executeRecaptcha } from '~~/composables/useRecaptcha'
 
   definePageMeta({ layout: 'auth' })
 
@@ -13,23 +14,22 @@
   async function submit() {
     pending.value = true
     error.value = null
+    const captchaToken = await executeRecaptcha('signup')
+    const headers: Record<string, string> = {}
+    if (captchaToken) headers['x-captcha-response'] = captchaToken
+
     const res = await signUp.email({
       email: email.value,
       password: password.value,
       name: name.value,
-      // After the user clicks the verification link, Better Auth signs them
-      // in and redirects here. /dashboard's empty-state pushes new users into
-      // the onboarding wizard automatically.
       callbackURL: '/dashboard',
+      fetchOptions: { headers },
     })
     pending.value = false
     if (res.error) {
       error.value = res.error.message ?? t('auth.signup.error')
       return
     }
-    // requireEmailVerification: true blocks sign-in until the verification
-    // link is clicked. Park the user on /verify-email; the Better Auth flow
-    // sends them to /dashboard via callbackURL once the email is confirmed.
     await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
   }
 </script>
