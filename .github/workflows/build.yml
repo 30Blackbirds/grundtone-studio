@@ -99,6 +99,9 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
     environment:
       name: staging
       url: https://studio.staging.grundtone.com
@@ -106,17 +109,22 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
-          script_stop: true
-          envs: IMAGE_TAG
+          envs: GHCR_USER,GHCR_TOKEN
           script: |
+            set -euo pipefail
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
             docker compose --env-file .env.production -f docker-compose.production.yml pull
+            docker logout ghcr.io
             docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
             docker image prune -f
 
@@ -142,6 +150,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # packages: read → jobbets GITHUB_TOKEN kan pulle imaget fra ghcr; VM'en
+    # logger ind med det ephemeralt i deploy-scriptet og logger ud igen, så
+    # ingen langlivede registry-tokens ligger på serveren.
+    permissions:
+      contents: read
+      packages: read
     environment:
       name: production
       url: https://studio.grundtone.com
@@ -153,24 +167,32 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          script_stop: true
           script: |
+            set -euo pipefail
             cd ~/grundtone-studio
             cp .env.production .env.production.bak.$(date +%Y%m%d-%H%M%S)
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          script_stop: true
-          envs: IMAGE_TAG
+          envs: GHCR_USER,GHCR_TOKEN
+          # set -e er den reelle fail-fast-gate: appleboy v1 ignorerer
+          # script_stop, så uden den bliver et fejlet pull et grønt no-op-
+          # deploy (v0.1.6, #121).
           script: |
+            set -euo pipefail
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
             docker compose --env-file .env.production -f docker-compose.production.yml pull
+            docker logout ghcr.io
             docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
             docker image prune -f
 
