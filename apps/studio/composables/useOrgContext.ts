@@ -1,4 +1,14 @@
-import { organization } from '~~/lib/auth-client'
+import { organization, useSession } from '~~/lib/auth-client'
+import {
+  type OrgRole,
+  canCreateProjects as roleCanCreateProjects,
+  canManageBilling as roleCanManageBilling,
+  canManageOrgMembers as roleCanManageOrgMembers,
+  canViewProjects as roleCanViewProjects,
+  findMemberForUser,
+  isOrgOwner,
+  parseOrgRole,
+} from '~~/lib/org-role'
 
 interface OrgListItem {
   id: string
@@ -36,6 +46,8 @@ const noMember = () => null
  */
 export const useOrgContext = () => {
   const route = useRoute()
+  const session = useSession()
+  const userId = computed(() => session.value.data?.user?.id)
 
   const activeSlug = computed(() => {
     const m = route.path.match(/^\/orgs\/([^/]+)/)
@@ -78,27 +90,16 @@ export const useOrgContext = () => {
   )
 
   const { data: activeMember, refresh: refreshActiveMember } = useAsyncData(
-    () => `org-context-member-${activeOrg.value?.id ?? 'none'}`,
+    () => `org-context-member-${activeOrg.value?.id ?? 'none'}-${userId.value ?? 'anon'}`,
     async () => {
-      if (!activeOrg.value?.id) return null
-      try {
-        const res = await organization.getActiveMember({
-          fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
-        })
-        return res.data ?? null
-      } catch (err) {
-        // Stale session: the session cookie's activeOrganizationId points at
-        // an org that no longer exists (typical after a DB reseed during dev,
-        // or right after a user got removed from an org). Clear it so the
-        // next page load isn't trapped in a 404 loop.
-        const msg = (err as { message?: string } | null)?.message ?? String(err)
-        if (/not found|404/i.test(msg)) {
-          await organization.setActive({ organizationId: null }).catch(() => {})
-        }
-        return null
-      }
+      if (!activeOrg.value?.id || !userId.value) return null
+      const res = await organization.getFullOrganization({
+        query: { organizationId: activeOrg.value.id },
+        fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+      })
+      return findMemberForUser(res.data?.members, userId.value)
     },
-    { default: noMember, watch: [activeOrg] },
+    { default: noMember, watch: [activeOrg, userId] },
   )
 
   // Sentry-style 5-tier org roles (see server/lib/project-access.ts for the
@@ -108,20 +109,16 @@ export const useOrgContext = () => {
   // Better Auth's client types narrow Member.role to 'owner' | 'admin' | 'member',
   // so we widen via string at the read boundary — the actual values are
   // validated by the server-side ac config in server/lib/auth.ts.
-  type OrgRole = 'billing' | 'member' | 'admin' | 'manager' | 'owner'
-  const role = computed<OrgRole | null>(() => {
-    const r = activeMember.value?.role as string | undefined
-    return r === 'billing' || r === 'member' || r === 'admin' || r === 'manager' || r === 'owner'
-      ? r
-      : null
-  })
-  const isOwner = computed(() => role.value === 'owner')
+  const role = computed<OrgRole | null>(() =>
+    parseOrgRole(activeMember.value?.role as string | undefined),
+  )
+  const isOwner = computed(() => isOrgOwner(role.value))
   const isManager = computed(() => role.value === 'manager')
   const isAdmin = computed(() => role.value === 'admin')
-  const canManageOrgMembers = computed(() => isOwner.value || isManager.value)
-  const canManageBilling = computed(() => isOwner.value || role.value === 'billing')
-  const canCreateProjects = computed(() => isOwner.value || isManager.value || isAdmin.value)
-  const canViewProjects = computed(() => Boolean(role.value) && role.value !== 'billing')
+  const canManageOrgMembers = computed(() => roleCanManageOrgMembers(role.value))
+  const canManageBilling = computed(() => roleCanManageBilling(role.value))
+  const canCreateProjects = computed(() => roleCanCreateProjects(role.value))
+  const canViewProjects = computed(() => roleCanViewProjects(role.value))
 
   return {
     orgs,

@@ -10,7 +10,7 @@
 
   const { activeOrg, isOwner, canManageOrgMembers } = useOrgContext()
 
-  const canAccess = computed(() => canManageOrgMembers.value || isOwner.value)
+  const canAccess = computed(() => canManageOrgMembers.value)
 
   const orgName = ref(activeOrg.value?.name ?? '')
   const orgSlug = ref(slug.value)
@@ -28,7 +28,7 @@
   })
 
   async function save() {
-    if (!activeOrg.value?.id) return
+    if (!activeOrg.value?.id || !canAccess.value) return
     saving.value = true
     saveError.value = null
     saved.value = false
