@@ -27,7 +27,7 @@
 
     <GTTabs :tabs="tabs">
       <GTTabPanel id="profile">
-        <GTCard>
+        <GTCard :title="t('account.tabs.profile')">
           <AccountProfileForm />
           <hr class="my-6" />
           <AccountEmailForm />
@@ -35,19 +35,19 @@
       </GTTabPanel>
 
       <GTTabPanel id="security">
-        <GTCard>
+        <GTCard :title="t('account.tabs.security')">
           <AccountPasswordForm />
         </GTCard>
       </GTTabPanel>
 
       <GTTabPanel id="organizations">
-        <GTCard>
+        <GTCard :title="t('account.tabs.organizations')">
           <AccountOrganizationsList />
         </GTCard>
       </GTTabPanel>
 
       <GTTabPanel id="privacy">
-        <GTCard class="mb-6">
+        <GTCard :title="t('account.privacy.export')" class="mb-6">
           <AccountDataExport />
         </GTCard>
         <AccountDeleteSection />

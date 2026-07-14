@@ -10,8 +10,8 @@
   const sent = ref(false)
   const error = ref<string | null>(null)
 
-  const currentEmail = computed(() => session.data.value?.user?.email ?? '')
-  const emailVerified = computed(() => session.data.value?.user?.emailVerified === true)
+  const currentEmail = computed(() => session.value.data?.user?.email ?? '')
+  const emailVerified = computed(() => session.value.data?.user?.emailVerified === true)
 
   async function submit() {
     pending.value = true

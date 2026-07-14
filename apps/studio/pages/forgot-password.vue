@@ -14,22 +14,27 @@
   async function submit() {
     pending.value = true
     error.value = null
-    const captchaToken = await executeRecaptcha('forgot_password')
-    const headers: Record<string, string> = {}
-    if (captchaToken) headers['x-captcha-response'] = captchaToken
+    try {
+      const captchaToken = await executeRecaptcha('forgot_password')
+      const headers: Record<string, string> = {}
+      if (captchaToken) headers['x-captcha-response'] = captchaToken
 
-    const redirectTo = `${config.public.appUrl || ''}/reset-password`
-    const res = await authClient.requestPasswordReset({
-      email: email.value,
-      redirectTo,
-      fetchOptions: { headers },
-    })
-    pending.value = false
-    if (res.error) {
-      error.value = res.error.message ?? t('auth.forgotPassword.error')
-      return
+      const redirectTo = `${config.public.appUrl || ''}/reset-password`
+      const res = await authClient.requestPasswordReset({
+        email: email.value,
+        redirectTo,
+        fetchOptions: { headers },
+      })
+      if (res.error) {
+        error.value = res.error.message ?? t('auth.forgotPassword.error')
+        return
+      }
+      sent.value = true
+    } catch {
+      error.value = t('auth.recaptchaError')
+    } finally {
+      pending.value = false
     }
-    sent.value = true
   }
 </script>
 
@@ -54,7 +59,9 @@
         :heading="error"
         :aria-label="t('auth.forgotPassword.error')"
       />
-      <GTButton type="submit" :loading="pending" block>{{ t('auth.forgotPassword.submit') }}</GTButton>
+      <GTButton type="submit" :loading="pending" block>{{
+        t('auth.forgotPassword.submit')
+      }}</GTButton>
     </form>
 
     <p class="mt-6 text-tertiary">

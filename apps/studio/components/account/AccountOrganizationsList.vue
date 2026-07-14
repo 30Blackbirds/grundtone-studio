@@ -3,11 +3,11 @@
 
   const { t } = useI18n()
   const session = useSession()
-  const userId = computed(() => session.data.value?.user?.id)
+  const userId = computed(() => session.value.data?.user?.id)
 
   const { data: orgs, refresh } = await useAsyncData('account-orgs', async () => {
     const res = await organization.list({
-      fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+      fetchOptions: { headers: useRequestHeaders(['cookie']) as Record<string, string> },
     })
     return res.data ?? []
   })
@@ -20,7 +20,7 @@
       for (const org of list) {
         const full = await organization.getFullOrganization({
           query: { organizationId: org.id },
-          fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
+          fetchOptions: { headers: useRequestHeaders(['cookie']) as Record<string, string> },
         })
         const member = full.data?.members?.find((m) => m.userId === userId.value)
         if (member?.role) map.set(org.id, member.role)
@@ -75,7 +75,9 @@
         </div>
         <div class="flex gap-2">
           <NuxtLink :to="`/orgs/${org.slug}/settings`">
-            <GTButton variant="secondary" size="sm">{{ t('account.organizations.settings') }}</GTButton>
+            <GTButton variant="secondary" size="sm">{{
+              t('account.organizations.settings')
+            }}</GTButton>
           </NuxtLink>
           <GTButton
             v-if="roleByOrg?.get(org.id) !== 'owner'"

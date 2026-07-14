@@ -17,26 +17,31 @@
   async function submit() {
     pending.value = true
     error.value = null
-    const captchaToken = await executeRecaptcha('login')
-    const headers: Record<string, string> = {}
-    if (captchaToken) headers['x-captcha-response'] = captchaToken
+    try {
+      const captchaToken = await executeRecaptcha('login')
+      const headers: Record<string, string> = {}
+      if (captchaToken) headers['x-captcha-response'] = captchaToken
 
-    const res = await signIn.email({
-      email: email.value,
-      password: password.value,
-      fetchOptions: { headers },
-    })
-    pending.value = false
-    if (res.error) {
-      const code = (res.error as { code?: string }).code
-      if (code === 'EMAIL_NOT_VERIFIED') {
-        await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
+      const res = await signIn.email({
+        email: email.value,
+        password: password.value,
+        fetchOptions: { headers },
+      })
+      if (res.error) {
+        const code = (res.error as { code?: string }).code
+        if (code === 'EMAIL_NOT_VERIFIED') {
+          await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
+          return
+        }
+        error.value = res.error.message ?? t('auth.login.error')
         return
       }
-      error.value = res.error.message ?? t('auth.login.error')
-      return
+      await navigateTo(redirect.value)
+    } catch {
+      error.value = t('auth.recaptchaError')
+    } finally {
+      pending.value = false
     }
-    await navigateTo(redirect.value)
   }
 </script>
 

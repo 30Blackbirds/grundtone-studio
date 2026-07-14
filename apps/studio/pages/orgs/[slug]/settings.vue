@@ -74,7 +74,7 @@
 
     <h1 class="m-0 mb-6">{{ t('orgSettings.title') }}</h1>
 
-    <GTCard class="mb-6">
+    <GTCard :title="t('orgSettings.title')" class="mb-6">
       <form class="flex flex-col gap-4" @submit.prevent="save">
         <GTInput v-model="orgName" :label="t('orgSettings.nameLabel')" required />
         <GTInput
@@ -91,8 +91,7 @@
       </form>
     </GTCard>
 
-    <GTCard v-if="isOwner" class="border-error">
-      <h2 class="mt-0 text-lg">{{ t('orgSettings.deleteTitle') }}</h2>
+    <GTCard v-if="isOwner" :title="t('orgSettings.deleteTitle')" class="border-error">
       <p class="text-tertiary">{{ t('orgSettings.deleteBody') }}</p>
       <form class="flex flex-col gap-4 mt-4" @submit.prevent="deleteOrg">
         <GTInput

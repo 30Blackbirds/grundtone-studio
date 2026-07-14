@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import { createError, defineEventHandler, setHeader } from 'h3'
 import { db } from '~~/server/db'
 import {
   activeVersion,

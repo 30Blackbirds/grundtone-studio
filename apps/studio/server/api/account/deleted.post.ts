@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { createError, defineEventHandler, getRequestHeader, readBody } from 'h3'
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import {
@@ -53,7 +54,10 @@ export default defineEventHandler(async (event) => {
 
   await db.delete(projectMember).where(eq(projectMember.userId, userId))
 
-  await db.update(apiKey).set({ createdByEmail: REDACTED_EMAIL }).where(eq(apiKey.createdBy, userId))
+  await db
+    .update(apiKey)
+    .set({ createdByEmail: REDACTED_EMAIL })
+    .where(eq(apiKey.createdBy, userId))
 
   await db
     .update(configVersion)

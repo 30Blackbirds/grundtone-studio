@@ -11,7 +11,7 @@
   const error = ref<string | null>(null)
 
   const { data: guard } = await useAsyncData('account-delete-guard', () =>
-    checkAccountDeletionGuards(session.data.value?.user?.id),
+    checkAccountDeletionGuards(session.value.data?.user?.id),
   )
 
   async function submit() {
@@ -30,8 +30,7 @@
 </script>
 
 <template>
-  <GTCard class="border-error">
-    <h3 class="mt-0">{{ t('account.delete.title') }}</h3>
+  <GTCard :title="t('account.delete.title')" class="border-error">
     <p class="text-tertiary">{{ t('account.delete.body') }}</p>
 
     <template v-if="guard?.blocked">

@@ -1,4 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('~~/lib/auth-client', () => ({
+  organization: {
+    list: vi.fn(),
+    getFullOrganization: vi.fn(),
+  },
+}))
+
 import { isSoleOwnerOfOrg } from '~~/composables/useAccountDeletionGuards'
 
 describe('isSoleOwnerOfOrg', () => {

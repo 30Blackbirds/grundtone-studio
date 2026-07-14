@@ -9,6 +9,23 @@ declare global {
 
 let scriptPromise: Promise<void> | null = null
 
+function isRecaptchaScriptLoaded(script: HTMLScriptElement): boolean {
+  if (window.grecaptcha) return true
+  const readyState = (script as HTMLScriptElement & { readyState?: string }).readyState
+  return readyState === 'loaded' || readyState === 'complete'
+}
+
+function waitForRecaptchaScript(script: HTMLScriptElement): Promise<void> {
+  if (isRecaptchaScriptLoaded(script)) return Promise.resolve()
+
+  return new Promise((resolve, reject) => {
+    script.addEventListener('load', () => resolve(), { once: true })
+    script.addEventListener('error', () => reject(new Error('reCAPTCHA script failed to load')), {
+      once: true,
+    })
+  })
+}
+
 function loadRecaptchaScript(): Promise<void> {
   if (import.meta.server) return Promise.resolve()
   if (window.grecaptcha) return Promise.resolve()
@@ -22,8 +39,9 @@ function loadRecaptchaScript(): Promise<void> {
     }
     const existing = document.querySelector('script[data-recaptcha]')
     if (existing) {
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => reject(new Error('reCAPTCHA script failed to load')))
+      waitForRecaptchaScript(existing as HTMLScriptElement)
+        .then(resolve)
+        .catch(reject)
       return
     }
     const script = document.createElement('script')
@@ -53,10 +71,7 @@ export async function executeRecaptcha(action: string): Promise<string> {
 
   return await new Promise((resolve, reject) => {
     window.grecaptcha!.ready(() => {
-      window
-        .grecaptcha!.execute(siteKey, { action })
-        .then(resolve)
-        .catch(reject)
+      window.grecaptcha!.execute(siteKey, { action }).then(resolve).catch(reject)
     })
   })
 }

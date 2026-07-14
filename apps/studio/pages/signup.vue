@@ -14,23 +14,28 @@
   async function submit() {
     pending.value = true
     error.value = null
-    const captchaToken = await executeRecaptcha('signup')
-    const headers: Record<string, string> = {}
-    if (captchaToken) headers['x-captcha-response'] = captchaToken
+    try {
+      const captchaToken = await executeRecaptcha('signup')
+      const headers: Record<string, string> = {}
+      if (captchaToken) headers['x-captcha-response'] = captchaToken
 
-    const res = await signUp.email({
-      email: email.value,
-      password: password.value,
-      name: name.value,
-      callbackURL: '/dashboard',
-      fetchOptions: { headers },
-    })
-    pending.value = false
-    if (res.error) {
-      error.value = res.error.message ?? t('auth.signup.error')
-      return
+      const res = await signUp.email({
+        email: email.value,
+        password: password.value,
+        name: name.value,
+        callbackURL: '/dashboard',
+        fetchOptions: { headers },
+      })
+      if (res.error) {
+        error.value = res.error.message ?? t('auth.signup.error')
+        return
+      }
+      await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
+    } catch {
+      error.value = t('auth.recaptchaError')
+    } finally {
+      pending.value = false
     }
-    await navigateTo(`/verify-email?email=${encodeURIComponent(email.value)}`)
   }
 </script>
 

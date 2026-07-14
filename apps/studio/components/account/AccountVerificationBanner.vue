@@ -4,8 +4,8 @@
   const { t } = useI18n()
   const session = useSession()
 
-  const email = computed(() => session.data.value?.user?.email ?? '')
-  const show = computed(() => session.data.value?.user?.emailVerified !== true)
+  const email = computed(() => session.value.data?.user?.email ?? '')
+  const show = computed(() => session.value.data?.user?.emailVerified !== true)
 
   const resending = ref(false)
   const resent = ref(false)

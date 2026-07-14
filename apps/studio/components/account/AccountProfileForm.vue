@@ -4,13 +4,13 @@
   const { t } = useI18n()
   const session = useSession()
 
-  const name = ref(session.data.value?.user?.name ?? '')
+  const name = ref(session.value.data?.user?.name ?? '')
   const pending = ref(false)
   const saved = ref(false)
   const error = ref<string | null>(null)
 
   watch(
-    () => session.data.value?.user?.name,
+    () => session.value.data?.user?.name,
     (v) => {
       if (v !== undefined) name.value = v ?? ''
     },
