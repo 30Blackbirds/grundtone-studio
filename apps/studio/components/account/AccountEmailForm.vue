@@ -17,7 +17,7 @@
     pending.value = true
     sent.value = false
     error.value = null
-    const callbackURL = `${config.public.appUrl || ''}/account`
+    const callbackURL = `${config.public.appUrl || window.location.origin}/account`
     const res = await changeEmail({
       newEmail: newEmail.value,
       callbackURL,

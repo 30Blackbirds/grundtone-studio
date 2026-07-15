@@ -19,7 +19,7 @@
       const headers: Record<string, string> = {}
       if (captchaToken) headers['x-captcha-response'] = captchaToken
 
-      const redirectTo = `${config.public.appUrl || ''}/reset-password`
+      const redirectTo = `${config.public.appUrl || window.location.origin}/reset-password`
       const res = await authClient.requestPasswordReset({
         email: email.value,
         redirectTo,
