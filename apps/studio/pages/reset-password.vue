@@ -76,7 +76,9 @@
           :heading="error"
           :aria-label="t('auth.resetPassword.error')"
         />
-        <GTButton type="submit" :loading="pending" block>{{ t('auth.resetPassword.submit') }}</GTButton>
+        <GTButton type="submit" :loading="pending" block>{{
+          t('auth.resetPassword.submit')
+        }}</GTButton>
       </form>
     </template>
 

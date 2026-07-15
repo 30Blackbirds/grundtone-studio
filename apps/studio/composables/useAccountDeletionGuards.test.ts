@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 
+import { isSoleOwnerOfOrg } from '~~/composables/useAccountDeletionGuards'
+
 vi.mock('~~/lib/auth-client', () => ({
   organization: {
     list: vi.fn(),
     getFullOrganization: vi.fn(),
   },
 }))
-
-import { isSoleOwnerOfOrg } from '~~/composables/useAccountDeletionGuards'
 
 describe('isSoleOwnerOfOrg', () => {
   it('returns true when user is the only owner', () => {
