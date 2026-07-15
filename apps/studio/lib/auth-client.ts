@@ -21,4 +21,16 @@ export const authClient = createAuthClient({
   plugins: [organizationClient(), magicLinkClient()],
 })
 
-export const { useSession, signIn, signUp, signOut, organization } = authClient
+export const {
+  useSession,
+  signIn,
+  signUp,
+  signOut,
+  organization,
+  changeEmail,
+  changePassword,
+  deleteUser,
+  updateUser,
+  requestPasswordReset,
+  resetPassword,
+} = authClient

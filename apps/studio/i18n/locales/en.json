@@ -9,7 +9,8 @@
     "save": "Save",
     "delete": "Delete",
     "loading": "Loading …",
-    "language": "Language"
+    "language": "Language",
+    "account": "Account"
   },
   "footer": {
     "installGuide": "Install guide",
@@ -40,7 +41,7 @@
       "logs": "Access logs: 30 days, then dropped."
     },
     "rightsHeading": "Your rights",
-    "rights": "You can request access, correction, deletion, restriction, and data portability under GDPR. We respond within one month. Write to the contact address below or open the account-deletion flow inside Studio (post-MVP).",
+    "rights": "You can request access, correction, deletion, restriction, and data portability under GDPR. We respond within one month. Write to the contact address below or use the account page in Studio (/account).",
     "subProcessorsHeading": "Sub-processors",
     "subProcessors": "We use a small set of EU-located processors to operate Studio. The full list is at",
     "subProcessorsLink": "Sub-processors",
@@ -108,6 +109,8 @@
       "submit": "Sign in",
       "noAccount": "No account?",
       "createAccount": "Sign up",
+      "forgotPassword": "Forgot password?",
+      "resetSuccess": "Your password has been updated. Sign in with your new password.",
       "error": "Sign in failed"
     },
     "signup": {
@@ -117,11 +120,32 @@
       "loginLink": "Sign in",
       "error": "Could not create account"
     },
+    "recaptchaError": "Security check failed. Please try again.",
     "verifyRequired": "Please verify your email before signing in. Check your inbox for the link.",
     "magicLink": {
       "subject": "Sign in to Grundtone Studio",
       "body": "Click the link below to sign in:",
       "ignore": "If you didn't request this, ignore this email."
+    },
+    "forgotPassword": {
+      "title": "Forgot password",
+      "body": "Enter your email address and we'll send a link to reset your password.",
+      "submit": "Send reset link",
+      "sent": "If an account exists for that address, we've sent a reset link.",
+      "backToLogin": "Back to sign in",
+      "error": "Could not send reset link"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "body": "Choose a new password for your account.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Update password",
+      "success": "Password updated.",
+      "invalidToken": "This link is invalid or has expired.",
+      "mismatch": "Passwords do not match.",
+      "requestNewLink": "Request a new link",
+      "error": "Could not update password"
     }
   },
   "orgs": {
@@ -427,5 +451,81 @@
   },
   "skip": {
     "toContent": "Skip to main content"
+  },
+  "account": {
+    "title": "Account",
+    "nav": "Account",
+    "tabs": {
+      "profile": "Profile",
+      "security": "Security",
+      "organizations": "Organizations",
+      "privacy": "Data & privacy"
+    },
+    "profile": {
+      "nameLabel": "Name",
+      "emailLabel": "Email",
+      "emailVerified": "Email verified",
+      "emailNotVerified": "Email not verified",
+      "saved": "Profile updated",
+      "error": "Could not update profile"
+    },
+    "email": {
+      "newEmail": "New email address",
+      "submit": "Change email",
+      "pending": "We've sent a confirmation email to the new address.",
+      "error": "Could not request email change"
+    },
+    "verification": {
+      "banner": "Verify your email address to secure your account.",
+      "resend": "Resend verification email",
+      "resent": "Verification email sent.",
+      "error": "Could not send verification email"
+    },
+    "security": {
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Update password",
+      "saved": "Password updated",
+      "mismatch": "Passwords do not match",
+      "error": "Could not update password"
+    },
+    "organizations": {
+      "empty": "You are not a member of any organizations.",
+      "role": "Role: {role}",
+      "settings": "Settings",
+      "leave": "Leave",
+      "leaveConfirm": "Are you sure you want to leave {org}?",
+      "leaveError": "Could not leave organization",
+      "ownerBlocked": "As the sole owner you must transfer ownership or delete the organization first."
+    },
+    "privacy": {
+      "export": "Download my data",
+      "exportHelp": "Exports your Studio data as JSON (GDPR data portability).",
+      "exportError": "Could not export data",
+      "privacyLink": "Read the privacy policy"
+    },
+    "delete": {
+      "title": "Delete account",
+      "body": "This permanently deletes your account. This cannot be undone.",
+      "password": "Confirm with password",
+      "submit": "Delete my account",
+      "confirm": "Yes, delete my account",
+      "blocked": "You cannot delete your account yet:",
+      "soleOwner": "You are the sole owner of {org}",
+      "error": "Could not delete account"
+    }
+  },
+  "orgSettings": {
+    "title": "Organization settings",
+    "nameLabel": "Name",
+    "slugLabel": "Slug",
+    "saved": "Organization updated",
+    "error": "Could not update organization",
+    "deleteTitle": "Delete organization",
+    "deleteBody": "This permanently deletes the organization and all associated projects.",
+    "deleteConfirm": "Type the organization slug ({slug}) to confirm",
+    "deleteSubmit": "Delete organization",
+    "deleteError": "Could not delete organization"
   }
 }

@@ -9,7 +9,8 @@
     "save": "Gem",
     "delete": "Slet",
     "loading": "Indlæser …",
-    "language": "Sprog"
+    "language": "Sprog",
+    "account": "Konto"
   },
   "footer": {
     "installGuide": "Installations-guide",
@@ -40,7 +41,7 @@
       "logs": "Adgangslogs: 30 dage, derefter droppet."
     },
     "rightsHeading": "Dine rettigheder",
-    "rights": "Du har under GDPR ret til indsigt, berigtigelse, sletning, begrænsning og dataportabilitet. Vi svarer inden for én måned. Skriv til kontaktadressen nedenfor eller brug kontosletnings-flowet i Studio (post-MVP).",
+    "rights": "Du har under GDPR ret til indsigt, berigtigelse, sletning, begrænsning og dataportabilitet. Vi svarer inden for én måned. Skriv til kontaktadressen nedenfor eller brug kontosiden i Studio (/account).",
     "subProcessorsHeading": "Underleverandører",
     "subProcessors": "Vi bruger et lille sæt EU-baserede databehandlere til at drive Studio. Den fulde liste står på",
     "subProcessorsLink": "Underleverandører",
@@ -108,6 +109,8 @@
       "submit": "Log ind",
       "noAccount": "Ingen konto?",
       "createAccount": "Opret en",
+      "forgotPassword": "Glemt adgangskode?",
+      "resetSuccess": "Din adgangskode er opdateret. Log ind med den nye adgangskode.",
       "error": "Login mislykkedes"
     },
     "signup": {
@@ -117,11 +120,32 @@
       "loginLink": "Log ind",
       "error": "Kunne ikke oprette konto"
     },
+    "recaptchaError": "Sikkerhedstjek mislykkedes. Prøv igen.",
     "verifyRequired": "Bekræft din e-mail før du logger ind. Tjek din indbakke for linket.",
     "magicLink": {
       "subject": "Log ind på Grundtone Studio",
       "body": "Klik på linket nedenfor for at logge ind:",
       "ignore": "Hvis du ikke har anmodet om dette, kan du ignorere e-mailen."
+    },
+    "forgotPassword": {
+      "title": "Glemt adgangskode",
+      "body": "Indtast din e-mailadresse, så sender vi et link til at nulstille din adgangskode.",
+      "submit": "Send nulstillingslink",
+      "sent": "Hvis der findes en konto med den adresse, har vi sendt et nulstillingslink.",
+      "backToLogin": "Tilbage til login",
+      "error": "Kunne ikke sende nulstillingslink"
+    },
+    "resetPassword": {
+      "title": "Nulstil adgangskode",
+      "body": "Vælg en ny adgangskode til din konto.",
+      "newPassword": "Ny adgangskode",
+      "confirmPassword": "Bekræft adgangskode",
+      "submit": "Opdater adgangskode",
+      "success": "Adgangskoden er opdateret.",
+      "invalidToken": "Linket er ugyldigt eller udløbet.",
+      "mismatch": "Adgangskoderne matcher ikke.",
+      "requestNewLink": "Anmod om nyt link",
+      "error": "Kunne ikke opdatere adgangskode"
     }
   },
   "orgs": {
@@ -427,5 +451,81 @@
   },
   "skip": {
     "toContent": "Spring til hovedindhold"
+  },
+  "account": {
+    "title": "Konto",
+    "nav": "Konto",
+    "tabs": {
+      "profile": "Profil",
+      "security": "Sikkerhed",
+      "organizations": "Organisationer",
+      "privacy": "Data og privatliv"
+    },
+    "profile": {
+      "nameLabel": "Navn",
+      "emailLabel": "E-mail",
+      "emailVerified": "E-mail bekræftet",
+      "emailNotVerified": "E-mail ikke bekræftet",
+      "saved": "Profil opdateret",
+      "error": "Kunne ikke opdatere profil"
+    },
+    "email": {
+      "newEmail": "Ny e-mailadresse",
+      "submit": "Skift e-mail",
+      "pending": "Vi har sendt en bekræftelsesmail til den nye adresse.",
+      "error": "Kunne ikke anmode om e-mailskift"
+    },
+    "verification": {
+      "banner": "Bekræft din e-mailadresse for at sikre din konto.",
+      "resend": "Gensend bekræftelsesmail",
+      "resent": "Bekræftelsesmail sendt.",
+      "error": "Kunne ikke sende bekræftelsesmail"
+    },
+    "security": {
+      "currentPassword": "Nuværende adgangskode",
+      "newPassword": "Ny adgangskode",
+      "confirmPassword": "Bekræft adgangskode",
+      "submit": "Opdater adgangskode",
+      "saved": "Adgangskode opdateret",
+      "mismatch": "Adgangskoderne matcher ikke",
+      "error": "Kunne ikke opdatere adgangskode"
+    },
+    "organizations": {
+      "empty": "Du er ikke medlem af nogen organisationer.",
+      "role": "Rolle: {role}",
+      "settings": "Indstillinger",
+      "leave": "Forlad",
+      "leaveConfirm": "Er du sikker på, at du vil forlade {org}?",
+      "leaveError": "Kunne ikke forlade organisationen",
+      "ownerBlocked": "Som eneste ejer skal du overdrage ejerskab eller slette organisationen først."
+    },
+    "privacy": {
+      "export": "Download mine data",
+      "exportHelp": "Eksporterer dine Studio-data som JSON (GDPR dataportabilitet).",
+      "exportError": "Kunne ikke eksportere data",
+      "privacyLink": "Læs privatlivspolitikken"
+    },
+    "delete": {
+      "title": "Slet konto",
+      "body": "Dette sletter din konto permanent. Denne handling kan ikke fortrydes.",
+      "password": "Bekræft med adgangskode",
+      "submit": "Slet min konto",
+      "confirm": "Ja, slet min konto",
+      "blocked": "Du kan ikke slette din konto endnu:",
+      "soleOwner": "Du er eneste ejer af {org}",
+      "error": "Kunne ikke slette konto"
+    }
+  },
+  "orgSettings": {
+    "title": "Organisationsindstillinger",
+    "nameLabel": "Navn",
+    "slugLabel": "Slug",
+    "saved": "Organisation opdateret",
+    "error": "Kunne ikke opdatere organisation",
+    "deleteTitle": "Slet organisation",
+    "deleteBody": "Dette sletter organisationen og alle tilknyttede projekter permanent.",
+    "deleteConfirm": "Skriv organisationens slug ({slug}) for at bekræfte",
+    "deleteSubmit": "Slet organisation",
+    "deleteError": "Kunne ikke slette organisation"
   }
 }

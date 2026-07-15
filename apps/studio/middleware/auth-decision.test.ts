@@ -6,6 +6,8 @@ describe('isPublicPath', () => {
     ['/login', true],
     ['/signup', true],
     ['/verify-email', true],
+    ['/forgot-password', true],
+    ['/reset-password', true],
     ['/privacy', true],
     ['/dpa', true],
     ['/sub-processors', true],

@@ -211,6 +211,162 @@ const PROJECT_ROLE_LABEL: Record<Locale, Record<ProjectInviteArgs['role'], strin
   en: { viewer: 'Viewer', editor: 'Editor', admin: 'Admin' },
 }
 
+export interface ResetPasswordArgs {
+  url: string
+  name?: string
+}
+
+export function resetPasswordEmail(
+  args: ResetPasswordArgs,
+  locale: Locale = DEFAULT_LOCALE,
+): RenderedEmail {
+  const { url, name } = args
+  const greetingDa = name ? `Hej ${name},` : 'Hej,'
+  const greetingEn = name ? `Hi ${name},` : 'Hi,'
+  if (locale === 'da') {
+    return {
+      subject: 'Nulstil din adgangskode til Grundtone Studio',
+      text: [
+        greetingDa,
+        '',
+        'Du har anmodet om at nulstille din adgangskode. Klik på linket nedenfor:',
+        '',
+        url,
+        '',
+        'Linket udløber om 1 time. Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.',
+      ].join('\n'),
+      html: `
+        <p>${esc(greetingDa)}</p>
+        <p>Du har anmodet om at nulstille din adgangskode. Klik på linket nedenfor:</p>
+        <p><a href="${esc(url)}">Nulstil adgangskode</a></p>
+        <p>Linket udløber om 1 time. Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.</p>
+      `,
+    }
+  }
+  return {
+    subject: 'Reset your Grundtone Studio password',
+    text: [
+      greetingEn,
+      '',
+      'You requested a password reset. Click the link below:',
+      '',
+      url,
+      '',
+      `The link expires in 1 hour. If you didn't request this, ignore this email.`,
+    ].join('\n'),
+    html: `
+      <p>${esc(greetingEn)}</p>
+      <p>You requested a password reset. Click the link below:</p>
+      <p><a href="${esc(url)}">Reset password</a></p>
+      <p>The link expires in 1 hour. If you didn't request this, ignore this email.</p>
+    `,
+  }
+}
+
+export interface ChangeEmailConfirmationArgs {
+  url: string
+  newEmail: string
+}
+
+export function changeEmailConfirmationEmail(
+  args: ChangeEmailConfirmationArgs,
+  locale: Locale = DEFAULT_LOCALE,
+): RenderedEmail {
+  const { url, newEmail } = args
+  if (locale === 'da') {
+    return {
+      subject: 'Bekræft skift af e-mail på Grundtone Studio',
+      text: [
+        'Du har anmodet om at ændre din e-mailadresse til:',
+        newEmail,
+        '',
+        'Bekræft ændringen ved at klikke på linket nedenfor:',
+        '',
+        url,
+        '',
+        'Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.',
+      ].join('\n'),
+      html: `
+        <p>Du har anmodet om at ændre din e-mailadresse til <strong>${esc(newEmail)}</strong>.</p>
+        <p>Bekræft ændringen ved at klikke på linket nedenfor:</p>
+        <p><a href="${esc(url)}">Bekræft e-mailskift</a></p>
+        <p>Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.</p>
+      `,
+    }
+  }
+  return {
+    subject: 'Confirm your Grundtone Studio email change',
+    text: [
+      'You requested to change your email address to:',
+      newEmail,
+      '',
+      'Confirm the change by clicking the link below:',
+      '',
+      url,
+      '',
+      `If you didn't request this, ignore this email.`,
+    ].join('\n'),
+    html: `
+      <p>You requested to change your email address to <strong>${esc(newEmail)}</strong>.</p>
+      <p>Confirm the change by clicking the link below:</p>
+      <p><a href="${esc(url)}">Confirm email change</a></p>
+      <p>If you didn't request this, ignore this email.</p>
+    `,
+  }
+}
+
+export interface DeleteAccountVerificationArgs {
+  url: string
+  name?: string
+}
+
+export function deleteAccountVerificationEmail(
+  args: DeleteAccountVerificationArgs,
+  locale: Locale = DEFAULT_LOCALE,
+): RenderedEmail {
+  const { url, name } = args
+  const greetingDa = name ? `Hej ${name},` : 'Hej,'
+  const greetingEn = name ? `Hi ${name},` : 'Hi,'
+  if (locale === 'da') {
+    return {
+      subject: 'Bekræft sletning af din Grundtone Studio-konto',
+      text: [
+        greetingDa,
+        '',
+        'Du har anmodet om at slette din konto. Bekræft ved at klikke på linket nedenfor:',
+        '',
+        url,
+        '',
+        'Linket udløber om 1 time. Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.',
+      ].join('\n'),
+      html: `
+        <p>${esc(greetingDa)}</p>
+        <p>Du har anmodet om at slette din konto. Bekræft ved at klikke på linket nedenfor:</p>
+        <p><a href="${esc(url)}">Bekræft kontosletning</a></p>
+        <p>Linket udløber om 1 time. Hvis du ikke har anmodet om dette, kan du ignorere e-mailen.</p>
+      `,
+    }
+  }
+  return {
+    subject: 'Confirm deletion of your Grundtone Studio account',
+    text: [
+      greetingEn,
+      '',
+      'You requested to delete your account. Confirm by clicking the link below:',
+      '',
+      url,
+      '',
+      `The link expires in 1 hour. If you didn't request this, ignore this email.`,
+    ].join('\n'),
+    html: `
+      <p>${esc(greetingEn)}</p>
+      <p>You requested to delete your account. Confirm by clicking the link below:</p>
+      <p><a href="${esc(url)}">Confirm account deletion</a></p>
+      <p>The link expires in 1 hour. If you didn't request this, ignore this email.</p>
+    `,
+  }
+}
+
 export function projectInviteEmail(
   args: ProjectInviteArgs,
   locale: Locale = DEFAULT_LOCALE,

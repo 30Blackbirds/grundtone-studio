@@ -23,6 +23,9 @@
         <NuxtLink to="/changelog" class="text-tertiary text-sm no-underline">
           {{ t('changelog.title') }}
         </NuxtLink>
+        <NuxtLink to="/account" class="text-tertiary text-sm no-underline">
+          {{ t('account.nav') }}
+        </NuxtLink>
         <LanguageSwitch />
         <span v-if="session.data?.user" class="text-tertiary text-sm">
           {{ session.data.user.email }}
