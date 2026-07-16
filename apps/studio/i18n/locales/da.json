@@ -120,7 +120,7 @@
       "loginLink": "Log ind",
       "error": "Kunne ikke oprette konto"
     },
-    "recaptchaError": "Sikkerhedstjek mislykkedes. Prøv igen.",
+    "captchaError": "Sikkerhedstjek mislykkedes. Prøv igen.",
     "verifyRequired": "Bekræft din e-mail før du logger ind. Tjek din indbakke for linket.",
     "magicLink": {
       "subject": "Log ind på Grundtone Studio",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { authClient } from '~~/lib/auth-client'
-  import { executeRecaptcha } from '~~/composables/useRecaptcha'
+  import { solveAltchaChallenge } from '~~/composables/useAltcha'
 
   definePageMeta({ layout: 'auth' })
 
@@ -15,7 +15,7 @@
     pending.value = true
     error.value = null
     try {
-      const captchaToken = await executeRecaptcha('forgot_password')
+      const captchaToken = await solveAltchaChallenge()
       const headers: Record<string, string> = {}
       if (captchaToken) headers['x-captcha-response'] = captchaToken
 
@@ -31,7 +31,7 @@
       }
       sent.value = true
     } catch {
-      error.value = t('auth.recaptchaError')
+      error.value = t('auth.captchaError')
     } finally {
       pending.value = false
     }
