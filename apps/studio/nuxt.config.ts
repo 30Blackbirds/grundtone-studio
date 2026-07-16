@@ -58,7 +58,6 @@ export default defineNuxtConfig({
     s3SecretAccessKey: '',
     public: {
       appUrl: '',
-      recaptchaSiteKey: '',
       cdnBase: '',
       // Browser-facing base URL of the central auth service. The Better Auth
       // client (lib/auth-client.ts) points its baseURL here for sign-in,

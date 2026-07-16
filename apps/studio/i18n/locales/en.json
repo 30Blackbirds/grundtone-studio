@@ -120,7 +120,7 @@
       "loginLink": "Sign in",
       "error": "Could not create account"
     },
-    "recaptchaError": "Security check failed. Please try again.",
+    "captchaError": "Security check failed. Please try again.",
     "verifyRequired": "Please verify your email before signing in. Check your inbox for the link.",
     "magicLink": {
       "subject": "Sign in to Grundtone Studio",
