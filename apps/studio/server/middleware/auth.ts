@@ -1,5 +1,6 @@
 import { createJwtVerifier } from '@klanghaus/auth-jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
+import { authenticateMachineKey } from '~~/server/lib/machine-auth'
 
 // Studio no longer runs Better Auth. Authentication is delegated to the central
 // auth service: the browser holds a `better-auth.session_token` cookie scoped to
@@ -87,7 +88,12 @@ async function exchangeCookieForToken(event: H3Event): Promise<string | null> {
 
 export default defineEventHandler(async (event) => {
   const token = await exchangeCookieForToken(event)
-  if (!token) return
+  if (!token) {
+    // No browser session — a headless client may present a per-project secret
+    // key (`Authorization: Bearer sk_...`). Resolve it to a machine principal.
+    await authenticateMachineKey(event)
+    return
+  }
 
   try {
     const actor = await getVerifier().verify(token)

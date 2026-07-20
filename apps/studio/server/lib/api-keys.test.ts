@@ -29,6 +29,17 @@ describe('generateApiKey', () => {
     for (let i = 0; i < 1000; i++) seen.add(generateApiKey('live').plaintext)
     expect(seen.size).toBe(1000)
   })
+
+  it('produces an sk_ prefixed key for the secret key type', () => {
+    const k = generateApiKey('live', 'secret')
+    expect(k.plaintext).toMatch(/^sk_live_[0-9a-f]{64}$/)
+    expect(k.prefix).toMatch(/^sk_live_[0-9a-f]{4}$/)
+    expect(k.hash).toBe(hashApiKey(k.plaintext))
+  })
+
+  it('defaults to publishable (pk_) when no key type is given', () => {
+    expect(generateApiKey('live').plaintext).toMatch(/^pk_/)
+  })
 })
 
 describe('hashApiKey', () => {

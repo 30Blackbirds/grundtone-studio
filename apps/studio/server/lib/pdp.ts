@@ -34,6 +34,13 @@ function userSubject(sub: string): string {
   return `user:${sub}`
 }
 
+// Machine (per-project secret key) tuple subjects use the PDP's dedicated
+// `machine:` type (permissions #63) — distinct from `user:` so a customer-issued
+// key never inherits platform-service authority. The keyId is the tuple subject.
+function machineSubject(keyId: string): string {
+  return `machine:${keyId}`
+}
+
 function getActor(event: H3Event) {
   return event.context.auth ?? null
 }
@@ -46,6 +53,13 @@ function bearerInterceptor(token: string): Interceptor {
 }
 
 async function getToken(event: H3Event): Promise<string | null> {
+  // Machine-key requests have no session cookie — the machine-auth middleware
+  // has already exchanged the `sk_` key for a short-lived `machine:{keyId}` JWT
+  // and stashed it here. Prefer it so the PDP call is authenticated as the
+  // machine principal (its editor tuple is what gets adjudicated).
+  const stashed = event.context.authToken as string | undefined
+  if (stashed) return stashed
+
   // Re-exchange the forwarded session cookie for a fresh JWT to attach to the
   // PDP call. The auth middleware already verified the session for this request,
   // but the PDP needs the raw bearer token (it re-verifies + reads the org
@@ -219,6 +233,46 @@ export async function revokeProjectRole(
   if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   await client.revokeRole({
     subject: userSubject(subject),
+    role,
+    resource: projectResource(projectId),
+  })
+}
+
+/**
+ * Grant a machine (secret-key) principal a project role. Called at key-creation
+ * on the admin's browser context (tenant derived server-side from the admin's
+ * JWT org claim — never from the request body, per Beslutning K). Throws on
+ * failure so key-creation rolls back if the tuple can't be written.
+ */
+export async function grantMachineProjectRole(
+  event: H3Event,
+  projectId: string,
+  keyId: string,
+  role: 'viewer' | 'editor' | 'admin',
+): Promise<void> {
+  const client = await clientFor(event)
+  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  await client.grantRole({
+    subject: machineSubject(keyId),
+    role,
+    resource: projectResource(projectId),
+  })
+}
+
+/**
+ * Revoke a machine principal's project role. Called at key-delete so revocation
+ * is a single PDP tuple-delete (permissions owns the source of truth).
+ */
+export async function revokeMachineProjectRole(
+  event: H3Event,
+  projectId: string,
+  keyId: string,
+  role: 'viewer' | 'editor' | 'admin',
+): Promise<void> {
+  const client = await clientFor(event)
+  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  await client.revokeRole({
+    subject: machineSubject(keyId),
     role,
     resource: projectResource(projectId),
   })
