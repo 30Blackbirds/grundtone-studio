@@ -5,6 +5,7 @@
   interface ApiKeyRow {
     id: string
     keyPrefix: string
+    keyType: 'publishable' | 'secret'
     environment: 'live' | 'test'
     allowedOrigins: string[]
     rateLimit: number
@@ -39,6 +40,7 @@
 
   const showCreate = ref(false)
   const newEnv = ref<'live' | 'test'>('live')
+  const newKeyType = ref<'publishable' | 'secret'>('publishable')
   const newOrigins = ref('')
   // GTInput's model is string-typed even for type="number". Store as string,
   // coerce + clamp at submit time. Default '1000' matches the DB-level default
@@ -47,18 +49,23 @@
   const creating = ref(false)
   const createError = ref<string | null>(null)
   const createdPlaintext = ref<string | null>(null)
+  // Carried alongside the plaintext so the install snippet (CDN-only) never
+  // renders a secret key, which is a server/CLI credential, not a URL token.
+  const createdKeyType = ref<'publishable' | 'secret'>('publishable')
   const copyState = ref<'idle' | 'copied'>('idle')
+  const idCopyState = ref<'idle' | 'copied'>('idle')
 
   async function createKey() {
     creating.value = true
     createError.value = null
     try {
-      const res = await $fetch<{ plaintext: string; keyPrefix: string }>(
+      const res = await $fetch<{ plaintext: string; keyPrefix: string; keyType: string }>(
         `/api/projects/${props.projectId}/api-keys`,
         {
           method: 'POST',
           body: {
             environment: newEnv.value,
+            keyType: newKeyType.value,
             allowedOrigins: newOrigins.value
               .split('\n')
               .map((s) => s.trim())
@@ -71,8 +78,10 @@
         },
       )
       createdPlaintext.value = res.plaintext
+      createdKeyType.value = newKeyType.value
       newOrigins.value = ''
       newEnv.value = 'live'
+      newKeyType.value = 'publishable'
       newRateLimit.value = DEFAULT_RATE_LIMIT
       await refresh()
     } catch (err) {
@@ -80,6 +89,12 @@
     } finally {
       creating.value = false
     }
+  }
+
+  async function copyProjectId() {
+    await navigator.clipboard.writeText(props.projectId)
+    idCopyState.value = 'copied'
+    setTimeout(() => (idCopyState.value = 'idle'), 2000)
   }
 
   async function copyPlaintext() {
@@ -103,11 +118,14 @@
   const activeKeys = computed(() => (keys.value ?? []).filter((k) => !k.revokedAt))
   const revokedKeys = computed(() => (keys.value ?? []).filter((k) => k.revokedAt))
 
-  // First active key drives the install snippet UI. New plaintext shown once
-  // takes precedence so the snippet matches what the user is about to copy.
-  const snippetKey = computed(
-    () => createdPlaintext.value ?? activeKeys.value[0]?.keyPrefix ?? null,
-  )
+  // First active publishable key drives the install snippet UI (the CDN
+  // /k route is publishable-only). A freshly created publishable key takes
+  // precedence so the snippet matches what the user is about to copy; secret
+  // keys are server/CLI credentials and never belong in the CDN snippet.
+  const snippetKey = computed(() => {
+    if (createdPlaintext.value && createdKeyType.value !== 'secret') return createdPlaintext.value
+    return activeKeys.value.find((k) => k.keyType !== 'secret')?.keyPrefix ?? null
+  })
 </script>
 
 <template>
@@ -125,6 +143,19 @@
         {{ t('apiKeys.create') }}
       </GTButton>
     </header>
+
+    <div class="flex justify-between items-center gap-4 p-4 bg-surface-raised border rounded-lg">
+      <div class="flex flex-col gap-1 min-w-0">
+        <span class="text-sm uppercase text-tertiary tracking-wide">
+          {{ t('apiKeys.projectId') }}
+        </span>
+        <code class="font-mono text-sm break-all">{{ projectId }}</code>
+        <span class="text-tertiary text-sm">{{ t('apiKeys.projectIdHelp') }}</span>
+      </div>
+      <GTButton variant="outlined" size="sm" @click="copyProjectId">
+        {{ idCopyState === 'copied' ? t('apiKeys.idCopied') : t('apiKeys.copyId') }}
+      </GTButton>
+    </div>
 
     <GTAlert v-if="createdPlaintext" variant="warning" :heading="t('apiKeys.shownOnce')">
       <p class="mt-0">{{ t('apiKeys.shownOnceBody') }}</p>
@@ -147,6 +178,15 @@
       @submit.prevent="createKey"
     >
       <GTSelect
+        v-model="newKeyType"
+        :label="t('apiKeys.keyType')"
+        :help-text="t('apiKeys.keyTypeHelp')"
+        :options="[
+          { value: 'publishable', label: t('apiKeys.typePublishable') },
+          { value: 'secret', label: t('apiKeys.typeSecret') },
+        ]"
+      />
+      <GTSelect
         v-model="newEnv"
         :label="t('apiKeys.environment')"
         :options="[
@@ -154,22 +194,26 @@
           { value: 'test', label: t('apiKeys.envTest') },
         ]"
       />
-      <GTTextarea
-        v-model="newOrigins"
-        :label="t('apiKeys.allowedOrigins')"
-        :help-text="t('apiKeys.allowedOriginsHelp')"
-        placeholder="acme.com&#10;*.acme.com"
-        :rows="3"
-      />
-      <GTInput
-        v-model="newRateLimit"
-        type="number"
-        :label="t('apiKeys.rateLimit')"
-        :help-text="t('apiKeys.rateLimitHelp')"
-        :min="1"
-        :max="1_000_000"
-        :step="100"
-      />
+      <!-- Origins + rate limit are CDN concerns; secret keys are server/CLI
+           credentials that never hit the CDN /k route, so we hide them. -->
+      <template v-if="newKeyType !== 'secret'">
+        <GTTextarea
+          v-model="newOrigins"
+          :label="t('apiKeys.allowedOrigins')"
+          :help-text="t('apiKeys.allowedOriginsHelp')"
+          placeholder="acme.com&#10;*.acme.com"
+          :rows="3"
+        />
+        <GTInput
+          v-model="newRateLimit"
+          type="number"
+          :label="t('apiKeys.rateLimit')"
+          :help-text="t('apiKeys.rateLimitHelp')"
+          :min="1"
+          :max="1_000_000"
+          :step="100"
+        />
+      </template>
       <GTAlert v-if="createError" variant="error" :heading="createError" />
       <div class="flex gap-3 justify-end">
         <GTButton type="button" variant="secondary" @click="showCreate = false">
@@ -190,11 +234,19 @@
           class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
         >
           <div class="flex flex-col gap-1">
-            <code class="font-mono text-sm">{{ k.keyPrefix }}…</code>
+            <span class="flex items-center gap-2">
+              <code class="font-mono text-sm">{{ k.keyPrefix }}…</code>
+              <GTBadge v-if="k.keyType === 'secret'" variant="warning">
+                {{ t('apiKeys.secretBadge') }}
+              </GTBadge>
+            </span>
             <span class="text-tertiary text-sm">
-              {{ t(`apiKeys.env${k.environment === 'live' ? 'Live' : 'Test'}`) }} ·
-              {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }} ·
-              {{ t('apiKeys.rateLimitBadge', { n: k.rateLimit }) }}
+              {{ t(`apiKeys.env${k.environment === 'live' ? 'Live' : 'Test'}`) }}
+              <template v-if="k.keyType !== 'secret'">
+                ·
+                {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }}
+                · {{ t('apiKeys.rateLimitBadge', { n: k.rateLimit }) }}
+              </template>
             </span>
           </div>
           <GTButton v-if="canManage" variant="outlined" size="sm" @click="revoke(k.id)">
