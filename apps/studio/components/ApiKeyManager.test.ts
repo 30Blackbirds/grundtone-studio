@@ -39,6 +39,9 @@ vi.stubGlobal('useI18n', () => ({
 const confirmMock = vi.fn(() => true)
 vi.stubGlobal('confirm', confirmMock)
 
+const writeTextMock = vi.fn(() => Promise.resolve())
+vi.stubGlobal('navigator', { clipboard: { writeText: writeTextMock } })
+
 // Generic passthrough stub for grundtone components. Renders default slot
 // inside a div tagged with `data-test="<lower-name>"` plus any structured
 // props the assertions care about (variant / heading / loading).
@@ -98,6 +101,7 @@ const global = {
   components: {
     GTButton,
     GTAlert: gtStub('GTAlert'),
+    GTBadge: gtStub('GTBadge'),
     GTSelect: gtStub('GTSelect'),
     GTTextarea: gtStub('GTTextarea'),
     GTInput: gtStub('GTInput'),
@@ -117,6 +121,7 @@ function k(overrides: Partial<Record<string, unknown>> = {}): unknown {
   return {
     id: 'k1',
     keyPrefix: 'pk_live_abc',
+    keyType: 'publishable',
     environment: 'live',
     allowedOrigins: ['acme.com'],
     rateLimit: 1000,
@@ -145,6 +150,7 @@ beforeEach(() => {
   fetchMock.mockReset()
   confirmMock.mockReset()
   confirmMock.mockReturnValue(true)
+  writeTextMock.mockReset()
 })
 
 describe('ApiKeyManager', () => {
@@ -185,9 +191,11 @@ describe('ApiKeyManager', () => {
     fetchMock.mockResolvedValueOnce([k({ id: 'a' })])
     const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: false }, global })
     await flushPromises()
-    // No buttons should render at all: create button is canManage-gated,
-    // revoke button is canManage-gated.
-    expect(w.findAll('[data-test="gt-button"]')).toHaveLength(0)
+    // Only the always-available copy-project-id button renders; the create and
+    // revoke buttons are both canManage-gated.
+    const buttons = w.findAll('[data-test="gt-button"]')
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].text()).toContain('apiKeys.copyId')
   })
 
   it('creates a key: POSTs body, surfaces plaintext, then refreshes the list', async () => {
@@ -218,13 +226,45 @@ describe('ApiKeyManager', () => {
         (opts as { method?: string })?.method === 'POST',
     )
     expect(postCall).toBeDefined()
-    const body = (postCall![1] as { body: { environment: string; rateLimit: number } }).body
+    const body = (
+      postCall![1] as { body: { environment: string; rateLimit: number; keyType: string } }
+    ).body
     expect(body.environment).toBe('live')
     expect(body.rateLimit).toBe(1000)
+    // Defaults to a publishable key when the type toggle is untouched.
+    expect(body.keyType).toBe('publishable')
 
     // Plaintext-shown-once alert should now be on screen.
     expect(w.text()).toContain('pk_live_full_secret')
     expect(w.text()).toContain('apiKeys.shownOnce')
+  })
+
+  it('copies the project id to the clipboard', async () => {
+    fetchMock.mockResolvedValueOnce([])
+    const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: false }, global })
+    await flushPromises()
+
+    const copyBtn = w
+      .findAll('[data-test="gt-button"]')
+      .find((b) => b.text().includes('apiKeys.copyId'))
+    expect(copyBtn).toBeDefined()
+    await copyBtn!.trigger('click')
+    await flushPromises()
+
+    expect(writeTextMock).toHaveBeenCalledWith(PROJECT_ID)
+  })
+
+  it('badges secret keys and keeps them out of the CDN install snippet', async () => {
+    fetchMock.mockResolvedValueOnce([
+      k({ id: 's', keyPrefix: 'sk_live_secret', keyType: 'secret' }),
+    ])
+    const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: true }, global })
+    await flushPromises()
+
+    // Secret key is flagged in the list…
+    expect(w.text()).toContain('apiKeys.secretBadge')
+    // …and never feeds the publishable-only install snippet.
+    expect(w.find('[data-test="install-snippet"]').attributes('data-api-key')).toBe('')
   })
 
   it('revoke(): confirms, DELETEs, refreshes', async () => {
@@ -236,11 +276,11 @@ describe('ApiKeyManager', () => {
     const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: true }, global })
     await flushPromises()
 
-    // Two buttons render: create-toggle + revoke. The revoke button is the
-    // outlined one rendered inside the active-key row.
+    // Locate the revoke button by its label — the copy-project-id button shares
+    // the outlined variant, so variant alone is no longer unambiguous.
     const revokeBtn = w
       .findAll('[data-test="gt-button"]')
-      .find((b) => b.attributes('data-variant') === 'outlined')
+      .find((b) => b.text().includes('apiKeys.revoke'))
     expect(revokeBtn).toBeDefined()
     await revokeBtn!.trigger('click')
     await flushPromises()
@@ -264,7 +304,7 @@ describe('ApiKeyManager', () => {
 
     const revokeBtn = w
       .findAll('[data-test="gt-button"]')
-      .find((b) => b.attributes('data-variant') === 'outlined')
+      .find((b) => b.text().includes('apiKeys.revoke'))
     await revokeBtn!.trigger('click')
     await flushPromises()
 
