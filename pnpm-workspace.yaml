@@ -14,9 +14,26 @@ overrides:
   # Pulled in by @nuxtjs/i18n; remove when that package bumps.
   devalue: ^5.8.1
   # GHSA-w7jw-789q-3m8p — critical: shell-quote quote() does not escape
-  # newlines in object .op values; patched in 1.8.4. Pulled in by
-  # @nuxt/devtools > launch-editor (transitive through @sentry/nuxt > nuxt).
-  shell-quote: ^1.8.4
+  # newlines in object .op values (patched 1.8.4). Plus a later quadratic-
+  # complexity DoS in parse() patched in 1.9.0 — floor raised to cover both.
+  # Pulled in by @nuxt/devtools > launch-editor (transitive through
+  # @sentry/nuxt > nuxt).
+  shell-quote: ^1.9.0
+  # GHSA — critical node-tar decompression/parse DoS (unlimited input) plus a
+  # high infinite-loop on negative entry size; both patched in 7.5.19. Pulled
+  # in via @sentry/nuxt > nuxt > nitropack > @vercel/nft > @mapbox/node-pre-gyp.
+  tar: '>=7.5.19'
+  # GHSA — high: js-yaml merge-key chains force quadratic CPU; patched 4.3.0.
+  # Pulled in by @nuxtjs/i18n > @rollup/plugin-yaml. Stays in the 4.x line.
+  js-yaml: '>=4.3.0'
+  # GHSA — high: brace-expansion DoS via exponential-time expansion. Two
+  # disjoint vulnerable ranges reach us through different minimatch parents
+  # (glob and eslint). Version-scoped so we only bump the vulnerable ranges and
+  # leave any legitimate 1.x consumers (minimatch@3) untouched — a flat bump to
+  # 5.x would break those. brace-expansion's API is a single stable function,
+  # so forcing the patched version is safe regardless of the declared range.
+  'brace-expansion@>=2.0.0 <2.1.2': '>=2.1.2 <3.0.0'
+  'brace-expansion@>=3.0.0 <5.0.7': '>=5.0.7'
   # GHSA-gv7w-rqvm-qjhr — high: esbuild missing binary integrity verification
   # in Deno module enables RCE via NPM_CONFIG_REGISTRY; patched in 0.28.1.
   # Pulled in by @nuxtjs/i18n + nitropack + sentry chain.
