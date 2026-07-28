@@ -572,5 +572,22 @@
     "memberRemoved": "Medlem fjernet",
     "inviteCancelled": "Invitation annulleret",
     "leftOrg": "Du har forladt organisationen"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overblik over dine projekter og aktivitet",
+    "statOrgs": "Organisationer",
+    "statProjects": "Projekter",
+    "statPublished": "Publicerede",
+    "statLastPublish": "Seneste publish",
+    "projectsHeading": "Projekter",
+    "activityHeading": "Seneste aktivitet",
+    "noProjects": "Ingen projekter endnu.",
+    "noProjectsCta": "Opret dit første projekt →",
+    "status": {
+      "published": "Publiceret",
+      "draft": "Kladde",
+      "none": "Ikke publiceret"
+    }
   }
 }

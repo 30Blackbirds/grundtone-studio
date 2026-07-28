@@ -572,5 +572,22 @@
     "memberRemoved": "Member removed",
     "inviteCancelled": "Invitation cancelled",
     "leftOrg": "You have left the organization"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your projects and activity",
+    "statOrgs": "Organizations",
+    "statProjects": "Projects",
+    "statPublished": "Published",
+    "statLastPublish": "Last publish",
+    "projectsHeading": "Projects",
+    "activityHeading": "Recent activity",
+    "noProjects": "No projects yet.",
+    "noProjectsCta": "Create your first project →",
+    "status": {
+      "published": "Published",
+      "draft": "Draft",
+      "none": "Not published"
+    }
   }
 }
