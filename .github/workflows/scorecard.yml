@@ -1,10 +1,17 @@
 name: OSSF Scorecard
 
-# NB: OSSF Scorecard er designet til OFFENTLIGE repos. På PRIVATE repos kræver
-# det en classic PAT med `repo`-scope gemt som `SCORECARD_TOKEN` repo-secret
-# (default GITHUB_TOKEN har ikke GraphQL-adgang til private commits) + sæt
-# `publish_results: false`. Skabelonen nedenfor er konfigureret til offentlige
-# repos; tilpas inputs hvis dit repo er privat. Se GITHUB-RULES.md "GHAS"-sektion.
+# OSSF Scorecard er et OFFENTLIGT-repo-værktøj: på private repos kan default
+# GITHUB_TOKEN ikke GraphQL-query'e commits ("Resource not accessible by
+# integration"), og `upload-sarif` 403'er fordi GHAS/Code Security er slået fra
+# på private repos (cost — SonarQube + gitleaks er posturen; se GITHUB-RULES.md
+# "GHAS"). Kørt som public-skabelon på et privat repo fejlede den derfor på hver
+# push til main OG smittede code-scanning med en repo-wide "CodeQL configuration
+# error" (studio-issue #71).
+#
+# Fix: hele jobbet self-gater på repo-visibility. På PRIVATE repos skippes det
+# rent (alle triggers → ingen fejl, ingen SARIF-upload). Bliver studio nogensinde
+# public, aktiverer det automatisk med den korrekte public-config nedenfor
+# (publish_results + upload-sarif virker på public uden PAT). Intet at pille ved.
 
 on:
   schedule:
@@ -18,6 +25,8 @@ permissions: read-all
 jobs:
   analysis:
     name: Scorecard analysis
+    # Kun på offentlige repos — se header. På private (studio i dag) skippes det.
+    if: ${{ github.event.repository.visibility == 'public' }}
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -34,9 +43,6 @@ jobs:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
-          # For private repos, uncomment:
-          # repo_token: ${{ secrets.SCORECARD_TOKEN }}
-          # publish_results: false
 
       - uses: actions/upload-artifact@v7
         with:
