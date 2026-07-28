@@ -82,11 +82,21 @@
     "intro": "Grundtone uses the following EU-located sub-processors to operate Studio. Each provider has its own DPA + GDPR commitments — links below.",
     "dpaLink": "Their DPA →",
     "notification": "We notify customers 30 days before adding a new sub-processor unless an urgent security replacement is required. Material objections can lead to contract termination per the DPA.",
-    "upcloud": { "role": "Application hosting, Managed PostgreSQL, Object Storage" },
-    "bunny": { "role": "CDN edge caching for /k/ endpoints (public API key in URL)" },
-    "postmark": { "role": "Transactional email delivery (magic links, invitations)" },
-    "sentry": { "role": "Error tracking + performance monitoring" },
-    "github": { "role": "Source code hosting + CI; no production customer data" }
+    "upcloud": {
+      "role": "Application hosting, Managed PostgreSQL, Object Storage"
+    },
+    "bunny": {
+      "role": "CDN edge caching for /k/ endpoints (public API key in URL)"
+    },
+    "postmark": {
+      "role": "Transactional email delivery (magic links, invitations)"
+    },
+    "sentry": {
+      "role": "Error tracking + performance monitoring"
+    },
+    "github": {
+      "role": "Source code hosting + CI; no production customer data"
+    }
   },
   "integrationGuide": {
     "title": "Integration guide",
@@ -536,5 +546,8 @@
     "deleteConfirm": "Type the organization slug ({slug}) to confirm",
     "deleteSubmit": "Delete organization",
     "deleteError": "Could not delete organization"
+  },
+  "componentLibrary": {
+    "nav": "Components"
   }
 }

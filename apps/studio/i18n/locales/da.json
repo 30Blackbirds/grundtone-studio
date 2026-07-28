@@ -82,11 +82,21 @@
     "intro": "Grundtone bruger følgende EU-baserede underleverandører til at drive Studio. Hver leverandør har sin egen DPA + GDPR-forpligtelser — links nedenfor.",
     "dpaLink": "Deres DPA →",
     "notification": "Vi notificerer kunder 30 dage før tilføjelse af en ny underleverandør medmindre en akut sikkerhedsudskiftning er nødvendig. Materielle indvendinger kan medføre kontraktophør per DPA'en.",
-    "upcloud": { "role": "App-hosting, Managed PostgreSQL, Object Storage" },
-    "bunny": { "role": "CDN edge-caching for /k/-endpoints (offentlig API-nøgle i URL)" },
-    "postmark": { "role": "Transaktionel email-levering (magic links, invitationer)" },
-    "sentry": { "role": "Fejl-tracking + performance-monitoring" },
-    "github": { "role": "Kildekode-hosting + CI; ingen produktions-kundedata" }
+    "upcloud": {
+      "role": "App-hosting, Managed PostgreSQL, Object Storage"
+    },
+    "bunny": {
+      "role": "CDN edge-caching for /k/-endpoints (offentlig API-nøgle i URL)"
+    },
+    "postmark": {
+      "role": "Transaktionel email-levering (magic links, invitationer)"
+    },
+    "sentry": {
+      "role": "Fejl-tracking + performance-monitoring"
+    },
+    "github": {
+      "role": "Kildekode-hosting + CI; ingen produktions-kundedata"
+    }
   },
   "integrationGuide": {
     "title": "Integrations-guide",
@@ -536,5 +546,8 @@
     "deleteConfirm": "Skriv organisationens slug ({slug}) for at bekræfte",
     "deleteSubmit": "Slet organisation",
     "deleteError": "Kunne ikke slette organisation"
+  },
+  "componentLibrary": {
+    "nav": "Komponenter"
   }
 }

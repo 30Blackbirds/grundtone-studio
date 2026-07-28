@@ -62,6 +62,14 @@
             {{ $t('audit.title') }}
           </NuxtLink>
         </li>
+        <li>
+          <NuxtLink
+            to="/components"
+            class="block p-2 rounded text-sm no-underline text-inherit hover:bg-surface-raised"
+          >
+            {{ $t('componentLibrary.nav') }}
+          </NuxtLink>
+        </li>
       </ul>
     </nav>
   </aside>
