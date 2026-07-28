@@ -23,17 +23,39 @@ overrides:
   # high infinite-loop on negative entry size; both patched in 7.5.19. Pulled
   # in via @sentry/nuxt > nuxt > nitropack > @vercel/nft > @mapbox/node-pre-gyp.
   tar: '>=7.5.19'
-  # GHSA — high: js-yaml merge-key chains force quadratic CPU; patched 4.3.0.
-  # Pulled in by @nuxtjs/i18n > @rollup/plugin-yaml. Stays in the 4.x line.
-  js-yaml: '>=4.3.0'
-  # GHSA — high: brace-expansion DoS via exponential-time expansion. Two
-  # disjoint vulnerable ranges reach us through different minimatch parents
-  # (glob and eslint). Version-scoped so we only bump the vulnerable ranges and
-  # leave any legitimate 1.x consumers (minimatch@3) untouched — a flat bump to
-  # 5.x would break those. brace-expansion's API is a single stable function,
-  # so forcing the patched version is safe regardless of the declared range.
-  'brace-expansion@>=2.0.0 <2.1.2': '>=2.1.2 <3.0.0'
-  'brace-expansion@>=3.0.0 <5.0.7': '>=5.0.7'
+  # GHSA — high: js-yaml quadratic/exponential parse-time DoS. The old merge-key
+  # advisory was patched in 4.3.0; a newer exponential-parse-time-in-flow-
+  # collections advisory (vuln 5.0.0–5.2.1) is patched in 5.2.2. The tree already
+  # resolves js-yaml to 5.x via @nuxtjs/i18n > @rollup/plugin-yaml, so floor to
+  # 5.2.2 to cover both. API is stable across the bump for our consumers.
+  js-yaml: '>=5.2.2'
+  # GHSA-mh99-v99m-4gvg — high: brace-expansion OOM-crash DoS via unbounded
+  # expansion. The advisory marks EVERY version <=5.0.7 vulnerable across all
+  # major lines and patches only in 5.0.8, so the earlier "keep 2.x on 2.1.2"
+  # scoping is no longer sufficient. Force the whole 2.x–5.0.7 span (reached via
+  # multiple minimatch parents: eslint, and archiver>glob) up to 5.0.8. The 1.x
+  # line (<2.0.0, used by minimatch@3) is left untouched — a flat 5.x bump there
+  # risks the CJS/ESM break the original scoping guarded against; no 1.x
+  # brace-expansion is in the prod tree (audit confirms green).
+  'brace-expansion@>=2.0.0 <5.0.8': '>=5.0.8'
+  # GHSA — high (x2): Immutable.js List 32-bit trie overflow + Map/Set hash-
+  # collision algorithmic-complexity DoS; both patched in 5.1.8. Pulled in via
+  # @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite > sass. Remove when sass
+  # drops the immutable dep or bumps it.
+  immutable: '>=5.1.8'
+  # GHSA — high: SVGO removeScripts plugin leaves some executable scripts
+  # intact; patched in 4.0.2. Pulled in via @sentry/nuxt > nuxt > cssnano >
+  # postcss-svgo. Build-time SVG optimization only.
+  svgo: '>=4.0.2'
+  # GHSA — high (x2): fast-uri host confusion via literal-backslash authority
+  # delimiter + failed IDN canonicalization; both patched in 3.1.4. Pulled in
+  # via @sentry/nuxt > nuxt > vite-plugin-checker > stylelint > table > ajv.
+  fast-uri: '>=3.1.4'
+  # GHSA — high: PostCSS path traversal in previous-source-map auto-loading
+  # (sourceMappingURL) → arbitrary .map file disclosure; patched in 8.5.18.
+  # Pulled in via @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite. Stable
+  # within the 8.x line.
+  postcss: '>=8.5.18'
   # GHSA-gv7w-rqvm-qjhr — high: esbuild missing binary integrity verification
   # in Deno module enables RCE via NPM_CONFIG_REGISTRY; patched in 0.28.1.
   # Pulled in by @nuxtjs/i18n + nitropack + sentry chain.
