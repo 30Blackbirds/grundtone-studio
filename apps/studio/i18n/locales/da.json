@@ -164,7 +164,8 @@
     "empty": "Ingen organisationer endnu.",
     "nameLabel": "Navn",
     "slugLabel": "Slug",
-    "createError": "Kunne ikke oprette organisation"
+    "createError": "Kunne ikke oprette organisation",
+    "switch": "Skift organisation"
   },
   "projects": {
     "title": "Projekter",
@@ -549,5 +550,27 @@
   },
   "componentLibrary": {
     "nav": "Komponenter"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "menu": "Menu",
+    "global": "Global navigation",
+    "orgAdmin": "Organisation",
+    "openMenu": "Åbn menu",
+    "closeMenu": "Luk menu",
+    "breadcrumb": "Brødkrumme"
+  },
+  "confirm": {
+    "confirm": "Bekræft",
+    "cancel": "Annullér"
+  },
+  "toasts": {
+    "draftSaved": "Kladde gemt",
+    "published": "Publiceret — live på CDN om et øjeblik",
+    "keyRevoked": "API-nøgle tilbagekaldt",
+    "versionActivated": "Version aktiveret",
+    "memberRemoved": "Medlem fjernet",
+    "inviteCancelled": "Invitation annulleret",
+    "leftOrg": "Du har forladt organisationen"
   }
 }

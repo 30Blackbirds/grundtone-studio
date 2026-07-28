@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import type { ProjectRole } from '~~/composables/useProjectRole'
 
   const props = defineProps<{ projectId: string; canManage: boolean }>()
@@ -74,12 +75,26 @@
       method: 'DELETE',
     })
     await refresh()
+    toast.success(t('toasts.inviteCancelled'))
   }
 
-  async function removeMember(memberId: string) {
-    if (!confirm(t('projectMembers.confirmRemove'))) return
-    await $fetch(`/api/projects/${props.projectId}/members/${memberId}`, { method: 'DELETE' })
-    await refresh()
+  const toast = useToast()
+  const pendingRemoveId = ref<string | null>(null)
+  const removing = ref(false)
+
+  async function confirmRemoveMember() {
+    if (!pendingRemoveId.value) return
+    removing.value = true
+    try {
+      await $fetch(`/api/projects/${props.projectId}/members/${pendingRemoveId.value}`, {
+        method: 'DELETE',
+      })
+      await refresh()
+      pendingRemoveId.value = null
+      toast.success(t('toasts.memberRemoved'))
+    } finally {
+      removing.value = false
+    }
   }
 
   function orgBadgeVariant(role: string): 'info' | 'warning' | 'neutral' {
@@ -146,7 +161,7 @@
           </div>
           <div class="flex items-center gap-3">
             <GTBadge variant="info">{{ t(`projectMembers.roles.${m.role}`) }}</GTBadge>
-            <GTButton v-if="canManage" variant="outlined" size="sm" @click="removeMember(m.id)">
+            <GTButton v-if="canManage" variant="outlined" size="sm" @click="pendingRemoveId = m.id">
               {{ t('projectMembers.remove') }}
             </GTButton>
           </div>
@@ -199,5 +214,16 @@
         </li>
       </ul>
     </section>
+
+    <ConfirmDialog
+      :open="pendingRemoveId !== null"
+      :title="t('projectMembers.remove')"
+      :message="t('projectMembers.confirmRemove')"
+      :confirm-label="t('projectMembers.remove')"
+      destructive
+      :loading="removing"
+      @confirm="confirmRemoveMember"
+      @update:open="(v: boolean) => !v && (pendingRemoveId = null)"
+    />
   </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import { organization, useSession } from '~~/lib/auth-client'
 
   const { t } = useI18n()
@@ -30,24 +31,31 @@
     { watch: [orgs, userId] },
   )
 
+  const toast = useToast()
   const leaving = ref<string | null>(null)
   const error = ref<string | null>(null)
+  const pendingLeave = ref<{ id: string; name: string } | null>(null)
 
-  async function leaveOrg(orgId: string, orgName: string) {
-    if (!confirm(t('account.organizations.leaveConfirm', { org: orgName }))) return
-    const role = roleByOrg.value?.get(orgId)
+  async function confirmLeaveOrg() {
+    const org = pendingLeave.value
+    if (!org) return
+    const role = roleByOrg.value?.get(org.id)
     if (role === 'owner') {
       error.value = t('account.organizations.ownerBlocked')
+      pendingLeave.value = null
       return
     }
-    leaving.value = orgId
+    leaving.value = org.id
     error.value = null
-    const res = await organization.leave({ organizationId: orgId })
+    const res = await organization.leave({ organizationId: org.id })
     leaving.value = null
     if (res.error) {
       error.value = res.error.message ?? t('account.organizations.leaveError')
+      pendingLeave.value = null
       return
     }
+    pendingLeave.value = null
+    toast.success(t('toasts.leftOrg'))
     await refresh()
     await refreshRoles()
   }
@@ -84,12 +92,25 @@
             variant="outlined"
             size="sm"
             :loading="leaving === org.id"
-            @click="leaveOrg(org.id, org.name)"
+            @click="pendingLeave = { id: org.id, name: org.name }"
           >
             {{ t('account.organizations.leave') }}
           </GTButton>
         </div>
       </li>
     </ul>
+
+    <ConfirmDialog
+      :open="pendingLeave !== null"
+      :title="t('account.organizations.leave')"
+      :message="
+        pendingLeave ? t('account.organizations.leaveConfirm', { org: pendingLeave.name }) : ''
+      "
+      :confirm-label="t('account.organizations.leave')"
+      destructive
+      :loading="leaving !== null"
+      @confirm="confirmLeaveOrg"
+      @update:open="(v: boolean) => !v && (pendingLeave = null)"
+    />
   </div>
 </template>

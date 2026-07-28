@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   const props = defineProps<{ projectId: string; canManage: boolean }>()
   const { t } = useI18n()
 
@@ -109,10 +110,23 @@
     showCreate.value = false
   }
 
-  async function revoke(keyId: string) {
-    if (!confirm(t('apiKeys.confirmRevoke'))) return
-    await $fetch(`/api/projects/${props.projectId}/api-keys/${keyId}`, { method: 'DELETE' })
-    await refresh()
+  const toast = useToast()
+  const pendingRevokeId = ref<string | null>(null)
+  const revoking = ref(false)
+
+  async function confirmRevoke() {
+    if (!pendingRevokeId.value) return
+    revoking.value = true
+    try {
+      await $fetch(`/api/projects/${props.projectId}/api-keys/${pendingRevokeId.value}`, {
+        method: 'DELETE',
+      })
+      await refresh()
+      pendingRevokeId.value = null
+      toast.success(t('toasts.keyRevoked'))
+    } finally {
+      revoking.value = false
+    }
   }
 
   const activeKeys = computed(() => (keys.value ?? []).filter((k) => !k.revokedAt))
@@ -249,7 +263,7 @@
               </template>
             </span>
           </div>
-          <GTButton v-if="canManage" variant="outlined" size="sm" @click="revoke(k.id)">
+          <GTButton v-if="canManage" variant="outlined" size="sm" @click="pendingRevokeId = k.id">
             {{ t('apiKeys.revoke') }}
           </GTButton>
         </li>
@@ -274,5 +288,16 @@
 
     <hr />
     <InstallSnippet :api-key="snippetKey" />
+
+    <ConfirmDialog
+      :open="pendingRevokeId !== null"
+      :title="t('apiKeys.revoke')"
+      :message="t('apiKeys.confirmRevoke')"
+      :confirm-label="t('apiKeys.revoke')"
+      destructive
+      :loading="revoking"
+      @confirm="confirmRevoke"
+      @update:open="(v: boolean) => !v && (pendingRevokeId = null)"
+    />
   </div>
 </template>

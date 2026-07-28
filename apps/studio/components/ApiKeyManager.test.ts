@@ -4,6 +4,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import ApiKeyManager from './ApiKeyManager.vue'
+// Real ConfirmDialog (not a stub): the revoke tests exercise the actual
+// open → confirm/cancel contract end-to-end against GTModal/GTButton stubs.
+import ConfirmDialog from './ConfirmDialog.vue'
 
 // Stubs for the Nuxt auto-imports the SFC reaches for. Safe to define after
 // the SFC import — <script setup> doesn't evaluate until mount() runs.
@@ -35,9 +38,6 @@ vi.stubGlobal('useI18n', () => ({
   t: (key: string, params?: Record<string, unknown>) =>
     params ? `${key}(${JSON.stringify(params)})` : key,
 }))
-
-const confirmMock = vi.fn(() => true)
-vi.stubGlobal('confirm', confirmMock)
 
 const writeTextMock = vi.fn(() => Promise.resolve())
 vi.stubGlobal('navigator', { clipboard: { writeText: writeTextMock } })
@@ -97,9 +97,26 @@ const InstallSnippet = defineComponent({
   },
 })
 
+const GTModal = defineComponent({
+  name: 'GTModal',
+  props: ['open', 'title', 'persistent'],
+  emits: ['update:open', 'close'],
+  setup(props, { slots }) {
+    return () =>
+      props.open
+        ? h('div', { 'data-test': 'gt-modal', 'data-title': props.title }, [
+            slots.default?.(),
+            slots.footer?.(),
+          ])
+        : null
+  },
+})
+
 const global = {
   components: {
     GTButton,
+    GTModal,
+    ConfirmDialog,
     GTAlert: gtStub('GTAlert'),
     GTBadge: gtStub('GTBadge'),
     GTSelect: gtStub('GTSelect'),
@@ -148,8 +165,6 @@ const Wrapper = defineComponent({
 
 beforeEach(() => {
   fetchMock.mockReset()
-  confirmMock.mockReset()
-  confirmMock.mockReturnValue(true)
   writeTextMock.mockReset()
 })
 
@@ -267,7 +282,7 @@ describe('ApiKeyManager', () => {
     expect(w.find('[data-test="install-snippet"]').attributes('data-api-key')).toBe('')
   })
 
-  it('revoke(): confirms, DELETEs, refreshes', async () => {
+  it('revoke: opens the confirm dialog, DELETEs on confirm, refreshes', async () => {
     fetchMock
       .mockResolvedValueOnce([k({ id: 'a', keyPrefix: 'pk_live_x' })])
       .mockResolvedValueOnce(undefined) // DELETE response
@@ -285,7 +300,21 @@ describe('ApiKeyManager', () => {
     await revokeBtn!.trigger('click')
     await flushPromises()
 
-    expect(confirmMock).toHaveBeenCalledTimes(1)
+    // Dialog is open — no DELETE yet.
+    const modal = w.find('[data-test="gt-modal"]')
+    expect(modal.exists()).toBe(true)
+    expect(
+      fetchMock.mock.calls.filter(([, o]) => (o as { method?: string })?.method === 'DELETE'),
+    ).toHaveLength(0)
+
+    // Confirm (the destructive/negative button inside the dialog footer).
+    const confirmBtn = modal
+      .findAll('[data-test="gt-button"]')
+      .find((b) => b.attributes('data-variant') === 'negative')
+    expect(confirmBtn).toBeDefined()
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
     const deleteCall = fetchMock.mock.calls.find(
       ([url, opts]) =>
         typeof url === 'string' &&
@@ -293,10 +322,11 @@ describe('ApiKeyManager', () => {
         (opts as { method?: string })?.method === 'DELETE',
     )
     expect(deleteCall).toBeDefined()
+    // Dialog closed after success.
+    expect(w.find('[data-test="gt-modal"]').exists()).toBe(false)
   })
 
-  it('revoke(): aborts when the user cancels the confirm prompt', async () => {
-    confirmMock.mockReturnValue(false)
+  it('revoke: cancelling the dialog aborts without a DELETE', async () => {
     fetchMock.mockResolvedValueOnce([k({ id: 'a' })])
 
     const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: true }, global })
@@ -308,7 +338,15 @@ describe('ApiKeyManager', () => {
     await revokeBtn!.trigger('click')
     await flushPromises()
 
-    expect(confirmMock).toHaveBeenCalledTimes(1)
+    const modal = w.find('[data-test="gt-modal"]')
+    expect(modal.exists()).toBe(true)
+    const cancelBtn = modal
+      .findAll('[data-test="gt-button"]')
+      .find((b) => b.attributes('data-variant') === 'outlined')
+    await cancelBtn!.trigger('click')
+    await flushPromises()
+
+    expect(w.find('[data-test="gt-modal"]').exists()).toBe(false)
     const deleteCalls = fetchMock.mock.calls.filter(
       ([, opts]) => (opts as { method?: string })?.method === 'DELETE',
     )

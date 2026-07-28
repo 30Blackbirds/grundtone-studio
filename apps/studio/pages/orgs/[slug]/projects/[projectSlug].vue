@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import type { Tokens } from '~~/server/lib/tokens'
 
   definePageMeta({ layout: 'app' })
@@ -62,8 +63,9 @@
   const saving = ref(false)
   const publishing = ref(false)
   const error = ref<string | null>(null)
+  const toast = useToast()
 
-  async function saveDraft() {
+  async function saveDraft(opts: { silent?: boolean } = {}) {
     if (!project.value?.id) return
     saving.value = true
     error.value = null
@@ -74,6 +76,8 @@
       })
       initialTokens.value = JSON.stringify(tokens.value)
       await refreshConfig()
+      // Silent when called as part of publish — one toast per user action.
+      if (!opts.silent) toast.success(t('toasts.draftSaved'))
     } catch (err) {
       error.value = (err as Error).message
     } finally {
@@ -86,9 +90,10 @@
     publishing.value = true
     error.value = null
     try {
-      if (isDirty.value) await saveDraft()
+      if (isDirty.value) await saveDraft({ silent: true })
       await $fetch(`/api/projects/${project.value.id}/publish`, { method: 'POST' })
       await refreshConfig()
+      toast.success(t('toasts.published'))
     } catch (err) {
       error.value = (err as Error).message
     } finally {
@@ -107,14 +112,7 @@
 
 <template>
   <section class="p-6">
-    <nav class="flex gap-2 text-tertiary text-sm mb-4">
-      <NuxtLink to="/dashboard">{{ t('orgs.title') }}</NuxtLink>
-      <span>/</span>
-      <NuxtLink :to="`/orgs/${slug}`">{{ t('projects.title') }}</NuxtLink>
-      <span>/</span>
-      <span>{{ project?.name ?? projectSlug }}</span>
-    </nav>
-
+    <!-- Breadcrumb lives in the app-shell (layouts/app.vue) — no page-local trail. -->
     <header class="mb-6 flex justify-between items-center">
       <div>
         <h1 class="m-0">{{ project?.name ?? projectSlug }}</h1>
@@ -137,7 +135,7 @@
           variant="secondary"
           :loading="saving"
           :disabled="publishing"
-          @click="saveDraft"
+          @click="saveDraft()"
         >
           {{ t('project.saveDraft') }}
         </GTButton>

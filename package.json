@@ -26,17 +26,6 @@
     "release:sdk": "pnpm --filter @grundtone/saas-client build && changeset tag",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "*.{ts,tsx,vue,css,json,md,yml,yaml}": [
-      "prettier --write"
-    ],
-    "*.{ts,tsx,vue}": [
-      "eslint --fix"
-    ],
-    "*.css": [
-      "stylelint --fix"
-    ]
-  },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
