@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import { organization } from '~~/lib/auth-client'
   import {
     ASSIGNABLE_ORG_ROLES,
@@ -123,27 +124,32 @@
     await refresh()
   }
 
-  async function remove() {
+  const toast = useToast()
+  const removeOpen = ref(false)
+  const removingMember = ref(false)
+
+  async function confirmRemove() {
     if (!activeOrg.value?.id) return
-    if (!confirm(t('memberDetail.confirmRemove'))) return
-    const res = await organization.removeMember({
-      memberIdOrEmail: memberId.value,
-      organizationId: activeOrg.value.id,
-    })
-    if (!res.error) await router.push(`/orgs/${slug.value}/members`)
+    removingMember.value = true
+    try {
+      const res = await organization.removeMember({
+        memberIdOrEmail: memberId.value,
+        organizationId: activeOrg.value.id,
+      })
+      if (!res.error) {
+        removeOpen.value = false
+        toast.success(t('toasts.memberRemoved'))
+        await router.push(`/orgs/${slug.value}/members`)
+      }
+    } finally {
+      removingMember.value = false
+    }
   }
 </script>
 
 <template>
   <section class="p-6 max-w-4xl mx-auto flex flex-col gap-4">
-    <nav class="flex gap-2 text-tertiary text-sm">
-      <NuxtLink :to="`/orgs/${slug}`">{{ t('memberDetail.settings') }}</NuxtLink>
-      <span>›</span>
-      <NuxtLink :to="`/orgs/${slug}/members`">{{ t('members.title') }}</NuxtLink>
-      <span>›</span>
-      <span>{{ member?.user?.name ?? member?.user?.email ?? '…' }}</span>
-    </nav>
-
+    <!-- Breadcrumb lives in the app-shell (layouts/app.vue) — no page-local trail. -->
     <h1 class="m-0 mb-4 font-heading">
       {{ member?.user?.name ?? member?.user?.email ?? t('memberDetail.loading') }}
     </h1>
@@ -266,7 +272,11 @@
 
       <!-- Footer: save + remove -->
       <footer class="flex justify-between items-center gap-4 pt-4">
-        <GTButton v-if="canManage && currentRole !== 'owner'" variant="negative" @click="remove">
+        <GTButton
+          v-if="canManage && currentRole !== 'owner'"
+          variant="negative"
+          @click="removeOpen = true"
+        >
           {{ t('memberDetail.removeAction') }}
         </GTButton>
         <span v-else />
@@ -284,6 +294,16 @@
         </div>
       </footer>
       <GTAlert v-if="saveError" variant="error" :heading="saveError" />
+
+      <ConfirmDialog
+        v-model:open="removeOpen"
+        :title="t('memberDetail.removeAction')"
+        :message="t('memberDetail.confirmRemove')"
+        :confirm-label="t('memberDetail.removeAction')"
+        destructive
+        :loading="removingMember"
+        @confirm="confirmRemove"
+      />
     </template>
   </section>
 </template>

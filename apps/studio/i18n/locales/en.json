@@ -164,7 +164,8 @@
     "empty": "No organizations yet.",
     "nameLabel": "Name",
     "slugLabel": "Slug",
-    "createError": "Could not create organization"
+    "createError": "Could not create organization",
+    "switch": "Switch organization"
   },
   "projects": {
     "title": "Projects",
@@ -549,5 +550,27 @@
   },
   "componentLibrary": {
     "nav": "Components"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "menu": "Menu",
+    "global": "Global navigation",
+    "orgAdmin": "Organization",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "breadcrumb": "Breadcrumb"
+  },
+  "confirm": {
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "toasts": {
+    "draftSaved": "Draft saved",
+    "published": "Published — live on the CDN in a moment",
+    "keyRevoked": "API key revoked",
+    "versionActivated": "Version activated",
+    "memberRemoved": "Member removed",
+    "inviteCancelled": "Invitation cancelled",
+    "leftOrg": "You have left the organization"
   }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   const props = defineProps<{ projectId: string; canManage: boolean }>()
   const emit = defineEmits<{ activated: [] }>()
   const { t } = useI18n()
@@ -25,10 +26,13 @@
     { default: () => ({ versions: [], activeVersionId: null }) },
   )
 
+  const toast = useToast()
   const activatingId = ref<string | null>(null)
+  const pendingActivateId = ref<string | null>(null)
 
-  async function activate(versionId: string) {
-    if (!confirm(t('versions.confirmActivate'))) return
+  async function confirmActivate() {
+    const versionId = pendingActivateId.value
+    if (!versionId) return
     activatingId.value = versionId
     try {
       await $fetch(`/api/projects/${props.projectId}/activate`, {
@@ -36,6 +40,8 @@
         body: { versionId },
       })
       await refresh()
+      pendingActivateId.value = null
+      toast.success(t('toasts.versionActivated'))
       emit('activated')
     } finally {
       activatingId.value = null
@@ -89,7 +95,7 @@
               variant="secondary"
               size="sm"
               :loading="activatingId === v.id"
-              @click="activate(v.id)"
+              @click="pendingActivateId = v.id"
             >
               {{ t('versions.activate') }}
             </GTButton>
@@ -98,5 +104,15 @@
       </ul>
       <p v-else class="text-tertiary">{{ t('versions.empty') }}</p>
     </section>
+
+    <ConfirmDialog
+      :open="pendingActivateId !== null"
+      :title="t('versions.activate')"
+      :message="t('versions.confirmActivate')"
+      :confirm-label="t('versions.activate')"
+      :loading="activatingId !== null"
+      @confirm="confirmActivate"
+      @update:open="(v: boolean) => !v && (pendingActivateId = null)"
+    />
   </div>
 </template>

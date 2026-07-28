@@ -19,7 +19,114 @@ main {
   margin: 0;
 }
 
+/* ── App-shell (redesign R1) ─────────────────────────────────────────────
+   App-chrome layout the design system can't express yet: GTAppShell/GTDrawer
+   exist on @grundtone/vue develop but aren't published (waiting on the `next`
+   prerelease channel). These classes mirror that shell's structure — sticky
+   header, persistent 256px sidebar, mobile drawer — so the swap to the real
+   components later is a template change, not a CSS rewrite. Colors/spacing
+   stay on grundtone utility classes + CSS vars; nothing hardcoded here. */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-shell__header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.app-shell__breadcrumb {
+  padding: 0.5rem 1.5rem;
+}
+
+.app-shell__body {
+  display: flex;
+  flex: 1;
+}
+
+.app-shell__sidebar {
+  flex-shrink: 0;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0; /* allow content (tables, code) to shrink instead of overflowing */
+}
+
 .app-sidebar {
-  width: 240px;
-  min-height: calc(100vh - 60px);
+  width: 256px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.app-shell__burger {
+  display: none;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: inherit;
+  border-radius: 4px;
+}
+
+.app-shell__burger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Mobile drawer (interim until GTDrawer ships on `next`) —
+   scrim + z-tier reuse grundtone's modal tokens so theming stays token-driven */
+.app-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+}
+
+.app-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-modal-backdrop);
+}
+
+.app-drawer__panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(20rem, 85vw);
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.app-drawer__panel .app-sidebar {
+  width: 100%;
+  border-right: none;
+}
+
+@media (width <= 900px) {
+  .app-shell__burger {
+    display: inline-flex;
+  }
+
+  .app-shell__sidebar {
+    display: none;
+  }
+
+  .app-shell__email,
+  .app-shell__org-switcher {
+    display: none;
+  }
+
+  main {
+    padding: 1rem;
+  }
 }

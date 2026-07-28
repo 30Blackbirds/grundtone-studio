@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import VersionHistory from './VersionHistory.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 
 // Stub Nuxt auto-imports the SFC reaches for. useAsyncData mirrors Nuxt's
 // shape: calls the fetcher once at setup time, exposes a reactive `data`
@@ -28,9 +29,6 @@ vi.stubGlobal(
   },
 )
 vi.stubGlobal('useRequestHeaders', () => ({}))
-
-const confirmMock = vi.fn(() => true)
-vi.stubGlobal('confirm', confirmMock)
 
 const GTBadge = defineComponent({
   name: 'GTBadge',
@@ -59,8 +57,23 @@ const GTButton = defineComponent({
   },
 })
 
+const GTModal = defineComponent({
+  name: 'GTModal',
+  props: ['open', 'title', 'persistent'],
+  emits: ['update:open', 'close'],
+  setup(props, { slots }) {
+    return () =>
+      props.open
+        ? h('div', { 'data-test': 'gt-modal', 'data-title': props.title }, [
+            slots.default?.(),
+            slots.footer?.(),
+          ])
+        : null
+  },
+})
+
 const global = {
-  components: { GTBadge, GTButton },
+  components: { GTBadge, GTButton, GTModal, ConfirmDialog },
   mocks: {
     $t: (k: string, params?: Record<string, unknown>) =>
       params ? `${k}(${JSON.stringify(params)})` : k,
@@ -101,8 +114,6 @@ const Wrapper = defineComponent({
 
 beforeEach(() => {
   fetchMock.mockReset()
-  confirmMock.mockReset()
-  confirmMock.mockReturnValue(true)
 })
 
 describe('VersionHistory', () => {
@@ -176,7 +187,7 @@ describe('VersionHistory', () => {
     expect(w.findAll('[data-test="gt-button"]')).toHaveLength(0)
   })
 
-  it('activate(): confirms, POSTs to /activate, refreshes, and emits "activated"', async () => {
+  it('activate: opens the confirm dialog, POSTs on confirm, refreshes, emits "activated"', async () => {
     fetchMock
       .mockResolvedValueOnce({
         // initial fetch
@@ -200,20 +211,33 @@ describe('VersionHistory', () => {
     await activateButton.trigger('click')
     await flushPromises()
 
-    expect(confirmMock).toHaveBeenCalledTimes(1)
-    // The POST goes to the activate endpoint with the version id.
+    // Dialog open, nothing POSTed yet.
+    const modal = w.find('[data-test="gt-modal"]')
+    expect(modal.exists()).toBe(true)
+    expect(
+      fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/activate')),
+    ).toHaveLength(0)
+
+    // Confirm via the dialog's confirm button (labelled with the activate key).
+    const confirmBtn = modal
+      .findAll('[data-test="gt-button"]')
+      .find((b) => b.text().includes('versions.activate'))
+    expect(confirmBtn).toBeDefined()
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
     const postCall = fetchMock.mock.calls.find(
       ([url]) => typeof url === 'string' && url.includes('/activate'),
     )
     expect(postCall).toBeDefined()
     expect(postCall![0]).toBe(`/api/projects/${PROJECT_ID}/activate`)
     expect((postCall![1] as { body?: { versionId: string } }).body?.versionId).toBe('p2')
-    // `activated` event fired exactly once.
+    // `activated` event fired exactly once and the dialog closed.
     expect(w.emitted('activated')).toHaveLength(1)
+    expect(w.find('[data-test="gt-modal"]').exists()).toBe(false)
   })
 
-  it('activate(): aborts when the confirm prompt is rejected', async () => {
-    confirmMock.mockReturnValue(false)
+  it('activate: cancelling the dialog aborts without a POST', async () => {
     fetchMock.mockResolvedValueOnce({
       versions: [v('p1', 1, 'published'), v('p2', 2, 'published')],
       activeVersionId: 'p1',
@@ -227,8 +251,16 @@ describe('VersionHistory', () => {
     await w.find('[data-test="gt-button"]').trigger('click')
     await flushPromises()
 
-    // Confirm was asked once; no POST hit the network.
-    expect(confirmMock).toHaveBeenCalledTimes(1)
+    const modal = w.find('[data-test="gt-modal"]')
+    expect(modal.exists()).toBe(true)
+    const cancelBtn = modal
+      .findAll('[data-test="gt-button"]')
+      .find((b) => b.text().includes('confirm.cancel'))
+    await cancelBtn!.trigger('click')
+    await flushPromises()
+
+    // Dialog closed; no POST hit the network.
+    expect(w.find('[data-test="gt-modal"]').exists()).toBe(false)
     const postCalls = fetchMock.mock.calls.filter(
       ([url]) => typeof url === 'string' && url.includes('/activate'),
     )
