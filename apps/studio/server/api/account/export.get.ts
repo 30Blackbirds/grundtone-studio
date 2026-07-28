@@ -15,11 +15,53 @@ import { SlidingWindowRateLimiter } from '~~/server/lib/rate-limit'
 const EXPORT_WINDOW_MS = 60 * 60 * 1000
 const exportLimiter = new SlidingWindowRateLimiter(EXPORT_WINDOW_MS)
 
+// Auth's art.20 identity-export contract (owned by @klanghaus/auth, PR #103).
+// Secrets are deliberately excluded upstream (password hash, JWKS, oauth /
+// session tokens) — we never receive them.
+interface IdentityExport {
+  user: Record<string, unknown>
+  accounts: unknown[]
+  organizations: unknown[]
+  sessions: unknown[]
+}
+
+// Soft-fail marker returned in place of the identity block when auth can't be
+// reached (endpoint 404 until IDENTITY_EXPORT_SERVICE_SECRET is provisioned,
+// or a transient s2s error). art.20 must never be blocked by an auth outage —
+// the caller refunds the rate-limit slot so the user can retry for a complete
+// export.
+interface IdentityUnavailable {
+  error: 'identity_temporarily_unavailable'
+  retryable: true
+  message: string
+}
+
+async function fetchIdentityExport(userId: string): Promise<IdentityExport | IdentityUnavailable> {
+  const base = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
+  const secret = process.env.IDENTITY_EXPORT_SERVICE_SECRET
+  const unavailable: IdentityUnavailable = {
+    error: 'identity_temporarily_unavailable',
+    retryable: true,
+    message:
+      'Din identitetsdata (konto, organisationer, sessioner) kunne ikke hentes lige nu. Din eksport er ellers komplet — prøv igen for at få identitetsdelen med.',
+  }
+  if (!base || !secret) return unavailable
+  try {
+    return await $fetch<IdentityExport>(`${base}/api/auth/identity-export`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+      body: { userId },
+    })
+  } catch {
+    return unavailable
+  }
+}
+
 defineRouteMeta({
   openAPI: {
-    summary: 'GDPR data export for the authenticated user (JSON download).',
+    summary: 'GDPR (art. 20) data export for the authenticated user (JSON download).',
     description:
-      'Aggregates Studio data belonging to the authenticated user and returns it as a JSON attachment. Rate-limited to one export per hour per user.',
+      "Aggregates the authenticated user's Studio data and joins their identity data from the central auth service, returned as a JSON attachment. Rate-limited to one complete export per hour per user; an incomplete export (auth unreachable) does not consume the limit so it stays retryable.",
     tags: ['Account'],
   },
 })
@@ -30,7 +72,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
 
-  const limit = exportLimiter.check(`account-export:${actor.sub}`, 1)
+  const rateLimitKey = `account-export:${actor.sub}`
+  const limit = exportLimiter.check(rateLimitKey, 1)
   if (!limit.ok) {
     throw createError({
       statusCode: 429,
@@ -114,16 +157,29 @@ export default defineEventHandler(async (event) => {
     .from(projectInvitation)
     .where(eq(projectInvitation.invitedBy, userId))
 
+  const identity = await fetchIdentityExport(userId)
+
+  // art.20 completeness > abuse-prevention: an export missing the identity
+  // block isn't the complete portable copy the user is entitled to, so it must
+  // not burn their once-per-hour slot. Refund it (limit is 1, so reset clears
+  // exactly the slot we just took) whenever identity couldn't be joined.
+  const identityComplete = !('error' in identity)
+  if (!identityComplete) exportLimiter.reset(rateLimitKey)
+
   const payload = {
     exportedAt: new Date().toISOString(),
     userId,
-    email: actor.email ?? null,
-    projectMemberships: memberships,
-    apiKeysCreated: keys,
-    publishedVersions,
-    activations,
-    auditLogEntries: auditEntries,
-    projectInvitationsSent: invitations,
+    complete: identityComplete,
+    studio: {
+      email: actor.email ?? null,
+      projectMemberships: memberships,
+      apiKeysCreated: keys,
+      publishedVersions,
+      activations,
+      auditLogEntries: auditEntries,
+      projectInvitationsSent: invitations,
+    },
+    identity,
   }
 
   setHeader(event, 'Content-Type', 'application/json')
