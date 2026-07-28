@@ -66,3 +66,27 @@ export async function lookupOrgById(
 ): Promise<FullOrg | null> {
   return fetchFullOrg(event, { organizationId })
 }
+
+export interface OrgListItem {
+  id: string
+  name: string
+  slug: string
+}
+
+/** All orgs the signed-in user is a member of (empty when unauthenticated). */
+export async function listCallerOrgs(event: H3Event): Promise<OrgListItem[]> {
+  const cookie = getRequestHeader(event, 'cookie')
+  if (!cookie) return []
+  try {
+    const orgs = await $fetch<OrgListItem[] | null>(`${authBase()}/api/auth/organization/list`, {
+      headers: { cookie },
+    })
+    return orgs ?? []
+  } catch (err) {
+    const status =
+      (err as { status?: number; statusCode?: number } | null)?.status ??
+      (err as { statusCode?: number } | null)?.statusCode
+    if (status === 401 || status === 403) return []
+    throw err
+  }
+}
