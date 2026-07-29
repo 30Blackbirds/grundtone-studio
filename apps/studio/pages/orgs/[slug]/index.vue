@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import { organization } from '~~/lib/auth-client'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
@@ -69,6 +70,21 @@
     }
   }
 
+  // Kontrakt §2: eksplicit entitlements-refetch på checkout-success-URL'en, så
+  // opgraderingen føles øjeblikkelig (ellers op til 60s TTL).
+  const router = useRouter()
+  const toast = useToast()
+  onMounted(async () => {
+    if (route.query.upgrade === 'success') {
+      toast.success(t('toasts.upgraded'))
+      await $fetch('/api/billing/entitlements-refresh', {
+        method: 'POST',
+        body: { organizationSlug: slug.value },
+      }).catch(() => {})
+      await router.replace({ query: { ...route.query, upgrade: undefined } })
+    }
+  })
+
   function statusVariant(
     status: 'published' | 'draft' | 'none',
   ): 'success' | 'warning' | 'neutral' {
@@ -134,8 +150,21 @@
           pattern="[a-z0-9-]+"
         />
         <GTAlert v-if="error" variant="error" :heading="error" />
+        <!-- Kvote-mødet, Flow A (designer billing-upgrade-flow v2): blød
+             invitation med "Se planer" + dismiss — aldrig en blokerende fejl. -->
         <GTAlert v-if="quotaLimit !== null" variant="info" :heading="$t('quota.heading')">
-          {{ $t('quota.body') }}
+          <p class="m-0 mb-2">{{ $t('quota.body') }}</p>
+          <p class="m-0 mb-3 text-sm text-tertiary">
+            {{ $t('quota.meter', { used: quotaLimit, limit: quotaLimit }) }}
+          </p>
+          <div class="flex gap-3 items-center">
+            <GTButton size="sm" @click="navigateTo(`/plans?org=${slug}`)">
+              {{ $t('quota.cta') }}
+            </GTButton>
+            <GTButton variant="unstyled" size="sm" @click="quotaLimit = null">
+              {{ $t('quota.later') }}
+            </GTButton>
+          </div>
         </GTAlert>
       </form>
       <template #footer>

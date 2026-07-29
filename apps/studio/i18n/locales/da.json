@@ -617,7 +617,8 @@
     "inviteCancelled": "Invitation annulleret",
     "leftOrg": "Du har forladt organisationen",
     "inviteSent": "Invitation sendt",
-    "inviteResent": "Invitation gensendt"
+    "inviteResent": "Invitation gensendt",
+    "upgraded": "Din plan er opgraderet."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -650,6 +651,72 @@
   "quota": {
     "heading": "Dit tredje projekt venter.",
     "body": "Free giver dig to projekter — nok til at se dit brand gå live overalt. Med Solo får du tre aktive brands, e-mail-skabeloner i samme tokens og API-adgang — fra €29/md. Stadig ubegrænsede medlemmer — vi tæller brands, ikke mennesker.",
-    "cta": "Se planer"
+    "cta": "Se planer →",
+    "meter": "{used}/{limit} projekter brugt",
+    "later": "Måske senere"
+  },
+  "plans": {
+    "introBadge": "Introduktionspriser",
+    "title": "Priser der følger dine brands, ikke dine kolleger",
+    "lead": "Per brand, ikke per bruger. Inviter hele holdet — betal kun for det der faktisk er live.",
+    "priceLock": "Priserne stiger i takt med at produktet vokser — tidlige kunder beholder deres pris i minimum 12 måneder.",
+    "orgSelect": "Organisation",
+    "names": {
+      "studio_free": "Free",
+      "studio_solo": "Solo",
+      "studio_studio": "Studio",
+      "studio_scale": "Scale",
+      "studio_enterprise": "Enterprise"
+    },
+    "new": "Ny",
+    "popular": "Mest populær",
+    "perMonth": "/md",
+    "custom": "Custom",
+    "freeBrands": "{n} projekter",
+    "freeSub": "Begge fuldt publicerbare — ægte live CDN",
+    "brandsIncluded": "{n} aktive brands",
+    "overage": "+€{n}/md pr. ekstra brand",
+    "hardCap": "Hård grænse — ingen overage",
+    "noBrandCap": "Ingen brand-loft",
+    "ctaFree": "Kom i gang gratis",
+    "ctaChoose": "Vælg {plan}",
+    "ctaContact": "Kontakt salg",
+    "ssoNote": "Basis-sikkerhed (2FA, roller) er med i alle planer. SSO/SCIM er enterprise-integration — tal med os.",
+    "memberCta": "Medlemmer tæller vi aldrig. På ingen plan.",
+    "memberCtaSub": "Invitér hele holdet — designere, udviklere, kunder. Vi tæller aktive brands, ikke mennesker.",
+    "features": {
+      "unlimitedMembers": "Ubegrænsede medlemmer",
+      "tokenEditor": "Fuld token-editor + theme-switcher",
+      "cdnFairUse": "Runtime-CDN (fair use)",
+      "history10": "10 versioners historik",
+      "emailTemplates": "Email-templates",
+      "provisioningApi": "Provisioning-API",
+      "rollback": "Rollback",
+      "fullHistoryRollback": "Fuld historik + rollback",
+      "basicAudit": "Basis audit-log",
+      "ssoScim": "SSO/SCIM",
+      "selfHost": "Self-host",
+      "allFromStudio": "Alt fra Studio",
+      "highCdnQuota": "Høj CDN-kvote",
+      "fullAudit": "Fuld audit-log",
+      "prioritySupport": "Prioritetssupport",
+      "allFromScale": "Alt fra Scale",
+      "dedicatedSupport": "Dedikeret support + SLA"
+    },
+    "confirm": {
+      "title": "Bekræft opgradering",
+      "sub": "{org} → {plan}-plan",
+      "plan": "Plan",
+      "billing": "Fakturering",
+      "monthly": "Månedlig",
+      "brands": "Inkluderede brands",
+      "brandsHard": "{n} (hård grænse)",
+      "today": "I dag",
+      "stripeNote": "Betaling håndteres sikkert af Stripe — vi gemmer aldrig dine kortoplysninger.",
+      "continue": "Fortsæt til betaling →",
+      "back": "← Skift plan",
+      "billing_unavailable": "Betaling er ikke åbnet endnu — planerne aktiveres snart.",
+      "checkout_failed": "Noget gik galt — prøv igen om et øjeblik."
+    }
   }
 }
