@@ -46,6 +46,11 @@ export function clearEntitlementsCache() {
   inflight.clear()
 }
 
+/** Contract §2: explicit refetch on checkout-success — bust one org's entry. */
+export function clearEntitlementsCacheFor(orgId: string) {
+  cache.delete(orgId)
+}
+
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
   const baseUrl = process.env.ACCOUNT_URL
   if (!baseUrl) return null

@@ -617,7 +617,8 @@
     "inviteCancelled": "Invitation cancelled",
     "leftOrg": "You have left the organization",
     "inviteSent": "Invitation sent",
-    "inviteResent": "Invitation resent"
+    "inviteResent": "Invitation resent",
+    "upgraded": "Your plan has been upgraded."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -650,6 +651,72 @@
   "quota": {
     "heading": "Your third project is waiting.",
     "body": "Free gives you two projects — enough to see your brand go live everywhere. Solo unlocks three active brands, email templates themed by the same tokens, and API access — from €29/mo. Members stay unlimited — we count brands, not people.",
-    "cta": "See plans"
+    "cta": "See plans →",
+    "meter": "{used}/{limit} projects used",
+    "later": "Maybe later"
+  },
+  "plans": {
+    "introBadge": "Introductory pricing",
+    "title": "Pricing that follows your brands, not your colleagues",
+    "lead": "Per brand, not per seat. Invite the whole team — pay only for what is actually live.",
+    "priceLock": "Prices grow with the product — early customers keep their price for at least 12 months.",
+    "orgSelect": "Organization",
+    "names": {
+      "studio_free": "Free",
+      "studio_solo": "Solo",
+      "studio_studio": "Studio",
+      "studio_scale": "Scale",
+      "studio_enterprise": "Enterprise"
+    },
+    "new": "New",
+    "popular": "Most popular",
+    "perMonth": "/mo",
+    "custom": "Custom",
+    "freeBrands": "{n} projects",
+    "freeSub": "Both fully publishable — real live CDN",
+    "brandsIncluded": "{n} active brands",
+    "overage": "+€{n}/mo per extra brand",
+    "hardCap": "Hard cap — no overage",
+    "noBrandCap": "No brand cap",
+    "ctaFree": "Start for free",
+    "ctaChoose": "Choose {plan}",
+    "ctaContact": "Contact sales",
+    "ssoNote": "Baseline security (2FA, roles) is included in every plan. SSO/SCIM is enterprise integration — talk to us.",
+    "memberCta": "We never count members. On any plan.",
+    "memberCtaSub": "Invite the whole team — designers, developers, clients. We count active brands, not people.",
+    "features": {
+      "unlimitedMembers": "Unlimited members",
+      "tokenEditor": "Full token editor + theme switcher",
+      "cdnFairUse": "Runtime CDN (fair use)",
+      "history10": "10-version history",
+      "emailTemplates": "Email templates",
+      "provisioningApi": "Provisioning API",
+      "rollback": "Rollback",
+      "fullHistoryRollback": "Full history + rollback",
+      "basicAudit": "Basic audit log",
+      "ssoScim": "SSO/SCIM",
+      "selfHost": "Self-host",
+      "allFromStudio": "Everything in Studio",
+      "highCdnQuota": "High CDN quota",
+      "fullAudit": "Full audit log",
+      "prioritySupport": "Priority support",
+      "allFromScale": "Everything in Scale",
+      "dedicatedSupport": "Dedicated support + SLA"
+    },
+    "confirm": {
+      "title": "Confirm upgrade",
+      "sub": "{org} → {plan} plan",
+      "plan": "Plan",
+      "billing": "Billing",
+      "monthly": "Monthly",
+      "brands": "Included brands",
+      "brandsHard": "{n} (hard cap)",
+      "today": "Today",
+      "stripeNote": "Payment is handled securely by Stripe — we never store your card details.",
+      "continue": "Continue to payment →",
+      "back": "← Change plan",
+      "billing_unavailable": "Payments are not open yet — plans will be activated soon.",
+      "checkout_failed": "Something went wrong — please try again in a moment."
+    }
   }
 }

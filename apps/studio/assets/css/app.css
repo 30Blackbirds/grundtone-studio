@@ -392,3 +392,96 @@ main {
     max-height: none;
   }
 }
+
+/* ── Billing: /plans + pre-checkout ([designer] billing-pricing-tiers v2 +
+   billing-upgrade-flow v2). All € values come from lib/plan-catalog.ts. */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  align-items: stretch;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+@media (width <= 980px) {
+  .plans-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (width <= 640px) {
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plan-card {
+  position: relative;
+}
+
+/* "Mest populær"-fremhævning kan ikke udtrykkes med utilities alene
+   (positioneret flag + accent-border) — accentfarven er theme-token. */
+.plan-card--rec {
+  border: 2px solid var(--color-primary);
+}
+
+.plan-card__flag {
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.plan-card__price {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.plan-feat--yes::before {
+  content: '✓ ';
+  color: var(--color-success, currentcolor);
+  font-weight: 700;
+}
+
+.plan-feat--no::before {
+  content: '– ';
+}
+
+.plans-org-select {
+  max-width: 18rem;
+  margin-inline: auto;
+}
+
+.plan-confirm__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--color-border, currentcolor);
+  font-size: 0.875rem;
+}
+
+.plan-confirm__line:first-child {
+  border-top: none;
+}
+
+.plan-confirm__line dt {
+  color: var(--color-text-tertiary, inherit);
+}
+
+.plan-confirm__line dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.plan-confirm__line--total {
+  font-weight: 700;
+}

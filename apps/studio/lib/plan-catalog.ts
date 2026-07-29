@@ -1,0 +1,139 @@
+// Studio plan catalog for the pricing/upgrade UI. Structure follows the
+// designer's v2 prototypes (docs/design/grundtone-studio/prototypes/billing-*)
+// and CMO's tier doc (market/grundtone-studio/2026-08-01-tier-struktur.md).
+//
+// ALL € amounts are PLACEHOLDER intro anchors — finance's cost-floor and
+// Allan's final yes are pending, and CMO/designer both mandated config-not-
+// hardcode. Change numbers HERE only; nothing else in the UI carries prices.
+// Display strings live in i18n under `plans.*`; this module is mechanical.
+// Checkout only ever sends the plan KEY across the account boundary (C3).
+
+export type PlanKey =
+  | 'studio_free'
+  | 'studio_solo'
+  | 'studio_studio'
+  | 'studio_scale'
+  | 'studio_enterprise'
+
+export interface PlanFeature {
+  /** i18n key under plans.features.* */
+  labelKey: string
+  included: boolean
+}
+
+export interface PlanDef {
+  key: PlanKey
+  /** null = custom/contact-sales (Enterprise) */
+  priceEur: number | null
+  /** Included active brands; null = custom */
+  brandsIncluded: number | null
+  /** €/month per extra brand; null = no overage (hard cap or custom) */
+  overageEurPerBrand: number | null
+  hardCap: boolean
+  highlighted?: boolean
+  isNew?: boolean
+  /** Purchasable via checkout (Free and Enterprise are not) */
+  purchasable: boolean
+  features: PlanFeature[]
+}
+
+const YES = (labelKey: string): PlanFeature => ({ labelKey, included: true })
+const NO = (labelKey: string): PlanFeature => ({ labelKey, included: false })
+
+export const PLAN_CATALOG: PlanDef[] = [
+  {
+    key: 'studio_free',
+    priceEur: 0,
+    brandsIncluded: 2,
+    overageEurPerBrand: null,
+    hardCap: true,
+    purchasable: false,
+    features: [
+      YES('unlimitedMembers'),
+      YES('tokenEditor'),
+      YES('cdnFairUse'),
+      YES('history10'),
+      NO('emailTemplates'),
+      NO('provisioningApi'),
+      NO('rollback'),
+    ],
+  },
+  {
+    key: 'studio_solo',
+    priceEur: 29,
+    brandsIncluded: 3,
+    overageEurPerBrand: null,
+    hardCap: true,
+    isNew: true,
+    purchasable: true,
+    features: [
+      YES('unlimitedMembers'),
+      YES('emailTemplates'),
+      YES('provisioningApi'),
+      YES('fullHistoryRollback'),
+      YES('basicAudit'),
+      NO('ssoScim'),
+      NO('selfHost'),
+    ],
+  },
+  {
+    key: 'studio_studio',
+    priceEur: 59,
+    brandsIncluded: 10,
+    overageEurPerBrand: 8,
+    hardCap: false,
+    highlighted: true,
+    purchasable: true,
+    features: [
+      YES('unlimitedMembers'),
+      YES('emailTemplates'),
+      YES('provisioningApi'),
+      YES('fullHistoryRollback'),
+      YES('basicAudit'),
+      NO('ssoScim'),
+      NO('selfHost'),
+    ],
+  },
+  {
+    key: 'studio_scale',
+    priceEur: 179,
+    brandsIncluded: 50,
+    overageEurPerBrand: 5,
+    hardCap: false,
+    purchasable: true,
+    features: [
+      YES('unlimitedMembers'),
+      YES('allFromStudio'),
+      YES('highCdnQuota'),
+      YES('fullAudit'),
+      YES('prioritySupport'),
+      NO('ssoScim'),
+      NO('selfHost'),
+    ],
+  },
+  {
+    key: 'studio_enterprise',
+    priceEur: null,
+    brandsIncluded: null,
+    overageEurPerBrand: null,
+    hardCap: false,
+    purchasable: false,
+    features: [
+      YES('unlimitedMembers'),
+      YES('allFromScale'),
+      YES('ssoScim'),
+      YES('selfHost'),
+      YES('dedicatedSupport'),
+    ],
+  },
+]
+
+/**
+ * The 12-month intro price lock line is CONDITIONAL — it renders only while
+ * this flag is on (awaiting Allan's final yes on the guarantee mechanics).
+ */
+export const SHOW_PRICE_LOCK_LINE = false
+
+export function getPlan(key: PlanKey): PlanDef {
+  return PLAN_CATALOG.find((p) => p.key === key)!
+}
