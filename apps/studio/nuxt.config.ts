@@ -67,13 +67,24 @@ export default defineNuxtConfig({
       sentryEnvironment: '',
     },
   },
+  // 'hidden': generate client sourcemaps for the Sentry upload WITHOUT
+  // referencing them from the served bundles (no public sourceMappingURL).
+  // Without this the upload step has nothing to upload — the build warned
+  // "Source map generation (sourcemap.client) is disabled".
+  sourcemap: { client: 'hidden' },
   sentry: {
-    // Source maps upload requires SENTRY_AUTH_TOKEN in the build env.
-    // Wire it into the GitHub Actions build job via the `release` environment
-    // before Phase 6 launch.
+    // Source-map upload runs during `nuxt build` when SENTRY_AUTH_TOKEN is in
+    // the env (repo secret → BuildKit secret in the image build; absent
+    // locally/CI-PR builds, where upload silently skips). Org token minted by
+    // Allan 2026-07-29 (issue #123).
     sourceMapsUploadOptions: {
-      org: 'asp-productions-aps',
+      org: 'klanghaus',
       project: 'grundtone-studio',
+      sourcemaps: {
+        // The maps exist ONLY for Sentry — never ship them in the image where
+        // they'd be publicly fetchable (source disclosure for a private SaaS).
+        filesToDeleteAfterUpload: ['.output/**/*.map'],
+      },
     },
   },
 })

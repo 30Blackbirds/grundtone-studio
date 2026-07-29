@@ -19,9 +19,18 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/studio/node_modules ./apps/studio/node_modules
 COPY --from=deps /app/packages/saas-client/node_modules ./packages/saas-client/node_modules
 COPY . .
-# Build saas-client first (workspace dep), then the Nuxt app
-RUN pnpm --filter @grundtone/saas-client build && \
-    pnpm --filter @grundtone-studio/studio build
+# Build saas-client first (workspace dep), then the Nuxt app.
+# sentry_auth_token: @sentry/nuxt uploader sourcemaps under builden når
+# SENTRY_AUTH_TOKEN er sat; secret-mount (ikke ARG) så tokenet aldrig lander
+# i et image-layer. Uden secret (lokale builds) skipper upload stille.
+RUN --mount=type=secret,id=sentry_auth_token \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+    pnpm --filter @grundtone/saas-client build && \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+    pnpm --filter @grundtone-studio/studio build && \
+    find apps/studio/.output -name '*.map' -delete
+    # ^ belt-and-braces: Sentry sletter maps efter upload, men bygges imaget
+    #   UDEN token (upload skippet) må maps stadig aldrig shippe offentligt.
 
 # pnpm deploy bygger en self-contained bundle for studio-workspace.
 # OBS: vi inkluderer dev-deps fordi Nitro's .output bundle'r packages

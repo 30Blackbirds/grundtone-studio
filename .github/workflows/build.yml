@@ -89,6 +89,7 @@ jobs:
           # org (kræver at de pakker grant'er denne repo Actions-adgang).
           secrets: |
             node_auth_token=${{ secrets.GITHUB_TOKEN }}
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
