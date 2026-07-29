@@ -1,5 +1,7 @@
 <script setup lang="ts">
+  import { useToast } from '@grundtone/vue'
   import { organization } from '~~/lib/auth-client'
+  import { daysUntil } from '~~/utils/invite-expiry'
 
   definePageMeta({ layout: 'app' })
 
@@ -66,21 +68,20 @@
     },
   )
 
+  const toast = useToast()
   const showInvite = ref(false)
-  const inviteEmail = ref('')
-  const inviteRole = ref<OrgRole>('member')
   const inviting = ref(false)
   const inviteError = ref<string | null>(null)
 
-  async function sendInvite() {
+  async function sendInvite(payload: { email: string; role: string }) {
     if (!activeOrg.value?.id) return
     inviting.value = true
     inviteError.value = null
     const res = await organization.inviteMember({
-      email: inviteEmail.value,
+      email: payload.email,
       // Better Auth's client types narrow this to 'admin' | 'member' but the
       // server-side ac config accepts our custom roles too.
-      role: inviteRole.value as 'admin' | 'member',
+      role: payload.role as 'admin' | 'member',
       organizationId: activeOrg.value.id,
     })
     inviting.value = false
@@ -89,14 +90,35 @@
       return
     }
     showInvite.value = false
-    inviteEmail.value = ''
-    inviteRole.value = 'member'
+    toast.success(t('toasts.inviteSent'))
     await refreshInvitations()
+  }
+
+  const resendingId = ref<string | null>(null)
+
+  // Better Auth re-sends an existing pending invitation when `resend` is set
+  // (same email+org) instead of erroring on the duplicate.
+  async function resendInvite(inv: { id: string; email: string; role: string }) {
+    if (!activeOrg.value?.id) return
+    resendingId.value = inv.id
+    try {
+      const res = await organization.inviteMember({
+        email: inv.email,
+        role: inv.role as 'admin' | 'member',
+        organizationId: activeOrg.value.id,
+        resend: true,
+      })
+      if (!res.error) toast.success(t('toasts.inviteResent'))
+      await refreshInvitations()
+    } finally {
+      resendingId.value = null
+    }
   }
 
   async function cancelInvite(invitationId: string) {
     await organization.cancelInvitation({ invitationId })
     await refreshInvitations()
+    toast.success(t('toasts.inviteCancelled'))
   }
 
   function roleBadgeVariant(role: string): 'info' | 'warning' | 'neutral' {
@@ -108,51 +130,23 @@
 
 <template>
   <section class="p-6">
-    <nav class="flex gap-2 text-tertiary text-sm mb-4">
-      <NuxtLink to="/dashboard">{{ t('orgs.title') }}</NuxtLink>
-      <span>/</span>
-      <NuxtLink :to="`/orgs/${slug}`">{{ activeOrg?.name ?? slug }}</NuxtLink>
-      <span>/</span>
-      <span>{{ t('members.title') }}</span>
-    </nav>
-
+    <!-- Breadcrumb lives in the app-shell (layouts/app.vue) — no page-local trail. -->
     <header class="flex justify-between items-center mb-6">
       <h1 class="m-0">{{ t('members.title') }}</h1>
-      <GTButton v-if="canManageOrgMembers && !showInvite" @click="showInvite = true">
+      <GTButton v-if="canManageOrgMembers" @click="showInvite = true">
         {{ t('members.invite') }}
       </GTButton>
     </header>
 
-    <form
-      v-if="showInvite"
-      class="flex flex-col gap-4 p-4 mb-6 bg-surface-raised border rounded-lg"
-      @submit.prevent="sendInvite"
-    >
-      <div class="grid grid-cols-2 gap-3">
-        <GTInput
-          v-model="inviteEmail"
-          type="email"
-          :label="t('auth.email')"
-          required
-          autocomplete="email"
-        />
-        <GTSelect
-          v-model="inviteRole"
-          :label="t('members.role')"
-          :options="ASSIGNABLE_ROLES.map((r) => ({ value: r.value, label: r.label }))"
-        />
-      </div>
-      <p class="text-tertiary text-sm m-0">
-        {{ ASSIGNABLE_ROLES.find((r) => r.value === inviteRole)?.description }}
-      </p>
-      <GTAlert v-if="inviteError" variant="error" :heading="inviteError" />
-      <div class="flex gap-3 justify-end">
-        <GTButton type="button" variant="secondary" @click="showInvite = false">
-          {{ t('app.cancel') }}
-        </GTButton>
-        <GTButton type="submit" :loading="inviting">{{ t('members.sendInvite') }}</GTButton>
-      </div>
-    </form>
+    <InviteMemberModal
+      v-model:open="showInvite"
+      :title="t('members.invite')"
+      :roles="ASSIGNABLE_ROLES"
+      default-role="member"
+      :loading="inviting"
+      :error="inviteError"
+      @submit="sendInvite"
+    />
 
     <h2 class="text-lg mt-6 mb-3">{{ t('members.active') }}</h2>
     <ul class="list-reset grid gap-2">
@@ -192,16 +186,31 @@
             <strong>{{ inv.email }}</strong>
             <span class="text-tertiary text-sm">
               {{ t(`members.roles.${inv.role}`) }}
+              <template v-if="inv.expiresAt">
+                ·
+                <span :class="{ 'text-warning': daysUntil(inv.expiresAt) < 2 }">
+                  {{
+                    daysUntil(inv.expiresAt) < 0
+                      ? t('invite.expired')
+                      : t('invite.expiresIn', { n: daysUntil(inv.expiresAt) })
+                  }}
+                </span>
+              </template>
             </span>
           </div>
-          <GTButton
-            v-if="canManageOrgMembers"
-            variant="outlined"
-            size="sm"
-            @click="cancelInvite(inv.id)"
-          >
-            {{ t('members.cancelInvite') }}
-          </GTButton>
+          <div v-if="canManageOrgMembers" class="flex gap-2">
+            <GTButton
+              variant="secondary"
+              size="sm"
+              :loading="resendingId === inv.id"
+              @click="resendInvite(inv)"
+            >
+              {{ t('invite.resend') }}
+            </GTButton>
+            <GTButton variant="outlined" size="sm" @click="cancelInvite(inv.id)">
+              {{ t('members.cancelInvite') }}
+            </GTButton>
+          </div>
         </li>
       </ul>
     </template>

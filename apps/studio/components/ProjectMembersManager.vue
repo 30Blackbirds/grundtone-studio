@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { useToast } from '@grundtone/vue'
+  import { daysUntil } from '~~/utils/invite-expiry'
   import type { ProjectRole } from '~~/composables/useProjectRole'
 
   const props = defineProps<{ projectId: string; canManage: boolean }>()
@@ -46,27 +47,50 @@
   )
 
   const showInvite = ref(false)
-  const inviteEmail = ref('')
-  const inviteRole = ref<ProjectRole>('editor')
   const inviting = ref(false)
   const inviteError = ref<string | null>(null)
 
-  async function sendInvite() {
+  const INVITE_ROLES = computed(() =>
+    (['viewer', 'editor', 'admin'] as const).map((r) => ({
+      value: r,
+      label: t(`projectMembers.roles.${r}`),
+      description: t(`projectMembers.roleDescriptions.${r}`),
+    })),
+  )
+
+  async function sendInvite(payload: { email: string; role: string }) {
     inviting.value = true
     inviteError.value = null
     try {
       await $fetch(`/api/projects/${props.projectId}/members`, {
         method: 'POST',
-        body: { email: inviteEmail.value, role: inviteRole.value },
+        body: { email: payload.email, role: payload.role },
       })
       showInvite.value = false
-      inviteEmail.value = ''
-      inviteRole.value = 'editor'
       await refresh()
+      toast.success(t('toasts.inviteSent'))
     } catch (err) {
       inviteError.value = (err as Error).message
     } finally {
       inviting.value = false
+    }
+  }
+
+  const resendingId = ref<string | null>(null)
+
+  // The invite endpoint is idempotent: re-POSTing a pending invitee's
+  // email+role refreshes the expiry and re-sends the mail — that IS resend.
+  async function resendInvite(inv: { id: string; email: string; role: ProjectRole }) {
+    resendingId.value = inv.id
+    try {
+      await $fetch(`/api/projects/${props.projectId}/members`, {
+        method: 'POST',
+        body: { email: inv.email, role: inv.role },
+      })
+      await refresh()
+      toast.success(t('toasts.inviteResent'))
+    } finally {
+      resendingId.value = null
     }
   }
 
@@ -113,37 +137,15 @@
       </GTButton>
     </header>
 
-    <form
-      v-if="showInvite"
-      class="flex flex-col gap-4 p-4 bg-surface-raised border rounded-lg"
-      @submit.prevent="sendInvite"
-    >
-      <div class="grid grid-cols-2 gap-3">
-        <GTInput
-          v-model="inviteEmail"
-          type="email"
-          :label="t('auth.email')"
-          required
-          autocomplete="email"
-        />
-        <GTSelect
-          v-model="inviteRole"
-          :label="t('projectMembers.role')"
-          :options="[
-            { value: 'viewer', label: t('projectMembers.roles.viewer') },
-            { value: 'editor', label: t('projectMembers.roles.editor') },
-            { value: 'admin', label: t('projectMembers.roles.admin') },
-          ]"
-        />
-      </div>
-      <GTAlert v-if="inviteError" variant="error" :heading="inviteError" />
-      <div class="flex gap-3 justify-end">
-        <GTButton type="button" variant="secondary" @click="showInvite = false">
-          {{ t('app.cancel') }}
-        </GTButton>
-        <GTButton type="submit" :loading="inviting">{{ t('projectMembers.send') }}</GTButton>
-      </div>
-    </form>
+    <InviteMemberModal
+      v-model:open="showInvite"
+      :title="t('projectMembers.invite')"
+      :roles="INVITE_ROLES"
+      default-role="editor"
+      :loading="inviting"
+      :error="inviteError"
+      @submit="sendInvite"
+    />
 
     <section>
       <h3 class="text-sm uppercase text-tertiary tracking-wide mb-3">
@@ -206,11 +208,29 @@
             <strong>{{ inv.email }}</strong>
             <span class="text-tertiary text-sm">
               {{ t(`projectMembers.roles.${inv.role}`) }}
+              ·
+              <span :class="{ 'text-warning': daysUntil(inv.expiresAt) < 2 }">
+                {{
+                  daysUntil(inv.expiresAt) < 0
+                    ? t('invite.expired')
+                    : t('invite.expiresIn', { n: daysUntil(inv.expiresAt) })
+                }}
+              </span>
             </span>
           </div>
-          <GTButton v-if="canManage" variant="outlined" size="sm" @click="cancelInvite(inv.id)">
-            {{ t('projectMembers.cancelInvite') }}
-          </GTButton>
+          <div v-if="canManage" class="flex gap-2">
+            <GTButton
+              variant="secondary"
+              size="sm"
+              :loading="resendingId === inv.id"
+              @click="resendInvite(inv)"
+            >
+              {{ t('invite.resend') }}
+            </GTButton>
+            <GTButton variant="outlined" size="sm" @click="cancelInvite(inv.id)">
+              {{ t('projectMembers.cancelInvite') }}
+            </GTButton>
+          </div>
         </li>
       </ul>
     </section>

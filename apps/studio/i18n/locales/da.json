@@ -206,6 +206,11 @@
       "admin": "Admin",
       "member": "Medlem",
       "billing": "Fakturering"
+    },
+    "roleDescriptions": {
+      "viewer": "Kan se tokens og versionshistorik, men ikke ændre noget.",
+      "editor": "Kan redigere og publicere tokens. Kan ikke administrere nøgler eller medlemmer.",
+      "admin": "Fuld projektadgang: tokens, API-nøgler og medlemmer."
     }
   },
   "projectInvitation": {
@@ -590,7 +595,9 @@
     "versionActivated": "Version aktiveret",
     "memberRemoved": "Medlem fjernet",
     "inviteCancelled": "Invitation annulleret",
-    "leftOrg": "Du har forladt organisationen"
+    "leftOrg": "Du har forladt organisationen",
+    "inviteSent": "Invitation sendt",
+    "inviteResent": "Invitation gensendt"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -612,5 +619,12 @@
   "validation": {
     "cssColor": "Ugyldig CSS-farve (fx #0059b3, rgb(...), var(--...))",
     "cssLength": "Ugyldig CSS-længde (fx 0.5rem, 8px, 50%)"
+  },
+  "invite": {
+    "role": "Rolle",
+    "send": "Send invitation",
+    "resend": "Gensend",
+    "expired": "Udløbet",
+    "expiresIn": "udløber om {n} dage"
   }
 }

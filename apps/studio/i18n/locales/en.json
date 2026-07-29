@@ -206,6 +206,11 @@
       "admin": "Admin",
       "member": "Member",
       "billing": "Billing"
+    },
+    "roleDescriptions": {
+      "viewer": "Can view tokens and version history, but not change anything.",
+      "editor": "Can edit and publish tokens. Cannot manage keys or members.",
+      "admin": "Full project access: tokens, API keys and members."
     }
   },
   "projectInvitation": {
@@ -590,7 +595,9 @@
     "versionActivated": "Version activated",
     "memberRemoved": "Member removed",
     "inviteCancelled": "Invitation cancelled",
-    "leftOrg": "You have left the organization"
+    "leftOrg": "You have left the organization",
+    "inviteSent": "Invitation sent",
+    "inviteResent": "Invitation resent"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -612,5 +619,12 @@
   "validation": {
     "cssColor": "Invalid CSS color (e.g. #0059b3, rgb(...), var(--...))",
     "cssLength": "Invalid CSS length (e.g. 0.5rem, 8px, 50%)"
+  },
+  "invite": {
+    "role": "Role",
+    "send": "Send invitation",
+    "resend": "Resend",
+    "expired": "Expired",
+    "expiresIn": "expires in {n} days"
   }
 }
