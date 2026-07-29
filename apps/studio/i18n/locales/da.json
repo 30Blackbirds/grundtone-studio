@@ -265,7 +265,8 @@
       "error": "Kunne ikke afslutte opsætningen",
       "retry": "Prøv igen",
       "finish": "Gå til dit projekt"
-    }
+    },
+    "stepAnnouncement": "Trin {current} af {total}: {label}"
   },
   "changelog": {
     "title": "Hvad er nyt",
