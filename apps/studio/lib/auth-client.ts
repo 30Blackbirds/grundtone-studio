@@ -10,10 +10,21 @@ import { magicLinkClient, organizationClient } from 'better-auth/client/plugins'
 // this straight at the auth container's URL (same-site on localhost, no proxy
 // needed). Studio no longer runs Better Auth server-side.
 function authBaseURL(): string | undefined {
-  // useRuntimeConfig is auto-imported in Nuxt; available on both server and
-  // client. public.authUrl is fed by NUXT_PUBLIC_AUTH_URL.
-  const url = useRuntimeConfig().public.authUrl
-  return url || undefined
+  // This module is evaluated at import time, and the CHUNK GRAPH decides the
+  // import context: when auth-client lands in a shared chunk that's loaded via
+  // dynamic import during SSR route navigation, evaluation happens OUTSIDE the
+  // Nuxt async context and useRuntimeConfig() throws "[nuxt] instance
+  // unavailable" — which 500'd /login, /signup and /dashboard on v0.2.6 (the
+  // redesign reshuffled the chunks). Never depend on Nuxt context at module
+  // scope: fall back to the same env var that feeds runtime config. In the
+  // browser process.env is empty → undefined → better-auth defaults to
+  // window.location.origin, which IS the BFF origin we want.
+  try {
+    const url = useRuntimeConfig().public.authUrl
+    return url || undefined
+  } catch {
+    return process.env.NUXT_PUBLIC_AUTH_URL || undefined
+  }
 }
 
 export const authClient = createAuthClient({
