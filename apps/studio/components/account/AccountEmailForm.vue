@@ -51,7 +51,15 @@
         required
         autocomplete="email"
       />
-      <GTAlert v-if="sent" variant="success" :heading="t('account.email.pending')" />
+      <!-- Better Auth sends the change-confirmation to the CURRENT address
+           (ownership proof — required for verified users). The copy must say
+           so, or users watch the wrong inbox. -->
+      <p class="text-tertiary text-sm m-0">{{ t('account.email.flowHint') }}</p>
+      <GTAlert
+        v-if="sent"
+        variant="success"
+        :heading="t('account.email.pending', { email: currentEmail })"
+      />
       <GTAlert v-if="error" variant="error" :heading="error" />
       <div class="flex justify-end">
         <GTButton type="submit" :loading="pending">{{ t('account.email.submit') }}</GTButton>
