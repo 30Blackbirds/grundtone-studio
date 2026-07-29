@@ -520,8 +520,9 @@
     "email": {
       "newEmail": "New email address",
       "submit": "Change email",
-      "pending": "We've sent a confirmation email to the new address.",
-      "error": "Could not request email change"
+      "pending": "We've sent a confirmation email to your CURRENT address ({email}). Confirm there to complete the change.",
+      "error": "Could not request email change",
+      "flowHint": "For security, the change is confirmed from your current address — only then does the new one take effect."
     },
     "verification": {
       "banner": "Verify your email address to secure your account.",

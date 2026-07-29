@@ -520,8 +520,9 @@
     "email": {
       "newEmail": "Ny e-mailadresse",
       "submit": "Skift e-mail",
-      "pending": "Vi har sendt en bekræftelsesmail til den nye adresse.",
-      "error": "Kunne ikke anmode om e-mailskift"
+      "pending": "Vi har sendt en bekræftelsesmail til din NUVÆRENDE adresse ({email}). Bekræft dér for at fuldføre skiftet.",
+      "error": "Kunne ikke anmode om e-mailskift",
+      "flowHint": "Af sikkerhedshensyn bekræftes skiftet fra din nuværende adresse — først derefter aktiveres den nye."
     },
     "verification": {
       "banner": "Bekræft din e-mailadresse for at sikre din konto.",
