@@ -718,5 +718,27 @@
       "billing_unavailable": "Payments are not open yet — plans will be activated soon.",
       "checkout_failed": "Something went wrong — please try again in a moment."
     }
+  },
+  "help": {
+    "publishHelp": {
+      "summary": "How does publishing work?",
+      "draft": "Draft: your changes are saved as a draft only your team can see. Nothing is live yet.",
+      "publish": "Publish: the draft becomes a new, numbered version — and the CDN address updates immediately, so every app using the project’s key gets the new tokens.",
+      "versions": "Versions are immutable: the full history lives in the Versions tab, and you can activate an earlier version if anything needs rolling back."
+    },
+    "keysHelp": {
+      "summary": "What is the difference between pk_ and sk_ keys?",
+      "pk": "pk_ (publishable): a read key for fetching published tokens from the CDN. It is designed to live visibly in your app code and URLs — it cannot change anything.",
+      "sk": "sk_ (secret): a write key for the API (e.g. CI/CD and token updates). It is shown only ONCE at creation and should be treated like a password — put it in your CI’s secrets, never in code."
+    },
+    "plansFaq": {
+      "title": "Frequently asked questions",
+      "brandQ": "What counts as an active brand?",
+      "brandA": "A project with a published version — tokens that are live on the CDN. Drafts are free and never count.",
+      "switchQ": "Can I switch or cancel my plan?",
+      "switchA": "Yes, any time. Downgrades and cancellations take effect from the next billing period — your tokens and drafts are never deleted, and already-published versions keep working.",
+      "limitQ": "What happens when I hit my limit?",
+      "limitA": "Nothing breaks: everything live stays live. You just can’t publish MORE brands until you upgrade (or unpublish another). On plans with overage you pay per extra brand instead."
+    }
   }
 }

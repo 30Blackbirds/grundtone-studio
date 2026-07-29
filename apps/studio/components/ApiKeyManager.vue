@@ -158,6 +158,15 @@
       </GTButton>
     </header>
 
+    <!-- In-app-hjælp v1 (launch-krav): pk/sk-forvekslingen er support-driver
+         #2 — den foldbare forklaring bor over tabellen hvor nøglerne vælges. -->
+    <GTDetails :summary="t('help.keysHelp.summary')" variant="subtle">
+      <ul class="m-0 pl-4 text-sm flex flex-col gap-2">
+        <li>{{ t('help.keysHelp.pk') }}</li>
+        <li>{{ t('help.keysHelp.sk') }}</li>
+      </ul>
+    </GTDetails>
+
     <div class="flex justify-between items-center gap-4 p-4 bg-surface-raised border rounded-lg">
       <div class="flex flex-col gap-1 min-w-0">
         <span class="text-sm uppercase text-tertiary tracking-wide">

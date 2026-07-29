@@ -485,3 +485,12 @@ main {
 .plan-confirm__line--total {
   font-weight: 700;
 }
+
+/* FAQ-sektionen på /plans (in-app-hjælp v1) — smal læsebredde midt på siden. */
+.plans-faq {
+  max-width: 44rem;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

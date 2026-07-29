@@ -173,6 +173,16 @@
       ]"
     >
       <GTTabPanel id="tokens">
+        <!-- In-app-hjælp v1 (launch-krav: self-serve-support): publicerings-
+             flowet er support-driver #1 — forklaringen bor hvor beslutningen
+             tages, ikke i et eksternt dok. -->
+        <GTDetails :summary="t('help.publishHelp.summary')" variant="subtle" class="mb-4">
+          <ul class="m-0 pl-4 text-sm flex flex-col gap-2">
+            <li>{{ t('help.publishHelp.draft') }}</li>
+            <li>{{ t('help.publishHelp.publish') }}</li>
+            <li>{{ t('help.publishHelp.versions') }}</li>
+          </ul>
+        </GTDetails>
         <div class="editor-layout">
           <TokenEditor v-model="tokens" v-model:mode="editorMode" />
           <div class="editor-layout__preview">
