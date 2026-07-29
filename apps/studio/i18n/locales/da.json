@@ -289,7 +289,14 @@
     "empty": "Ingen versioner publiceret endnu.",
     "publishedOn": "Publiceret {date}",
     "editedOn": "Senest redigeret {date}",
-    "confirmActivate": "Skift den aktive version til denne? Kunder der bruger CDN'et skifter inden for ~1 minut."
+    "confirmActivate": "Skift den aktive version til denne? Kunder der bruger CDN'et skifter inden for ~1 minut.",
+    "diffSummary": "{n} ændringer siden forrige version",
+    "diffFirst": "Første version — {n} tokens sat",
+    "diff": {
+      "added": "tilføjet",
+      "changed": "ændret",
+      "removed": "fjernet"
+    }
   },
   "tokens": {
     "colors": "Farver",
@@ -595,5 +602,9 @@
       "draft": "Kladde",
       "none": "Ikke publiceret"
     }
+  },
+  "validation": {
+    "cssColor": "Ugyldig CSS-farve (fx #0059b3, rgb(...), var(--...))",
+    "cssLength": "Ugyldig CSS-længde (fx 0.5rem, 8px, 50%)"
   }
 }

@@ -184,3 +184,30 @@ main {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ── Token editor (redesign R3b) ─────────────────────────────────────────
+   Editor + live preview side by side on wide screens; the two-column grid
+   used to break below ~1100px (UX-audit finding #3) — now the preview stacks
+   under the editor and drops its sticky behaviour. */
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.editor-layout__preview {
+  position: sticky;
+  top: 5rem; /* clears the sticky app-shell header */
+  align-self: start;
+}
+
+@media (width <= 1100px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-layout__preview {
+    position: static;
+  }
+}

@@ -289,7 +289,14 @@
     "empty": "No versions published yet.",
     "publishedOn": "Published {date}",
     "editedOn": "Last edited {date}",
-    "confirmActivate": "Switch the active version to this one? Customers using the CDN will switch within ~1 minute."
+    "confirmActivate": "Switch the active version to this one? Customers using the CDN will switch within ~1 minute.",
+    "diffSummary": "{n} changes since previous version",
+    "diffFirst": "First version — {n} tokens set",
+    "diff": {
+      "added": "added",
+      "changed": "changed",
+      "removed": "removed"
+    }
   },
   "tokens": {
     "colors": "Colors",
@@ -595,5 +602,9 @@
       "draft": "Draft",
       "none": "Not published"
     }
+  },
+  "validation": {
+    "cssColor": "Invalid CSS color (e.g. #0059b3, rgb(...), var(--...))",
+    "cssLength": "Invalid CSS length (e.g. 0.5rem, 8px, 50%)"
   }
 }

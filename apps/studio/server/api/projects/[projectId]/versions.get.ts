@@ -27,6 +27,10 @@ export default defineEventHandler(async (event) => {
       publishedBy: configVersion.publishedBy,
       publishedByEmail: configVersion.publishedByEmail,
       createdAt: configVersion.createdAt,
+      // Full token payloads power the client-side version diff (R3b). Token
+      // sets are small (~25 leaf values) and the caller already has viewer
+      // access to every version's content via the config endpoint.
+      tokensJson: configVersion.tokensJson,
     })
     .from(configVersion)
     .where(eq(configVersion.projectId, projectId))
