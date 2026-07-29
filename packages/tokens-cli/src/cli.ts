@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Command } from 'commander'
-import { applySets, resolveConfig, type ConfigFile, type ResolvedConfig } from './config.js'
+import {
+  applySets,
+  pickTokensBase,
+  resolveConfig,
+  type ConfigFile,
+  type ResolvedConfig,
+} from './config.js'
 
 function loadConfigFile(): ConfigFile | null {
   try {
@@ -72,10 +78,11 @@ program
     if (opts.file) {
       tokens = JSON.parse(readFileSync(opts.file, 'utf8'))
     } else {
-      // Start from the current draft (falling back to active) so `--set` tweaks
-      // one slot without having to resend the whole token object.
+      // Start from the current draft's tokens, falling back to the active
+      // version's tokens and finally the schema defaults — so `--set` tweaks
+      // one slot without resending (or wiping) the rest.
       const current = await api(cfg, 'GET', `/api/projects/${projectId}/config`)
-      tokens = current?.draft ?? current?.active ?? {}
+      tokens = pickTokensBase(current)
     }
     if (opts.set.length) tokens = applySets(tokens, opts.set)
 

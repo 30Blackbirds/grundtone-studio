@@ -52,6 +52,25 @@ export function resolveConfig(input: {
 
 type JsonObject = Record<string, unknown>
 
+export interface ConfigResponse {
+  draft?: { tokens?: JsonObject } | null
+  active?: { tokens?: JsonObject } | null
+  defaults?: JsonObject | null
+}
+
+/**
+ * Pick the token object `set --set` starts from: draft → active → defaults.
+ *
+ * Two bugs lived here before this helper: (1) the CLI used `config.draft ??
+ * config.active` — but those are WRAPPERS ({id, version, tokens}), and the
+ * config POST endpoint is zod-strict, so posting a wrapper 400'd with
+ * "Unrecognized key: id"; (2) there was no defaults fallback, so a project
+ * with no draft started from {} and wiped every unset slot.
+ */
+export function pickTokensBase(config: ConfigResponse | null | undefined): JsonObject {
+  return config?.draft?.tokens ?? config?.active?.tokens ?? config?.defaults ?? {}
+}
+
 /**
  * Apply `dot.path=value` assignments onto a clone of the base tokens object,
  * creating intermediate objects as needed. Used by `set --set colors.primary=#...`.

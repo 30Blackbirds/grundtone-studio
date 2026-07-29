@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveConfig, applySets } from './config'
+import { resolveConfig, applySets, pickTokensBase } from './config'
 
 describe('resolveConfig', () => {
   const base = { projectId: 'p1', flags: {}, env: {}, configFile: null }
@@ -81,5 +81,36 @@ describe('applySets', () => {
 
   it('throws on a malformed assignment', () => {
     expect(() => applySets({}, ['no-equals-sign'])).toThrow(/Invalid --set/)
+  })
+})
+
+describe('pickTokensBase', () => {
+  const draft = { tokens: { colors: { primary: '#111111' } } }
+  const active = { tokens: { colors: { primary: '#222222' } } }
+  const defaults = { colors: { primary: '#333333' } }
+
+  it('unwraps the DRAFT tokens (not the wrapper) when a draft exists', () => {
+    expect(pickTokensBase({ draft, active, defaults })).toEqual(draft.tokens)
+  })
+
+  it('falls back to the ACTIVE tokens when there is no draft', () => {
+    expect(pickTokensBase({ draft: null, active, defaults })).toEqual(active.tokens)
+  })
+
+  it('falls back to DEFAULTS when neither draft nor active exists', () => {
+    expect(pickTokensBase({ draft: null, active: null, defaults })).toEqual(defaults)
+  })
+
+  it('returns {} for a missing/empty config', () => {
+    expect(pickTokensBase(null)).toEqual({})
+    expect(pickTokensBase({})).toEqual({})
+  })
+
+  it('never returns the wrapper shape (id/version must not leak into the POST body)', () => {
+    const base = pickTokensBase({
+      draft: { tokens: { colors: {} }, ...({ id: 'x', version: 3 } as object) },
+    } as never)
+    expect(base).not.toHaveProperty('id')
+    expect(base).not.toHaveProperty('version')
   })
 })
