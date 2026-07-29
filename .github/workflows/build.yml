@@ -143,7 +143,7 @@ jobs:
             echo "waiting ($i/30)…"
             sleep 5
           done
-          for path in /login /signup /dashboard; do
+          for path in /login /signup /dashboard /components; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
             if [ "$code" != "200" ]; then
               echo "✗ $path returned $code"
@@ -225,7 +225,7 @@ jobs:
             echo "waiting ($i/30)…"
             sleep 5
           done
-          for path in /login /signup /dashboard; do
+          for path in /login /signup /dashboard /components; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
             if [ "$code" != "200" ]; then
               echo "✗ $path returned $code — investigate manually"
