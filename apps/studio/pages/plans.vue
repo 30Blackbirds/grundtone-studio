@@ -160,6 +160,21 @@
       <p class="text-tertiary text-sm m-0 mt-1">{{ t('plans.memberCtaSub') }}</p>
     </footer>
 
+    <!-- In-app-hjælp v1 (launch-krav): kvote-/plan-spørgsmålene er support-
+         driver #3 — svarene bor på siden hvor plan-beslutningen tages. -->
+    <section class="plans-faq mt-6">
+      <h2 class="text-sm uppercase text-tertiary tracking-wide">{{ t('help.plansFaq.title') }}</h2>
+      <GTDetails :summary="t('help.plansFaq.brandQ')" variant="subtle">
+        <p class="m-0 text-sm">{{ t('help.plansFaq.brandA') }}</p>
+      </GTDetails>
+      <GTDetails :summary="t('help.plansFaq.switchQ')" variant="subtle">
+        <p class="m-0 text-sm">{{ t('help.plansFaq.switchA') }}</p>
+      </GTDetails>
+      <GTDetails :summary="t('help.plansFaq.limitQ')" variant="subtle">
+        <p class="m-0 text-sm">{{ t('help.plansFaq.limitA') }}</p>
+      </GTDetails>
+    </section>
+
     <!-- Stage 3: pre-checkout summary (last step before Stripe's hosted page) -->
     <GTModal
       :open="confirmPlan !== null"

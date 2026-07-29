@@ -718,5 +718,27 @@
       "billing_unavailable": "Betaling er ikke åbnet endnu — planerne aktiveres snart.",
       "checkout_failed": "Noget gik galt — prøv igen om et øjeblik."
     }
+  },
+  "help": {
+    "publishHelp": {
+      "summary": "Hvordan virker publicering?",
+      "draft": "Kladde: dine ændringer gemmes som en kladde, som kun jeres team kan se. Intet er live endnu.",
+      "publish": "Publicér: kladden bliver til en ny, nummereret version — og CDN-adressen opdateres med det samme, så alle apps der bruger projektets nøgle får de nye tokens.",
+      "versions": "Versioner er urørlige: du kan altid se historikken under Versioner-fanen og aktivere en tidligere version, hvis noget skal rulles tilbage."
+    },
+    "keysHelp": {
+      "summary": "Hvad er forskellen på pk_- og sk_-nøgler?",
+      "pk": "pk_ (publishable): læse-nøgle til at hente publicerede tokens fra CDN’en. Den er designet til at ligge synligt i din app-kode og URL’er — den kan ikke ændre noget.",
+      "sk": "sk_ (secret): skrive-nøgle til API’et (fx CI/CD og token-opdateringer). Den vises kun ÉN gang ved oprettelse og skal behandles som et kodeord — læg den i din CI’s secrets, aldrig i koden."
+    },
+    "plansFaq": {
+      "title": "Ofte stillede spørgsmål",
+      "brandQ": "Hvad tæller som et aktivt brand?",
+      "brandA": "Et projekt med en publiceret version — altså tokens der er live på CDN’en. Kladder er gratis og tæller aldrig med.",
+      "switchQ": "Kan jeg skifte eller opsige min plan?",
+      "switchA": "Ja, når som helst. Nedgradering og opsigelse gælder fra næste faktureringsperiode — dine tokens og kladder forsvinder aldrig, og allerede publicerede versioner bliver ved med at virke.",
+      "limitQ": "Hvad sker der, når jeg rammer min grænse?",
+      "limitA": "Ingenting går i stykker: alt der er live, forbliver live. Du kan bare ikke publicere FLERE brands, før du opgraderer (eller afpublicerer et andet). På planer med overage betaler du pr. ekstra brand i stedet."
+    }
   }
 }
