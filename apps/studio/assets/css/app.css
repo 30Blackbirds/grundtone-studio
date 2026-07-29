@@ -263,3 +263,75 @@ main {
   flex: 1;
   border-top: 1px solid var(--color-border-light, var(--color-border-medium));
 }
+
+/* Sidebar user anchor (Allan 2026-07-29): the sidebar is a column, nav
+   scrolls, the user block pins to the bottom (prototype's su__user). */
+.app-sidebar--column {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sidebar--column > nav,
+.app-sidebar--column > p,
+.app-sidebar--column > header,
+.app-sidebar--column > template {
+  flex-shrink: 0;
+}
+
+.app-sidebar__user {
+  margin-top: auto;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Component workbench (/components, Storybook-style) ─────────────────
+   Three-zone layout: searchable rail · themed canvas · controls/snippet.
+   Layout-only; theming rides on the selected project's token vars. */
+.workbench {
+  display: grid;
+  grid-template-columns: 14rem 1fr 18rem;
+  gap: 1rem;
+  align-items: start;
+}
+
+.workbench__rail {
+  position: sticky;
+  top: 5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+.workbench__canvas {
+  min-height: 16rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+}
+
+.workbench__canvas--dark {
+  color-scheme: dark;
+}
+
+.workbench__snippet {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+@media (width <= 1100px) {
+  .workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .workbench__rail {
+    position: static;
+    max-height: none;
+  }
+}

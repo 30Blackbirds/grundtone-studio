@@ -586,7 +586,19 @@
     "deleteError": "Kunne ikke slette organisation"
   },
   "componentLibrary": {
-    "nav": "Komponenter"
+    "nav": "Komponenter",
+    "title": "Komponent-værksted",
+    "subtitle": "Interaktiv testbænk: vælg komponent, skru på props, se den i et projekts tema — og kopiér koden.",
+    "studioDefault": "Studio-standard",
+    "projectTheme": "Projekt-tema",
+    "dark": "Dark",
+    "railLabel": "Komponenter",
+    "search": "Søg komponent…",
+    "noMatches": "Ingen komponenter matcher.",
+    "controlsLabel": "Kontroller",
+    "slotLabel": "Indhold (slot)",
+    "copy": "Kopiér",
+    "copied": "Kopieret ✓"
   },
   "nav": {
     "dashboard": "Dashboard",
