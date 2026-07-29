@@ -471,7 +471,13 @@
       "config.published": "Publicerede konfiguration",
       "config.activated": "Aktiverede version",
       "organization.updated": "Opdaterede organisation"
-    }
+    },
+    "loadOlder": "Indlæs ældre",
+    "exportCsv": "Eksportér CSV",
+    "timezoneNote": "Tider vist i {tz}",
+    "actorSearch": "Søg aktør",
+    "actorSearchPlaceholder": "email (filtrerer indlæste rækker)",
+    "noMatches": "Ingen rækker matcher søgningen."
   },
   "invitation": {
     "title": "Invitation",
