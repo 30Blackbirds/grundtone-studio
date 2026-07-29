@@ -279,7 +279,44 @@ main {
 }
 
 .app-sidebar__user {
+  position: relative;
   margin-top: auto;
+}
+
+/* Account disclosure ([designer] #152-review): mirrors Resonans'
+   rail-bottom anchor (spaces-landing.html .rail__acct) for cross-product
+   consistency — avatar + name (bold) + email (muted) + chevron; actions
+   live behind the chevron so the bottom stays compact. */
+.app-sidebar__acct {
+  width: 100%;
+  text-align: left;
+  min-width: 0;
+}
+
+.app-sidebar__acct-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-sidebar__avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  flex: none;
+}
+
+/* Menu opens upward from the anchor (it sits at the viewport bottom). */
+.app-sidebar__menu {
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
 }
 
 .truncate {
@@ -305,16 +342,36 @@ main {
   overflow-y: auto;
 }
 
+/* --gt-canvas-bg is deliberately a TOOL-CHROME token decoupled from the
+   consumer token set ([designer] #152-review): the canvas previews an
+   arbitrary project theme, so its own background must never come from
+   that theme — otherwise low-contrast/dark themes visually merge with
+   the tool chrome (same rationale as Figma's canvas / Storybook's
+   background addon). Neutral checker, hardcoded by design. */
 .workbench__canvas {
+  --gt-canvas-bg: repeating-conic-gradient(#f3f3f3 0% 25%, #fbfbfb 0% 50%) 0 0 / 1.25rem 1.25rem;
+
   min-height: 16rem;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2.5rem;
+  background: var(--gt-canvas-bg);
 }
 
 .workbench__canvas--dark {
+  --gt-canvas-bg: repeating-conic-gradient(#2b2b2b 0% 25%, #343434 0% 50%) 0 0 / 1.25rem 1.25rem;
+
   color-scheme: dark;
+}
+
+/* Controls panel scrolls independently of the canvas ([designer]
+   #152-review): rich-API components stack many knobs + slot text. */
+.workbench__controls {
+  position: sticky;
+  top: 5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
 }
 
 .workbench__snippet {

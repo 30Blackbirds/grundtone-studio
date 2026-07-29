@@ -6,7 +6,44 @@
   const route = useRoute()
   const session = useSession()
 
+  const userName = computed(
+    () => session.value?.data?.user?.name || session.value?.data?.user?.email || '',
+  )
+  const userEmail = computed(() => session.value?.data?.user?.email ?? '')
+  const initials = computed(() =>
+    userName.value
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join(''),
+  )
+
+  const menuOpen = ref(false)
+  const acctRef = ref<HTMLElement | null>(null)
+
+  function closeOnOutside(e: MouseEvent) {
+    if (acctRef.value && !acctRef.value.contains(e.target as Node)) menuOpen.value = false
+  }
+  function closeOnEscape(e: KeyboardEvent) {
+    if (e.key === 'Escape') menuOpen.value = false
+  }
+  watch(menuOpen, (open) => {
+    if (open) {
+      document.addEventListener('click', closeOnOutside)
+      document.addEventListener('keydown', closeOnEscape)
+    } else {
+      document.removeEventListener('click', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  })
+  onUnmounted(() => {
+    document.removeEventListener('click', closeOnOutside)
+    document.removeEventListener('keydown', closeOnEscape)
+  })
+
   async function handleSignOut() {
+    menuOpen.value = false
     await signOut()
     await navigateTo('/login')
   }
@@ -109,20 +146,41 @@
       </ul>
     </nav>
 
-    <!-- User anchor pinned to the bottom (the prototype's su__user block —
-         Allan-request 2026-07-29: account/lang/sign-out live here, not in
-         the header). -->
-    <footer class="app-sidebar__user border-t pt-3 flex flex-col gap-2">
-      <p v-if="session.data?.user" class="m-0 text-sm text-tertiary truncate">
-        {{ session.data.user.email }}
-      </p>
-      <div class="flex items-center justify-between gap-2">
-        <NuxtLink to="/account" :class="linkClass">{{ $t('account.nav') }}</NuxtLink>
-        <LanguageSwitch />
+    <!-- User anchor pinned to the bottom (Allan-request 2026-07-29:
+         account/lang/sign-out live here, not in the header). Structure
+         mirrors Resonans' rail-bottom anchor ([designer] #152-review):
+         name first, actions behind the chevron. -->
+    <footer ref="acctRef" class="app-sidebar__user border-t pt-3">
+      <button
+        type="button"
+        class="app-sidebar__acct flex items-center gap-2 p-2 rounded border-0 bg-transparent cursor-pointer hover:bg-surface-raised"
+        :aria-expanded="menuOpen"
+        aria-controls="sidebar-account-menu"
+        @click="menuOpen = !menuOpen"
+      >
+        <span class="app-sidebar__avatar bg-surface-raised border" aria-hidden="true">
+          {{ initials }}
+        </span>
+        <span class="app-sidebar__acct-text">
+          <span class="block text-sm font-bold truncate">{{ userName }}</span>
+          <span class="block text-xs text-tertiary truncate">{{ userEmail }}</span>
+        </span>
+        <span aria-hidden="true" class="text-tertiary text-xs">{{ menuOpen ? '▴' : '▾' }}</span>
+      </button>
+      <div
+        v-if="menuOpen"
+        id="sidebar-account-menu"
+        class="app-sidebar__menu bg-surface border rounded-lg p-2 flex flex-col gap-1"
+      >
+        <NuxtLink to="/account" :class="linkClass" @click="menuOpen = false">
+          {{ $t('account.nav') }}
+        </NuxtLink>
+        <div class="p-2"><LanguageSwitch /></div>
+        <hr class="m-0" />
+        <GTButton variant="outlined" size="sm" block @click="handleSignOut">
+          {{ $t('app.signOut') }}
+        </GTButton>
       </div>
-      <GTButton variant="outlined" size="sm" block @click="handleSignOut">
-        {{ $t('app.signOut') }}
-      </GTButton>
     </footer>
   </aside>
 </template>

@@ -194,7 +194,7 @@
       <!-- Canvas: themed live render -->
       <div class="flex flex-col gap-3">
         <div
-          class="workbench__canvas rounded-lg border bg-surface"
+          class="workbench__canvas rounded-lg border"
           :class="{ 'workbench__canvas--dark': darkMode && hasDarkSet }"
           :style="themeVars"
         >
@@ -214,7 +214,7 @@
 
       <!-- Controls -->
       <aside
-        class="p-4 bg-surface-raised border rounded-lg flex flex-col gap-3"
+        class="workbench__controls p-4 bg-surface-raised border rounded-lg flex flex-col gap-3"
         :aria-label="t('componentLibrary.controlsLabel')"
       >
         <h2 class="text-xs uppercase text-tertiary tracking-wide m-0">
