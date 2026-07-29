@@ -1,9 +1,20 @@
 <script setup lang="ts">
+  import { isCssColor } from '~~/utils/css-values'
+
   const model = defineModel<string>()
   defineProps<{
     label: string
     placeholder?: string
   }>()
+
+  const { t } = useI18n()
+
+  // Inline live-validation (UX-audit finding #8): flag an invalid color the
+  // moment it's typed instead of waiting for the server's 400. Empty is fine —
+  // every token field is optional.
+  const errorText = computed(() =>
+    model.value && !isCssColor(model.value) ? t('validation.cssColor') : undefined,
+  )
 </script>
 
 <template>
@@ -21,6 +32,7 @@
         :model-value="model"
         :placeholder="placeholder ?? '#RRGGBB'"
         size="sm"
+        :error-text="errorText"
         @update:model-value="(v) => (model = String(v))"
       />
     </span>

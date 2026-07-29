@@ -172,9 +172,9 @@
       ]"
     >
       <GTTabPanel id="tokens">
-        <div class="grid grid-cols-2 gap-6">
+        <div class="editor-layout">
           <TokenEditor v-model="tokens" v-model:mode="editorMode" />
-          <div class="sticky top-4 self-start">
+          <div class="editor-layout__preview">
             <ClientOnly>
               <TokenPreview :tokens="previewTokens" />
             </ClientOnly>

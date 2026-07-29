@@ -1,5 +1,7 @@
 <script setup lang="ts">
   import { useToast } from '@grundtone/vue'
+  import { diffTokens, isColorPath } from '~~/utils/token-diff'
+
   const props = defineProps<{ projectId: string; canManage: boolean }>()
   const emit = defineEmits<{ activated: [] }>()
   const { t } = useI18n()
@@ -10,6 +12,7 @@
     status: 'draft' | 'published'
     publishedAt: string | null
     createdAt: string
+    tokensJson: Record<string, unknown>
   }
 
   interface VersionsResponse {
@@ -52,6 +55,16 @@
     () => data.value?.versions.filter((v) => v.status === 'published') ?? [],
   )
   const draft = computed(() => data.value?.versions.find((v) => v.status === 'draft') ?? null)
+
+  // Token-level diff vs the PREVIOUS published version (UX-audit finding #9).
+  // `published` is version-descending, so the predecessor sits at index+1;
+  // the oldest version diffs against {} and reads as "everything added".
+  function changesFor(index: number) {
+    const current = published.value[index]
+    const previous = published.value[index + 1]
+    return diffTokens(previous?.tokensJson ?? {}, current.tokensJson ?? {})
+  }
+  const changesByIndex = computed(() => published.value.map((_, i) => changesFor(i)))
 </script>
 
 <template>
@@ -76,30 +89,76 @@
       </h3>
       <ul v-if="published.length" class="list-reset grid gap-2">
         <li
-          v-for="v in published"
+          v-for="(v, index) in published"
           :key="v.id"
-          class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+          class="p-4 bg-surface-raised border rounded-lg"
         >
-          <div class="flex flex-col gap-1">
-            <strong>v{{ v.version }}</strong>
-            <span class="text-tertiary text-sm">
-              {{ t('versions.publishedOn', { date: new Date(v.publishedAt!).toLocaleString() }) }}
-            </span>
+          <div class="flex justify-between items-center">
+            <div class="flex flex-col gap-1">
+              <strong>v{{ v.version }}</strong>
+              <span class="text-tertiary text-sm">
+                {{ t('versions.publishedOn', { date: new Date(v.publishedAt!).toLocaleString() }) }}
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <GTBadge v-if="data?.activeVersionId === v.id" variant="success">
+                {{ t('versions.active') }}
+              </GTBadge>
+              <GTButton
+                v-else-if="canManage"
+                variant="secondary"
+                size="sm"
+                :loading="activatingId === v.id"
+                @click="pendingActivateId = v.id"
+              >
+                {{ t('versions.activate') }}
+              </GTButton>
+            </div>
           </div>
-          <div class="flex items-center gap-3">
-            <GTBadge v-if="data?.activeVersionId === v.id" variant="success">
-              {{ t('versions.active') }}
-            </GTBadge>
-            <GTButton
-              v-else-if="canManage"
-              variant="secondary"
-              size="sm"
-              :loading="activatingId === v.id"
-              @click="pendingActivateId = v.id"
-            >
-              {{ t('versions.activate') }}
-            </GTButton>
-          </div>
+
+          <GTDetails
+            v-if="changesByIndex[index].length"
+            class="mt-3"
+            :summary="
+              index === published.length - 1
+                ? t('versions.diffFirst', { n: changesByIndex[index].length })
+                : t('versions.diffSummary', { n: changesByIndex[index].length })
+            "
+          >
+            <ul class="list-reset flex flex-col gap-1 mt-2">
+              <li
+                v-for="c in changesByIndex[index]"
+                :key="c.path"
+                class="flex items-center gap-2 text-sm font-mono"
+              >
+                <GTBadge :variant="c.kind === 'removed' ? 'warning' : 'neutral'">
+                  {{ t(`versions.diff.${c.kind}`) }}
+                </GTBadge>
+                <span>{{ c.path }}</span>
+                <span v-if="c.from" class="flex items-center gap-1 text-tertiary">
+                  <!-- Swatches show the versions' own stored color values — data,
+                       not theming (same precedent as the dashboard grid). -->
+                  <span
+                    v-if="isColorPath(c.path)"
+                    class="dash-swatch"
+                    :style="{ background: c.from }"
+                    aria-hidden="true"
+                  />
+                  {{ c.from }}
+                </span>
+                <span v-if="c.from && c.to" class="text-tertiary" aria-hidden="true">→</span>
+                <span v-if="c.to" class="flex items-center gap-1">
+                  <span
+                    v-if="isColorPath(c.path)"
+                    class="dash-swatch"
+                    :style="{ background: c.to }"
+                    aria-hidden="true"
+                  />
+                  {{ c.to }}
+                </span>
+              </li>
+            </ul>
+          </GTDetails>
         </li>
       </ul>
       <p v-else class="text-tertiary">{{ t('versions.empty') }}</p>

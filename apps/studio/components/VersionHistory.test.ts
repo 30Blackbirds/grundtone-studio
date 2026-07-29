@@ -72,8 +72,17 @@ const GTModal = defineComponent({
   },
 })
 
+const GTDetails = defineComponent({
+  name: 'GTDetails',
+  props: ['summary'],
+  setup(props, { slots }) {
+    return () =>
+      h('details', { 'data-test': 'gt-details', 'data-summary': props.summary }, slots.default?.())
+  },
+})
+
 const global = {
-  components: { GTBadge, GTButton, GTModal, ConfirmDialog },
+  components: { GTBadge, GTButton, GTModal, GTDetails, ConfirmDialog },
   mocks: {
     $t: (k: string, params?: Record<string, unknown>) =>
       params ? `${k}(${JSON.stringify(params)})` : k,
@@ -266,5 +275,32 @@ describe('VersionHistory', () => {
     )
     expect(postCalls).toHaveLength(0)
     expect(w.emitted('activated')).toBeUndefined()
+  })
+
+  it('renders a token diff vs the previous version inside a details fold', async () => {
+    fetchMock.mockResolvedValueOnce({
+      versions: [
+        {
+          ...(v('p2', 2, 'published') as object),
+          tokensJson: { colors: { primary: '#004a94' } },
+        },
+        {
+          ...(v('p1', 1, 'published') as object),
+          tokensJson: { colors: { primary: '#0059b3' } },
+        },
+      ],
+      activeVersionId: 'p2',
+    })
+    const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: true }, global })
+    await flushPromises()
+
+    const folds = w.findAll('[data-test="gt-details"]')
+    // v2 diffs against v1 (1 change); v1 is the first version (1 token set).
+    expect(folds).toHaveLength(2)
+    expect(folds[0].attributes('data-summary')).toContain('versions.diffSummary')
+    expect(folds[0].text()).toContain('colors.primary')
+    expect(folds[0].text()).toContain('#0059b3')
+    expect(folds[0].text()).toContain('#004a94')
+    expect(folds[1].attributes('data-summary')).toContain('versions.diffFirst')
   })
 })

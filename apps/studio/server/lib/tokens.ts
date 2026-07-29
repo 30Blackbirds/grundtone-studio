@@ -1,19 +1,9 @@
 import { z } from 'zod'
+import { CSS_COLOR_PATTERN, CSS_LENGTH_PATTERN } from '~~/utils/css-values'
 
-const cssColor = z
-  .string()
-  .min(1)
-  .max(100)
-  .regex(
-    /^(#[0-9a-fA-F]{3,8}|rgb\([^)]+\)|rgba\([^)]+\)|hsl\([^)]+\)|hsla\([^)]+\)|[a-z-]+|var\(--[\w-]+\))$/,
-    'must be a valid CSS color',
-  )
+const cssColor = z.string().min(1).max(100).regex(CSS_COLOR_PATTERN, 'must be a valid CSS color')
 
-const cssLength = z
-  .string()
-  .min(1)
-  .max(40)
-  .regex(/^[\d.]+(px|rem|em|%|vh|vw|ch|ex|cm|mm|in|pt|pc)?$/, 'must be a valid CSS length')
+const cssLength = z.string().min(1).max(40).regex(CSS_LENGTH_PATTERN, 'must be a valid CSS length')
 
 const colorGroup = z
   .object({

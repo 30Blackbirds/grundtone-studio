@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { isCssLength } from '~~/utils/css-values'
   import type { Tokens } from '~~/server/lib/tokens'
 
   const tokens = defineModel<Tokens>({ required: true })
@@ -79,6 +80,12 @@
   }
   function updateFont(key: 'base' | 'heading' | 'mono', value: string) {
     fontFamily.value = { ...fontFamily.value, [key]: value }
+  }
+
+  // Inline live-validation for length fields (UX-audit finding #8). Colors
+  // validate inside TokenColorField; empty is always fine (optional tokens).
+  function lengthError(value: string | undefined): string | undefined {
+    return value && !isCssLength(value) ? t('validation.cssLength') : undefined
   }
 </script>
 
@@ -248,24 +255,28 @@
         <GTInput
           :model-value="radius.sm"
           label="sm"
+          :error-text="lengthError(radius.sm)"
           placeholder="0.25rem"
           @update:model-value="(v) => updateRadius('sm', String(v))"
         />
         <GTInput
           :model-value="radius.md"
           label="md"
+          :error-text="lengthError(radius.md)"
           placeholder="0.5rem"
           @update:model-value="(v) => updateRadius('md', String(v))"
         />
         <GTInput
           :model-value="radius.lg"
           label="lg"
+          :error-text="lengthError(radius.lg)"
           placeholder="0.75rem"
           @update:model-value="(v) => updateRadius('lg', String(v))"
         />
         <GTInput
           :model-value="radius.xl"
           label="xl"
+          :error-text="lengthError(radius.xl)"
           placeholder="1rem"
           @update:model-value="(v) => updateRadius('xl', String(v))"
         />
@@ -279,18 +290,21 @@
         <GTInput
           :model-value="spacing.sm"
           label="sm"
+          :error-text="lengthError(spacing.sm)"
           placeholder="0.5rem"
           @update:model-value="(v) => updateSpacing('sm', String(v))"
         />
         <GTInput
           :model-value="spacing.md"
           label="md"
+          :error-text="lengthError(spacing.md)"
           placeholder="1rem"
           @update:model-value="(v) => updateSpacing('md', String(v))"
         />
         <GTInput
           :model-value="spacing.lg"
           label="lg"
+          :error-text="lengthError(spacing.lg)"
           placeholder="1.5rem"
           @update:model-value="(v) => updateSpacing('lg', String(v))"
         />
