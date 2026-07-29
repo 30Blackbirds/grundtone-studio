@@ -5,7 +5,11 @@ services:
     restart: unless-stopped
     networks: [internal]
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/api/auth/session']
+      # /api/auth/session 404s (Better Auth's real route is get-session), which
+      # left the container permanently "unhealthy" on every version until
+      # [infra] caught it 2026-07-29. /api/healthz is the actual health route
+      # (same one the deploy workflow smokes).
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/api/healthz']
       interval: 30s
       timeout: 5s
       retries: 5
