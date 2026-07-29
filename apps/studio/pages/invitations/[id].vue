@@ -46,9 +46,7 @@
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('invitation.title') }}</h1>
-
+  <AuthCard :title="t('invitation.title')">
     <GTAlert v-if="loadError" variant="error" :heading="t('invitation.notFound')" class="mb-4" />
 
     <template v-else-if="invitation">
@@ -83,5 +81,5 @@
         </GTButton>
       </div>
     </template>
-  </div>
+  </AuthCard>
 </template>

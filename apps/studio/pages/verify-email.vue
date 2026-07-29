@@ -34,8 +34,7 @@
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('verifyEmail.title') }}</h1>
+  <AuthCard :title="t('verifyEmail.title')">
     <p>
       <template v-if="emailParam">
         {{ t('verifyEmail.bodyWithEmail', { email: emailParam }) }}
@@ -62,5 +61,5 @@
     <p class="text-tertiary">
       <NuxtLink to="/login">{{ t('verifyEmail.backToLogin') }}</NuxtLink>
     </p>
-  </div>
+  </AuthCard>
 </template>

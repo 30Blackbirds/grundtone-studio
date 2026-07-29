@@ -39,8 +39,7 @@
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('auth.forgotPassword.title') }}</h1>
+  <AuthCard :title="t('auth.forgotPassword.title')">
     <p class="text-tertiary">{{ t('auth.forgotPassword.body') }}</p>
 
     <GTAlert v-if="sent" variant="success" :heading="t('auth.forgotPassword.sent')" />
@@ -67,5 +66,5 @@
     <p class="mt-6 text-tertiary">
       <NuxtLink to="/login">{{ t('auth.forgotPassword.backToLogin') }}</NuxtLink>
     </p>
-  </div>
+  </AuthCard>
 </template>

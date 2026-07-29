@@ -41,9 +41,7 @@
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('auth.resetPassword.title') }}</h1>
-
+  <AuthCard :title="t('auth.resetPassword.title')">
     <template v-if="hasInvalidToken || !token">
       <GTAlert variant="error" :heading="t('auth.resetPassword.invalidToken')" />
       <p class="mt-4">
@@ -85,5 +83,5 @@
     <p class="mt-6 text-tertiary">
       <NuxtLink to="/login">{{ t('auth.forgotPassword.backToLogin') }}</NuxtLink>
     </p>
-  </div>
+  </AuthCard>
 </template>
