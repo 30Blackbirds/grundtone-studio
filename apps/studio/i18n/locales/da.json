@@ -386,7 +386,10 @@
     "copied": "Kopieret!",
     "dismiss": "Færdig",
     "revoke": "Tilbagekald",
-    "confirmRevoke": "Er du sikker på at du vil tilbagekalde denne nøgle? Den kan ikke bruges igen."
+    "confirmRevoke": "Er du sikker på at du vil tilbagekalde denne nøgle? Den kan ikke bruges igen.",
+    "envTooltip": "Live-nøgler serverer publicerede tokens i produktion. Test-nøgler er til udvikling/CI — samme data, men adskilt i adgangslogs og rate-limits.",
+    "lastUsed": "Sidst brugt {date}",
+    "neverUsed": "Aldrig brugt"
   },
   "members": {
     "title": "Medlemmer",
