@@ -40,10 +40,14 @@
   const projSlug = ref('')
   const creating = ref(false)
   const error = ref<string | null>(null)
+  // Quota errors get their own, non-scary rendering: this is a plan limit, not
+  // a failure. Becomes the upgrade-CTA entry point when checkout lands.
+  const quotaLimit = ref<number | null>(null)
 
   async function create() {
     creating.value = true
     error.value = null
+    quotaLimit.value = null
     try {
       await $fetch('/api/projects', {
         method: 'POST',
@@ -54,7 +58,12 @@
       projSlug.value = ''
       await refresh()
     } catch (err) {
-      error.value = (err as Error).message
+      const data = (err as { data?: { data?: { code?: string; limit?: number } } }).data?.data
+      if (data?.code === 'quota_exceeded') {
+        quotaLimit.value = data.limit ?? 0
+      } else {
+        error.value = (err as Error).message
+      }
     } finally {
       creating.value = false
     }
@@ -125,6 +134,9 @@
           pattern="[a-z0-9-]+"
         />
         <GTAlert v-if="error" variant="error" :heading="error" />
+        <GTAlert v-if="quotaLimit !== null" variant="info" :heading="$t('quota.heading')">
+          {{ $t('quota.body', { limit: quotaLimit }) }}
+        </GTAlert>
       </form>
       <template #footer>
         <div class="flex gap-3 justify-end">

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { grantProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
 
@@ -46,6 +47,29 @@ export default defineEventHandler(async (event) => {
   const isMember = org.members?.some((m) => m.userId === actor.sub) ?? true
   if (!isMember) {
     throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
+  }
+
+  // Free-tier project quota (kontrakt: .orchestration/STUDIO-KVOTE-
+  // ENTITLEMENTS-KONTRAKT.md). The limit comes from account, the count lives
+  // here. Fails open when entitlements are unavailable — existing behaviour is
+  // untouched until account's API is live, and no org can be locked out by an
+  // outage. Only CREATION is gated; existing projects are never affected.
+  const entitlements = await getStudioEntitlements(org.id)
+  const projectCount = await db.$count(project, eq(project.organizationId, org.id))
+  const verdict = evaluateProjectQuota(entitlements, projectCount)
+  if (!verdict.allowed) {
+    throw createError({
+      statusCode: 403,
+      statusMessage:
+        verdict.reason === 'quota_exceeded'
+          ? 'Project quota reached for this plan'
+          : 'Organization is suspended',
+      data: {
+        code: verdict.reason,
+        limit: verdict.reason === 'quota_exceeded' ? verdict.limit : undefined,
+        planKey: entitlements?.planKey,
+      },
+    })
   }
 
   const [inserted] = await db

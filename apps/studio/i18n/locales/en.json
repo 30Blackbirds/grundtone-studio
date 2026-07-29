@@ -646,5 +646,9 @@
     "resend": "Resend",
     "expired": "Expired",
     "expiresIn": "expires in {n} days"
+  },
+  "quota": {
+    "heading": "Your plan’s project limit is reached",
+    "body": "The free plan includes {limit} projects per organization. Upgrade options are coming soon — contact us at hello@grundtone.com if you need more projects now."
   }
 }

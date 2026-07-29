@@ -646,5 +646,9 @@
     "resend": "Gensend",
     "expired": "Udløbet",
     "expiresIn": "udløber om {n} dage"
+  },
+  "quota": {
+    "heading": "Projekt-grænsen for jeres plan er nået",
+    "body": "Free-planen giver {limit} projekter pr. organisation. Opgraderingsmuligheder er på vej — kontakt os på hello@grundtone.com hvis I har brug for flere projekter nu."
   }
 }
