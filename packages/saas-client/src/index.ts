@@ -58,11 +58,20 @@ export async function loadByApiKey(options: GrundtoneOptions): Promise<LoadResul
     throw new Error(`Failed to load tokens: ${res.status} ${res.statusText}`)
   }
   // Published Studio tokens are shaped { colors, typography, radius, spacing }
-  // — a partial theme, not a {light, dark} wrapper. createTheme's TS typing is
-  // too strict to express this cleanly, so we widen at the call site. Runtime
-  // shape is verified by the SDK integration test against a real CDN payload.
-  const tokens = (await res.json()) as unknown
-  const themes = createTheme({ light: tokens as never, dark: tokens as never })
+  // plus an optional `dark` OVERRIDE layer ({ colors } that differ in dark
+  // mode — override model, 2026-07-29). createTheme's TS typing is too strict
+  // to express the partial shape cleanly, so we widen at the call site. The
+  // runtime shape is verified by the SDK integration test.
+  const tokens = (await res.json()) as {
+    colors?: Record<string, string>
+    dark?: { colors?: Record<string, string> }
+  } & Record<string, unknown>
+  const { dark, ...baseTokens } = tokens
+  const darkTokens =
+    dark?.colors && Object.keys(dark.colors).length > 0
+      ? { ...baseTokens, colors: { ...baseTokens.colors, ...dark.colors } }
+      : baseTokens
+  const themes = createTheme({ light: baseTokens as never, dark: darkTokens as never })
   const requested = options.mode ?? 'light'
   const mode: 'light' | 'dark' = requested === 'auto' ? detectMode() : requested
   const theme = mode === 'dark' ? themes.dark : themes.light

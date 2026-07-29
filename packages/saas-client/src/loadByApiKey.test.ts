@@ -142,3 +142,36 @@ describe('grundtone Vue plugin', () => {
     expect((onError.mock.calls[0][0] as Error).message).toMatch(/500/)
   })
 })
+
+describe('dark override layer', () => {
+  const DARK_TOKENS = {
+    colors: { primary: '#0059b3', background: '#ffffff' },
+    spacing: { md: '1rem' },
+    dark: { colors: { background: '#111318' } },
+  }
+
+  it('mode dark applies base merged with dark.colors, without the dark key', async () => {
+    fetchMock.mockResolvedValueOnce(okJson(DARK_TOKENS))
+    await loadByApiKey({ apiKey: 'pk', mode: 'dark' })
+    const [theme] = applySpy.mock.calls[0]
+    expect(theme.colors).toEqual({ primary: '#0059b3', background: '#111318' })
+    expect(theme.spacing).toEqual({ md: '1rem' })
+    expect('dark' in theme).toBe(false)
+    expect(theme.mode).toBe('dark')
+  })
+
+  it('mode light ignores the dark layer entirely', async () => {
+    fetchMock.mockResolvedValueOnce(okJson(DARK_TOKENS))
+    await loadByApiKey({ apiKey: 'pk', mode: 'light' })
+    const [theme] = applySpy.mock.calls[0]
+    expect(theme.colors).toEqual({ primary: '#0059b3', background: '#ffffff' })
+    expect('dark' in theme).toBe(false)
+  })
+
+  it('payloads without a dark layer behave exactly as before', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ colors: { primary: '#0059b3' } }))
+    await loadByApiKey({ apiKey: 'pk', mode: 'dark' })
+    const [theme] = applySpy.mock.calls[0]
+    expect(theme.colors).toEqual({ primary: '#0059b3' })
+  })
+})

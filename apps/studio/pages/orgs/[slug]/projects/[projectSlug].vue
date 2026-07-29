@@ -107,6 +107,16 @@
     initialTokens.value = JSON.stringify(tokens.value)
   }
 
+  // Editor mode drives the live preview: in dark mode the preview renders the
+  // EFFECTIVE tokens (base with dark.colors merged) — mirrors the server-side
+  // resolveMode without pulling that (zod-adjacent) module into the client.
+  const editorMode = ref<'base' | 'dark'>('base')
+  const previewTokens = computed<Tokens>(() => {
+    const { dark, ...base } = tokens.value
+    if (editorMode.value !== 'dark' || !dark?.colors) return base
+    return { ...base, colors: { ...base.colors, ...dark.colors } }
+  })
+
   const hasDraft = computed(() => Boolean(config.value?.draft))
 </script>
 
@@ -163,10 +173,10 @@
     >
       <GTTabPanel id="tokens">
         <div class="grid grid-cols-2 gap-6">
-          <TokenEditor v-model="tokens" />
+          <TokenEditor v-model="tokens" v-model:mode="editorMode" />
           <div class="sticky top-4 self-start">
             <ClientOnly>
-              <TokenPreview :tokens="tokens" />
+              <TokenPreview :tokens="previewTokens" />
             </ClientOnly>
           </div>
         </div>

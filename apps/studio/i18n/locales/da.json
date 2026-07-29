@@ -316,7 +316,13 @@
     "font": {
       "base": "Brødtekst-skrifttype",
       "heading": "Overskrift-skrifttype"
-    }
+    },
+    "modeLabel": "Redigeringstilstand",
+    "modeBase": "Basis",
+    "modeDark": "Dark",
+    "clearDark": "Nulstil dark-overrides",
+    "darkHint": "Dark-overrides",
+    "darkHintBody": "Dark er et override-lag: kun de farver du ændrer her afviger fra basis. Ryd et felt for at falde tilbage til basis-værdien. Typografi, radius og spacing deles med basis."
   },
   "contrast": {
     "unparseable": "Kan ikke læse denne farve — brug #RRGGBB",

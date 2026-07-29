@@ -129,3 +129,26 @@ describe('publish round-trip safety', () => {
     `)
   })
 })
+
+describe('dark-override block', () => {
+  it('emits media-query + data-attribute selectors for dark color overrides', () => {
+    const css = renderTokensCss({
+      colors: { primary: '#0059b3', background: '#ffffff' },
+      dark: { colors: { background: '#111318' } },
+    })
+    expect(css).toContain('@media (prefers-color-scheme: dark)')
+    expect(css).toContain(":root:not([data-gt-mode='light'])")
+    expect(css).toContain(":root[data-gt-mode='dark']")
+    // Only the overridden token appears in the dark blocks.
+    const darkPart = css.slice(css.indexOf('@media'))
+    expect(darkPart).toContain('--color-background: #111318;')
+    expect(darkPart).not.toContain('--color-primary')
+  })
+
+  it('emits no dark block when the dark layer is absent or empty', () => {
+    expect(renderTokensCss({ colors: { primary: '#0059b3' } })).not.toContain('@media')
+    expect(renderTokensCss({ colors: { primary: '#0059b3' }, dark: { colors: {} } })).not.toContain(
+      '@media',
+    )
+  })
+})

@@ -316,7 +316,13 @@
     "font": {
       "base": "Body font family",
       "heading": "Heading font family"
-    }
+    },
+    "modeLabel": "Editing mode",
+    "modeBase": "Base",
+    "modeDark": "Dark",
+    "clearDark": "Clear dark overrides",
+    "darkHint": "Dark overrides",
+    "darkHintBody": "Dark is an override layer: only the colors you change here diverge from base. Clear a field to fall back to the base value. Typography, radius and spacing are shared with base."
   },
   "contrast": {
     "unparseable": "Can't read this color — use #RRGGBB",
