@@ -1,37 +1,66 @@
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue'
-  import { useOrgContext } from '~/composables/useOrgContext'
+  import {
+    GTButton,
+    GTBadge,
+    GTTag,
+    GTAlert,
+    GTInput,
+    GTSelect,
+    GTToggle,
+    GTCheckbox,
+    GTCard,
+    GTDetails,
+    GTTooltip,
+    GTBreadcrumb,
+  } from '@grundtone/vue'
+  import { COMPONENT_CATALOG, buildSnippet, type CatalogEntry } from '~~/lib/component-catalog'
   import { tokensToCssVars } from '~/composables/useThemeVars'
+  import type { DashboardPayload } from '~~/server/lib/dashboard'
   import type { Tokens } from '~~/server/lib/tokens'
 
   definePageMeta({ layout: 'app' })
+  const { t } = useI18n()
 
-  interface ConfigVersion {
-    id: string
-    version: number
-    tokens: Tokens
+  // Explicit map because <component :is> can't use Nuxt's auto-resolution.
+  const RENDERABLE: Record<string, unknown> = {
+    GTButton,
+    GTBadge,
+    GTTag,
+    GTAlert,
+    GTInput,
+    GTSelect,
+    GTToggle,
+    GTCheckbox,
+    GTCard,
+    GTDetails,
+    GTTooltip,
+    GTBreadcrumb,
   }
-  interface ConfigResponse {
-    draft: ConfigVersion | null
-    active: ConfigVersion | null
-    defaults: Tokens
-  }
 
-  const { projects } = useOrgContext()
-
-  // Theme switcher — the selected project's tokens drive the whole gallery, so
-  // you see components in that project's brand and watch colours change live.
-  const selectedProjectId = ref('')
-  watch(
-    projects,
-    (list) => {
-      if (!selectedProjectId.value && list.length) selectedProjectId.value = list[0].id
-    },
-    { immediate: true },
+  // Projects come from the dashboard aggregate — NOT useOrgContext, whose
+  // project list is derived from the route's org slug and therefore EMPTY on
+  // this global page (the v1 bug: the whole gallery hid behind it).
+  const { data: dash } = await useAsyncData<DashboardPayload>(
+    'workbench-projects',
+    () => $fetch<DashboardPayload>('/api/dashboard', { headers: useRequestHeaders(['cookie']) }),
+    { default: () => ({ orgs: [], projects: [], activity: [] }) },
   )
 
+  const STUDIO_DEFAULT = ''
+  const selectedProjectId = ref(STUDIO_DEFAULT)
+  const projectOptions = computed(() => [
+    { value: STUDIO_DEFAULT, label: t('componentLibrary.studioDefault') },
+    ...dash.value.projects.map((p) => ({ value: p.id, label: `${p.name} (${p.orgName})` })),
+  ])
+
+  interface ConfigResponse {
+    draft: { tokens: Tokens } | null
+    active: { tokens: Tokens } | null
+    defaults: Tokens
+  }
   const { data: config } = await useAsyncData<ConfigResponse | null>(
-    () => `components-theme-${selectedProjectId.value || 'none'}`,
+    () => `workbench-theme-${selectedProjectId.value || 'default'}`,
     async () => {
       if (!selectedProjectId.value) return null
       return await $fetch<ConfigResponse>(`/api/projects/${selectedProjectId.value}/config`, {
@@ -41,125 +70,187 @@
     { watch: [selectedProjectId], default: () => null },
   )
 
-  // Prefer the published (active) theme, fall back to the draft, then defaults.
-  const activeTokens = computed<Partial<Tokens>>(
+  const darkMode = ref(false)
+  const baseTokens = computed<Partial<Tokens>>(
     () =>
       config.value?.active?.tokens ?? config.value?.draft?.tokens ?? config.value?.defaults ?? {},
   )
-  const themeVars = computed(() => tokensToCssVars(activeTokens.value))
-  const source = computed(() =>
-    config.value?.active ? 'aktiv' : config.value?.draft ? 'draft' : 'defaults',
+  const hasDarkSet = computed(() => Boolean(baseTokens.value.dark?.colors))
+  // Dark = the project's dark-override layer merged over its base colors —
+  // exactly what the published CDN css serves for prefers-color-scheme: dark.
+  const themeVars = computed(() => {
+    const tokens = baseTokens.value
+    if (!darkMode.value || !tokens.dark?.colors) return tokensToCssVars(tokens)
+    return tokensToCssVars({
+      ...tokens,
+      colors: { ...(tokens.colors ?? {}), ...tokens.dark.colors },
+    })
+  })
+
+  // ── Workbench state ───────────────────────────────────────────────────────
+  const search = ref('')
+  const selectedName = ref(COMPONENT_CATALOG[0]!.name)
+  const entry = computed<CatalogEntry>(
+    () => COMPONENT_CATALOG.find((c) => c.name === selectedName.value) ?? COMPONENT_CATALOG[0]!,
   )
 
-  const projectOptions = computed(() => projects.value.map((p) => ({ value: p.id, label: p.name })))
-  const primary = computed(() => activeTokens.value.colors?.primary ?? '—')
+  const filtered = computed(() => {
+    const q = search.value.trim().toLowerCase()
+    const list = q
+      ? COMPONENT_CATALOG.filter((c) => c.name.toLowerCase().includes(q))
+      : COMPONENT_CATALOG
+    const groups = new Map<string, CatalogEntry[]>()
+    for (const c of list) {
+      if (!groups.has(c.group)) groups.set(c.group, [])
+      groups.get(c.group)!.push(c)
+    }
+    return [...groups.entries()]
+  })
 
-  // Curated gallery of components (studio's installed @grundtone/vue set). New
-  // develop-only components (GTAppShell/GTDrawer/GTMeter/GTRichText) join once
-  // the design system is prereleased under a consumable version.
-  const selectValue = ref('a')
-  const toggleValue = ref(true)
-  const checkValue = ref(false)
-  const inputValue = ref('')
+  const controlState = ref<Record<string, string | boolean>>({})
+  const slotState = ref('')
+  const modelState = ref<unknown>('')
+
+  function resetControls() {
+    controlState.value = Object.fromEntries(
+      entry.value.controls.map((control) => [control.prop, control.default]),
+    )
+    slotState.value = entry.value.slotText ?? ''
+    modelState.value =
+      entry.value.name === 'GTToggle' || entry.value.name === 'GTCheckbox' ? false : ''
+  }
+  watch(entry, resetControls, { immediate: true })
+
+  // Empty strings must not reach the component as real props (e.g. an empty
+  // errorText would flip GTInput into its error state).
+  const liveProps = computed(() => {
+    const props: Record<string, unknown> = { ...(entry.value.fixedProps ?? {}) }
+    for (const control of entry.value.controls) {
+      const value = controlState.value[control.prop]
+      if (control.type === 'text' && String(value ?? '').length === 0) continue
+      props[control.prop] = value
+    }
+    return props
+  })
+
+  const snippet = computed(() => buildSnippet(entry.value, controlState.value, slotState.value))
+
+  const copied = ref(false)
+  async function copySnippet() {
+    await navigator.clipboard.writeText(snippet.value)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 1500)
+  }
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col gap-4">
     <header class="flex justify-between items-center gap-4 flex-wrap">
       <div>
-        <h1 class="m-0">Komponent-bibliotek</h1>
-        <p class="text-tertiary m-0">
-          Interaktivt grundtone-komponent-galleri. Vælg et projekt for at se komponenterne i dets
-          tema.
-        </p>
+        <h1 class="m-0">{{ t('componentLibrary.title') }}</h1>
+        <p class="text-tertiary m-0 text-sm">{{ t('componentLibrary.subtitle') }}</p>
       </div>
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-2">
-          <span
-            :style="{
-              display: 'inline-block',
-              inlineSize: '1.25rem',
-              blockSize: '1.25rem',
-              borderRadius: '0.25rem',
-              background: primary,
-              border: '1px solid var(--color-border-light)',
-            }"
-            :title="`primary: ${primary}`"
-          />
-          <code class="text-sm">{{ primary }}</code>
-        </div>
+      <div class="flex items-center gap-4 flex-wrap">
+        <GTToggle
+          v-model="darkMode"
+          :label="t('componentLibrary.dark')"
+          :disabled="!hasDarkSet && !darkMode"
+        />
         <GTSelect
           v-model="selectedProjectId"
-          label="Projekt-tema"
+          :label="t('componentLibrary.projectTheme')"
           :options="projectOptions"
-          style="min-inline-size: 14rem"
         />
       </div>
     </header>
 
-    <p v-if="!projectOptions.length" class="text-tertiary">
-      Ingen projekter endnu — opret et projekt for at se dets tema anvendt her.
-    </p>
+    <div class="workbench">
+      <!-- Rail: search + grouped component list -->
+      <nav
+        class="workbench__rail flex flex-col gap-3"
+        :aria-label="t('componentLibrary.railLabel')"
+      >
+        <GTInput v-model="search" :placeholder="t('componentLibrary.search')" size="sm" />
+        <template v-for="[group, entries] in filtered" :key="group">
+          <h2 class="text-xs uppercase text-tertiary tracking-wide m-0">{{ group }}</h2>
+          <ul class="list-reset flex flex-col gap-1">
+            <li v-for="c in entries" :key="c.name">
+              <button
+                type="button"
+                class="block w-full text-left p-2 rounded text-sm border-0 bg-transparent cursor-pointer hover:bg-surface-raised"
+                :class="{ 'bg-surface-raised font-bold': c.name === selectedName }"
+                @click="selectedName = c.name"
+              >
+                {{ c.name }}
+              </button>
+            </li>
+          </ul>
+        </template>
+        <p v-if="!filtered.length" class="text-tertiary text-sm m-0">
+          {{ t('componentLibrary.noMatches') }}
+        </p>
+      </nav>
 
-    <!-- Themed preview: the selected project's tokens are applied as scoped CSS
-         vars, so every @grundtone component inside renders in that brand. -->
-    <div v-else :style="themeVars" class="p-6 rounded-lg border bg-surface flex flex-col gap-8">
-      <p class="text-tertiary text-sm m-0">
-        Tema-kilde: <strong>{{ source }}</strong> · ændr projektets tokens i token-editoren og se
-        galleriet skifte.
-      </p>
-
-      <section class="flex flex-col gap-3">
-        <h2 class="text-sm uppercase text-tertiary tracking-wide m-0">Knapper</h2>
-        <div class="flex gap-3 flex-wrap items-center">
-          <GTButton variant="primary">Primær</GTButton>
-          <GTButton variant="secondary">Sekundær</GTButton>
-          <GTButton variant="outlined">Outlined</GTButton>
-          <GTButton variant="negative">Negativ</GTButton>
-          <GTButton variant="primary" :loading="true">Loader</GTButton>
+      <!-- Canvas: themed live render -->
+      <div class="flex flex-col gap-3">
+        <div
+          class="workbench__canvas rounded-lg border"
+          :class="{ 'workbench__canvas--dark': darkMode && hasDarkSet }"
+          :style="themeVars"
+        >
+          <component :is="RENDERABLE[entry.name]" v-bind="liveProps" v-model="modelState">
+            <template v-if="entry.slotText !== undefined" #default>{{ slotState }}</template>
+          </component>
         </div>
-      </section>
 
-      <section class="flex flex-col gap-3">
-        <h2 class="text-sm uppercase text-tertiary tracking-wide m-0">Badges &amp; tags</h2>
-        <div class="flex gap-3 flex-wrap items-center">
-          <GTBadge variant="info">Info</GTBadge>
-          <GTBadge variant="success">Success</GTBadge>
-          <GTBadge variant="warning">Warning</GTBadge>
-          <GTBadge variant="error">Error</GTBadge>
-          <GTTag label="Tag" />
+        <!-- Snippet -->
+        <div class="p-4 bg-surface-raised border rounded-lg flex items-start gap-3">
+          <pre class="workbench__snippet flex-1"><code>{{ snippet }}</code></pre>
+          <GTButton variant="outlined" size="sm" @click="copySnippet">
+            {{ copied ? t('componentLibrary.copied') : t('componentLibrary.copy') }}
+          </GTButton>
         </div>
-      </section>
+      </div>
 
-      <section class="flex flex-col gap-3">
-        <h2 class="text-sm uppercase text-tertiary tracking-wide m-0">Feedback</h2>
-        <GTAlert variant="info" heading="Info">Tokens fra det valgte projekt.</GTAlert>
-        <GTAlert variant="success" heading="Success">Farverne kommer fra projektets tema.</GTAlert>
-      </section>
-
-      <section class="flex flex-col gap-3">
-        <h2 class="text-sm uppercase text-tertiary tracking-wide m-0">Formular</h2>
-        <div class="grid gap-4" style="max-inline-size: 24rem">
-          <GTInput v-model="inputValue" label="Navn" placeholder="Skriv…" />
+      <!-- Controls -->
+      <aside
+        class="workbench__controls p-4 bg-surface-raised border rounded-lg flex flex-col gap-3"
+        :aria-label="t('componentLibrary.controlsLabel')"
+      >
+        <h2 class="text-xs uppercase text-tertiary tracking-wide m-0">
+          {{ t('componentLibrary.controlsLabel') }}
+        </h2>
+        <template v-for="control in entry.controls" :key="control.prop">
           <GTSelect
-            v-model="selectValue"
-            label="Valg"
-            :options="[
-              { value: 'a', label: 'Første' },
-              { value: 'b', label: 'Anden' },
-            ]"
+            v-if="control.type === 'select'"
+            :model-value="String(controlState[control.prop])"
+            :label="control.prop"
+            :options="(control.options ?? []).map((o) => ({ value: o, label: o }))"
+            size="sm"
+            @update:model-value="(v) => (controlState[control.prop] = String(v))"
           />
-          <GTToggle v-model="toggleValue" label="Aktiveret" />
-          <GTCheckbox v-model="checkValue" label="Accepter vilkår" />
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-3">
-        <h2 class="text-sm uppercase text-tertiary tracking-wide m-0">Kort</h2>
-        <GTCard title="Projekt-kort" variant="raised" style="max-inline-size: 24rem">
-          Et kort med projektets surface- og tekst-tokens.
-        </GTCard>
-      </section>
+          <GTToggle
+            v-else-if="control.type === 'boolean'"
+            :model-value="Boolean(controlState[control.prop])"
+            :label="control.prop"
+            size="sm"
+            @update:model-value="(v) => (controlState[control.prop] = Boolean(v))"
+          />
+          <GTInput
+            v-else
+            :model-value="String(controlState[control.prop])"
+            :label="control.prop"
+            size="sm"
+            @update:model-value="(v) => (controlState[control.prop] = String(v))"
+          />
+        </template>
+        <GTInput
+          v-if="entry.slotText !== undefined"
+          v-model="slotState"
+          :label="t('componentLibrary.slotLabel')"
+          size="sm"
+        />
+      </aside>
     </div>
   </div>
 </template>

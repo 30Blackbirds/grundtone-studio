@@ -1,15 +1,7 @@
 <script setup lang="ts">
-  import { signOut, useSession } from '~~/lib/auth-client'
-
-  const session = useSession()
   const { t } = useI18n()
   const route = useRoute()
   const { activeOrg, activeSlug, activeProjectSlug, projects } = useOrgContext()
-
-  async function handleSignOut() {
-    await signOut()
-    await navigateTo('/login')
-  }
 
   // ── Mobile drawer (interim until GTAppShell/GTDrawer ship on the `next`
   // channel — same interaction contract: scrim + Escape close, focus moves
@@ -77,18 +69,8 @@
         <NuxtLink to="/dashboard" class="brand-link">{{ t('app.name') }}</NuxtLink>
         <OrgSwitcher class="app-shell__org-switcher" />
       </div>
-      <div class="flex items-center gap-4">
-        <NuxtLink to="/account" class="text-tertiary text-sm no-underline">
-          {{ t('account.nav') }}
-        </NuxtLink>
-        <LanguageSwitch />
-        <span v-if="session.data?.user" class="app-shell__email text-tertiary text-sm">
-          {{ session.data.user.email }}
-        </span>
-        <GTButton variant="outlined" size="sm" @click="handleSignOut">
-          {{ t('app.signOut') }}
-        </GTButton>
-      </div>
+      <!-- Account/lang/sign-out moved to the sidebar's user anchor
+           (Allan-request 2026-07-29, matches the prototype's su__user). -->
     </header>
 
     <div v-if="breadcrumbItems.length" class="app-shell__breadcrumb border-b">
