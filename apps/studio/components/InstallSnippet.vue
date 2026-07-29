@@ -42,12 +42,20 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
       {{ t('install.noKeyBody') }}
     </GTAlert>
 
-    <CodeSnippet
-      v-for="(code, id) in snippets"
-      :key="id"
-      :code="code"
-      :language="LANGUAGES[id] ?? 'txt'"
-      :label="t(`install.${id}`)"
-    />
+    <!-- Tabbed per the R7 forlæg (redesign-r7-apikeys-install.html, UX-audit
+         #12): one snippet pattern with variant tabs instead of a stacked
+         wall — the reader picks their integration, the rest stays hidden. -->
+    <GTTabs
+      :tabs="
+        Object.keys(snippets).map((id) => ({
+          id,
+          label: t(`install.${id}`),
+        }))
+      "
+    >
+      <GTTabPanel v-for="(code, id) in snippets" :id="id" :key="id">
+        <CodeSnippet :code="code" :language="LANGUAGES[id] ?? 'txt'" :label="t(`install.${id}`)" />
+      </GTTabPanel>
+    </GTTabs>
   </section>
 </template>
