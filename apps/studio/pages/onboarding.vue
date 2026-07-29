@@ -10,6 +10,17 @@
     { label: t('onboarding.steps.tokens') },
     { label: t('onboarding.steps.install') },
   ])
+
+  // Screen-reader announcement on step change (redesign R8 / UX-audit #15:
+  // the wizard had no aria-live). Visually hidden `role=status` region reads
+  // "Trin 2 af 4: Projekt" when the step flips; polite so it never interrupts.
+  const stepAnnouncement = computed(() =>
+    t('onboarding.stepAnnouncement', {
+      current: stepIndex.value + 1,
+      total: steps.value.length,
+      label: steps.value[stepIndex.value]?.label ?? '',
+    }),
+  )
 </script>
 
 <template>
@@ -32,6 +43,7 @@
     -->
     <ClientOnly>
       <GTStepper :steps="steps" :active-step="stepIndex" />
+      <span role="status" aria-live="polite" class="visually-hidden">{{ stepAnnouncement }}</span>
 
       <OnboardingOrgStep v-if="state.step === 'org'" />
       <OnboardingProjectStep v-else-if="state.step === 'project'" />

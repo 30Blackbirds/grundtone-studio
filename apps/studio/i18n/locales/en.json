@@ -265,7 +265,8 @@
       "error": "Could not finish setup",
       "retry": "Try again",
       "finish": "Go to your project"
-    }
+    },
+    "stepAnnouncement": "Step {current} of {total}: {label}"
   },
   "changelog": {
     "title": "What's new",
