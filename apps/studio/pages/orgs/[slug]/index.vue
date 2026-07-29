@@ -135,7 +135,7 @@
         />
         <GTAlert v-if="error" variant="error" :heading="error" />
         <GTAlert v-if="quotaLimit !== null" variant="info" :heading="$t('quota.heading')">
-          {{ $t('quota.body', { limit: quotaLimit }) }}
+          {{ $t('quota.body') }}
         </GTAlert>
       </form>
       <template #footer>

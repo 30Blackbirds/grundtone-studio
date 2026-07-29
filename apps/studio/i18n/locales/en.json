@@ -648,7 +648,8 @@
     "expiresIn": "expires in {n} days"
   },
   "quota": {
-    "heading": "Your plan’s project limit is reached",
-    "body": "The free plan includes {limit} projects per organization. Upgrade options are coming soon — contact us at hello@grundtone.com if you need more projects now."
+    "heading": "Your third project is waiting.",
+    "body": "Free gives you two projects — enough to see your brand go live everywhere. Solo unlocks three active brands, email templates themed by the same tokens, and API access — from €29/mo. Members stay unlimited — we count brands, not people.",
+    "cta": "See plans"
   }
 }

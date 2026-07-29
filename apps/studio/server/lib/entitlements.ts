@@ -35,11 +35,15 @@ interface CacheEntry {
 }
 
 const TTL_MS = 60_000
+// Contract §2 (v1.1): fresh ≤60s → background refresh → serve stale up to 24h.
+const STALE_MAX_MS = 24 * 60 * 60 * 1000
 const cache = new Map<string, CacheEntry>()
+const inflight = new Map<string, Promise<Entitlements | null>>()
 
 /** Test hook — the cache is module-level state. */
 export function clearEntitlementsCache() {
   cache.clear()
+  inflight.clear()
 }
 
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
@@ -47,8 +51,33 @@ export async function getStudioEntitlements(orgId: string): Promise<Entitlements
   if (!baseUrl) return null
 
   const cached = cache.get(orgId)
-  if (cached && Date.now() - cached.fetchedAt < TTL_MS) return cached.body
+  const age = cached ? Date.now() - cached.fetchedAt : Infinity
+  if (cached && age < TTL_MS) return cached.body
+  if (cached && age < STALE_MAX_MS) {
+    // Stale-while-revalidate: answer from cache now, refresh in the background.
+    void refresh(baseUrl, orgId, cached)
+    return cached.body
+  }
+  return await refresh(baseUrl, orgId, cached)
+}
 
+async function refresh(
+  baseUrl: string,
+  orgId: string,
+  cached: CacheEntry | undefined,
+): Promise<Entitlements | null> {
+  const running = inflight.get(orgId)
+  if (running) return running
+  const p = doFetch(baseUrl, orgId, cached).finally(() => inflight.delete(orgId))
+  inflight.set(orgId, p)
+  return p
+}
+
+async function doFetch(
+  baseUrl: string,
+  orgId: string,
+  cached: CacheEntry | undefined,
+): Promise<Entitlements | null> {
   try {
     const headers: Record<string, string> = {}
     const token = process.env.ACCOUNT_S2S_TOKEN
@@ -77,9 +106,10 @@ export async function getStudioEntitlements(orgId: string): Promise<Entitlements
     return parsed.data
   } catch (err) {
     console.error(`[entitlements] fetch failed for org ${orgId} — quota gates fail open:`, err)
-    // Stale beats nothing: an expired entry is closer to the truth than
-    // unlimited, and the contract's fail-open only covers the no-data case.
-    return cached?.body ?? null
+    // Stale beats nothing within the contract's 24h window; beyond it → null
+    // (fail-open for quotas either way, per §4).
+    if (cached && Date.now() - cached.fetchedAt < STALE_MAX_MS) return cached.body
+    return null
   }
 }
 
@@ -89,12 +119,15 @@ export type QuotaVerdict =
   | { allowed: false; reason: 'suspended' }
 
 /**
- * Contract §1+§4 as a pure function: absent key = unlimited, suspended =
- * fail-closed on everything, grace = active until graceUntil (expired grace
- * blocks creation like suspended — account flips the state server-side, this
- * only covers the cache-staleness window), null entitlements = fail-open.
+ * Contract §1+§4 (v1.1, LOCKED) as a pure function: absent key = unlimited,
+ * suspended = fail-closed on everything, grace = active until graceUntil
+ * (expired grace blocks creation like suspended — account flips the state
+ * server-side, this only covers the cache-staleness window), null = fail-open.
+ * `canceled` is the portal-without-default-plan edge case and quotas stay
+ * fail-OPEN there (account's ruling); normal expiry never reaches Studio as
+ * canceled — account resolves those orgs to the portal default plan.
  * `limits` are enforced as delivered; account guarantees they reflect the
- * org's EFFECTIVE plan regardless of planState (canceled → free limits).
+ * org's EFFECTIVE plan regardless of lifecycle.
  */
 export function evaluateProjectQuota(
   entitlements: Entitlements | null,
@@ -103,6 +136,7 @@ export function evaluateProjectQuota(
   if (!entitlements) return { allowed: true }
 
   if (entitlements.planState === 'suspended') return { allowed: false, reason: 'suspended' }
+  if (entitlements.planState === 'canceled') return { allowed: true }
   if (
     entitlements.planState === 'grace' &&
     entitlements.graceUntil &&
@@ -111,7 +145,7 @@ export function evaluateProjectQuota(
     return { allowed: false, reason: 'suspended' }
   }
 
-  const limit = entitlements.limits.max_projects
+  const limit = entitlements.limits['studio.projects']
   if (limit === undefined) return { allowed: true }
   if (currentCount < limit) return { allowed: true }
   return { allowed: false, reason: 'quota_exceeded', limit }

@@ -12,7 +12,7 @@ function ent(overrides: Partial<Entitlements> = {}): Entitlements {
     planState: 'active',
     graceUntil: null,
     features: [],
-    limits: { max_projects: 2 },
+    limits: { 'studio.projects': 2 },
     asOf: new Date().toISOString(),
     ...overrides,
   }
@@ -32,14 +32,14 @@ describe('evaluateProjectQuota (kontrakt §1 + §4)', () => {
     })
   })
 
-  it('treats an absent max_projects key as unlimited (studio-legacy)', () => {
+  it('treats an absent studio.projects key as unlimited (studio-legacy)', () => {
     expect(evaluateProjectQuota(ent({ planKey: 'studio-legacy', limits: {} }), 500)).toEqual({
       allowed: true,
     })
   })
 
   it('treats limit 0 as a hard zero', () => {
-    expect(evaluateProjectQuota(ent({ limits: { max_projects: 0 } }), 0)).toEqual({
+    expect(evaluateProjectQuota(ent({ limits: { 'studio.projects': 0 } }), 0)).toEqual({
       allowed: false,
       reason: 'quota_exceeded',
       limit: 0,
@@ -65,12 +65,8 @@ describe('evaluateProjectQuota (kontrakt §1 + §4)', () => {
     })
   })
 
-  it('enforces limits as delivered for canceled plans (account owns the downgrade)', () => {
-    expect(evaluateProjectQuota(ent({ planState: 'canceled' }), 2)).toEqual({
-      allowed: false,
-      reason: 'quota_exceeded',
-      limit: 2,
-    })
+  it('fails open on canceled (portal-without-default-plan edge, account ruling)', () => {
+    expect(evaluateProjectQuota(ent({ planState: 'canceled' }), 2)).toEqual({ allowed: true })
   })
 })
 
