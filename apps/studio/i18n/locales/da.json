@@ -646,5 +646,10 @@
     "resend": "Gensend",
     "expired": "Udløbet",
     "expiresIn": "udløber om {n} dage"
+  },
+  "quota": {
+    "heading": "Dit tredje projekt venter.",
+    "body": "Free giver dig to projekter — nok til at se dit brand gå live overalt. Med Solo får du tre aktive brands, e-mail-skabeloner i samme tokens og API-adgang — fra €29/md. Stadig ubegrænsede medlemmer — vi tæller brands, ikke mennesker.",
+    "cta": "Se planer"
   }
 }

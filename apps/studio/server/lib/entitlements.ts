@@ -1,0 +1,152 @@
+import { z } from 'zod'
+
+// Studio-side client for account's entitlements-API, per the locked contract
+// .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md (2026-07-29):
+// - quota LIMITS live in account (FeatureCatalog); the COUNT lives here
+// - absent limits key = unlimited; 0 = hard zero
+// - quota gates fail-OPEN on entitlements unavailability (Allan's lockout-forbud;
+//   paid plans have higher/no limits so there is no revenue leakage) — which also
+//   makes this client dormant-by-design: no ACCOUNT_URL configured → null →
+//   every caller allows, current behaviour preserved until account ships the API.
+//
+// ACCOUNT_URL/ACCOUNT_S2S_TOKEN are read from bare process.env like the other
+// service endpoints (see runtimeConfig comment in nuxt.config.ts) so the env
+// contract matches what [infra] provisions verbatim. The static token is an
+// interim transport: swaps to an [auth]-minted S2S-JWT (aud=klanghaus-account)
+// once their client-credentials mint flow lands.
+
+export const PORTAL_KEY = 'grundtone-studio'
+
+const entitlementsSchema = z.object({
+  planKey: z.string(),
+  planState: z.enum(['active', 'grace', 'suspended', 'canceled']),
+  graceUntil: z.string().nullable(),
+  features: z.array(z.string()),
+  limits: z.record(z.string(), z.number()),
+  asOf: z.string(),
+})
+
+export type Entitlements = z.infer<typeof entitlementsSchema>
+
+interface CacheEntry {
+  etag: string | null
+  body: Entitlements
+  fetchedAt: number
+}
+
+const TTL_MS = 60_000
+// Contract §2 (v1.1): fresh ≤60s → background refresh → serve stale up to 24h.
+const STALE_MAX_MS = 24 * 60 * 60 * 1000
+const cache = new Map<string, CacheEntry>()
+const inflight = new Map<string, Promise<Entitlements | null>>()
+
+/** Test hook — the cache is module-level state. */
+export function clearEntitlementsCache() {
+  cache.clear()
+  inflight.clear()
+}
+
+export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
+  const baseUrl = process.env.ACCOUNT_URL
+  if (!baseUrl) return null
+
+  const cached = cache.get(orgId)
+  const age = cached ? Date.now() - cached.fetchedAt : Infinity
+  if (cached && age < TTL_MS) return cached.body
+  if (cached && age < STALE_MAX_MS) {
+    // Stale-while-revalidate: answer from cache now, refresh in the background.
+    void refresh(baseUrl, orgId, cached)
+    return cached.body
+  }
+  return await refresh(baseUrl, orgId, cached)
+}
+
+async function refresh(
+  baseUrl: string,
+  orgId: string,
+  cached: CacheEntry | undefined,
+): Promise<Entitlements | null> {
+  const running = inflight.get(orgId)
+  if (running) return running
+  const p = doFetch(baseUrl, orgId, cached).finally(() => inflight.delete(orgId))
+  inflight.set(orgId, p)
+  return p
+}
+
+async function doFetch(
+  baseUrl: string,
+  orgId: string,
+  cached: CacheEntry | undefined,
+): Promise<Entitlements | null> {
+  try {
+    const headers: Record<string, string> = {}
+    const token = process.env.ACCOUNT_S2S_TOKEN
+    if (token) headers.Authorization = `Bearer ${token}`
+    if (cached?.etag) headers['If-None-Match'] = cached.etag
+
+    const res = await fetch(
+      `${baseUrl}/v1/entitlements/${encodeURIComponent(orgId)}?portal=${PORTAL_KEY}`,
+      { headers, signal: AbortSignal.timeout(3_000) },
+    )
+
+    if (res.status === 304 && cached) {
+      cached.fetchedAt = Date.now()
+      return cached.body
+    }
+    if (!res.ok) throw new Error(`entitlements responded ${res.status}`)
+
+    const parsed = entitlementsSchema.safeParse(await res.json())
+    if (!parsed.success) throw new Error(`entitlements response invalid: ${parsed.error.message}`)
+
+    cache.set(orgId, {
+      etag: res.headers.get('etag'),
+      body: parsed.data,
+      fetchedAt: Date.now(),
+    })
+    return parsed.data
+  } catch (err) {
+    console.error(`[entitlements] fetch failed for org ${orgId} — quota gates fail open:`, err)
+    // Stale beats nothing within the contract's 24h window; beyond it → null
+    // (fail-open for quotas either way, per §4).
+    if (cached && Date.now() - cached.fetchedAt < STALE_MAX_MS) return cached.body
+    return null
+  }
+}
+
+export type QuotaVerdict =
+  | { allowed: true }
+  | { allowed: false; reason: 'quota_exceeded'; limit: number }
+  | { allowed: false; reason: 'suspended' }
+
+/**
+ * Contract §1+§4 (v1.1, LOCKED) as a pure function: absent key = unlimited,
+ * suspended = fail-closed on everything, grace = active until graceUntil
+ * (expired grace blocks creation like suspended — account flips the state
+ * server-side, this only covers the cache-staleness window), null = fail-open.
+ * `canceled` is the portal-without-default-plan edge case and quotas stay
+ * fail-OPEN there (account's ruling); normal expiry never reaches Studio as
+ * canceled — account resolves those orgs to the portal default plan.
+ * `limits` are enforced as delivered; account guarantees they reflect the
+ * org's EFFECTIVE plan regardless of lifecycle.
+ */
+export function evaluateProjectQuota(
+  entitlements: Entitlements | null,
+  currentCount: number,
+): QuotaVerdict {
+  if (!entitlements) return { allowed: true }
+
+  if (entitlements.planState === 'suspended') return { allowed: false, reason: 'suspended' }
+  if (entitlements.planState === 'canceled') return { allowed: true }
+  if (
+    entitlements.planState === 'grace' &&
+    entitlements.graceUntil &&
+    Date.parse(entitlements.graceUntil) < Date.now()
+  ) {
+    return { allowed: false, reason: 'suspended' }
+  }
+
+  const limit = entitlements.limits['studio.projects']
+  if (limit === undefined) return { allowed: true }
+  if (currentCount < limit) return { allowed: true }
+  return { allowed: false, reason: 'quota_exceeded', limit }
+}
