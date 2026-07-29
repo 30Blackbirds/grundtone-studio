@@ -129,21 +129,35 @@ jobs:
             docker image prune -f
 
       - name: Smoke test
+        # healthz alone let the v0.2.6 SSR regression through (API healthy,
+        # pages 500) — page routes are part of the smoke since 2026-07-29.
         run: |
+          BASE=https://studio.staging.grundtone.com
           for i in $(seq 1 30); do
-            if curl -sf https://studio.staging.grundtone.com/api/healthz > /dev/null; then
-              echo "✓ staging is responding"
-              exit 0
+            if curl -sf "$BASE/api/healthz" > /dev/null; then
+              echo "✓ staging healthz responding"
+              break
             fi
+            [ "$i" = 30 ] && { echo "✗ healthz timed out"; exit 1; }
             echo "waiting ($i/30)…"
             sleep 5
           done
-          echo "✗ smoke test timed out"
-          exit 1
+          for path in /login /signup /dashboard; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
+            if [ "$code" != "200" ]; then
+              echo "✗ $path returned $code"
+              exit 1
+            fi
+            echo "✓ $path 200"
+          done
 
   # ─────────────────────────────────────────────────────────────────────────
   # Production deploy — only on semver tags pushed to main.
-  # GitHub Environment `production` is gated on a manual reviewer.
+  # NOTE: the `production` Environment has NO required-reviewer gate — that
+  # protection rule needs GitHub Enterprise (verified by [infra] 2026-07-29;
+  # our Team plan 422s on the attempt). The human gate is therefore the TAG
+  # PUSH itself: pushing vX.Y.Z IS the deploy authorisation. Who may push
+  # v-tags is an Allan-level decision — do not cut tags without it.
   # ─────────────────────────────────────────────────────────────────────────
   deploy-production:
     needs: build
@@ -197,17 +211,27 @@ jobs:
             docker image prune -f
 
       - name: Smoke test
+        # healthz alone let the v0.2.6 SSR regression through (API healthy,
+        # pages 500) — page routes are part of the smoke since 2026-07-29.
         run: |
+          BASE=https://studio.grundtone.com
           for i in $(seq 1 30); do
-            if curl -sf https://studio.grundtone.com/api/healthz > /dev/null; then
-              echo "✓ production is responding"
-              exit 0
+            if curl -sf "$BASE/api/healthz" > /dev/null; then
+              echo "✓ production healthz responding"
+              break
             fi
+            [ "$i" = 30 ] && { echo "✗ healthz timed out — investigate manually"; exit 1; }
             echo "waiting ($i/30)…"
             sleep 5
           done
-          echo "✗ smoke test timed out — investigate manually"
-          exit 1
+          for path in /login /signup /dashboard; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
+            if [ "$code" != "200" ]; then
+              echo "✗ $path returned $code — investigate manually"
+              exit 1
+            fi
+            echo "✓ $path 200"
+          done
 
       - name: Notify
         if: always()
