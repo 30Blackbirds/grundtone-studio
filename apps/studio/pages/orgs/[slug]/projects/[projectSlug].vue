@@ -166,6 +166,7 @@
       v-if="project"
       :tabs="[
         { id: 'tokens', label: t('project.tabTokens') },
+        { id: 'components', label: t('project.tabComponents') },
         { id: 'apiKeys', label: t('apiKeys.title') },
         { id: 'versions', label: t('versions.title') },
         { id: 'members', label: t('projectMembers.title') },
@@ -180,6 +181,15 @@
             </ClientOnly>
           </div>
         </div>
+      </GTTabPanel>
+
+      <!-- Workbench renders the LIVE editor state (previewTokens), so
+           unsaved colour/spacing changes from the tokens tab show up here
+           immediately — that's the point of having it at project level. -->
+      <GTTabPanel id="components">
+        <ClientOnly>
+          <ComponentWorkbench :tokens="previewTokens" :mode="editorMode" />
+        </ClientOnly>
       </GTTabPanel>
 
       <GTTabPanel id="apiKeys">

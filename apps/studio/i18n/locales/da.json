@@ -188,7 +188,8 @@
     "notPublished": "Endnu ikke publiceret",
     "saveDraft": "Gem kladde",
     "publish": "Publicér",
-    "discard": "Kassér ændringer"
+    "discard": "Kassér ændringer",
+    "tabComponents": "Komponenter"
   },
   "projectMembers": {
     "title": "Medlemmer",
@@ -586,12 +587,6 @@
     "deleteError": "Kunne ikke slette organisation"
   },
   "componentLibrary": {
-    "nav": "Komponenter",
-    "title": "Komponent-værksted",
-    "subtitle": "Interaktiv testbænk: vælg komponent, skru på props, se den i et projekts tema — og kopiér koden.",
-    "studioDefault": "Studio-standard",
-    "projectTheme": "Projekt-tema",
-    "dark": "Dark",
     "railLabel": "Komponenter",
     "search": "Søg komponent…",
     "noMatches": "Ingen komponenter matcher.",

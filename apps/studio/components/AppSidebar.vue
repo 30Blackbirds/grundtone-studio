@@ -72,11 +72,6 @@
             {{ $t('nav.dashboard') }}
           </NuxtLink>
         </li>
-        <li>
-          <NuxtLink to="/components" :class="linkClass">
-            {{ $t('componentLibrary.nav') }}
-          </NuxtLink>
-        </li>
       </ul>
     </nav>
 

@@ -188,7 +188,8 @@
     "notPublished": "Not published yet",
     "saveDraft": "Save draft",
     "publish": "Publish",
-    "discard": "Discard changes"
+    "discard": "Discard changes",
+    "tabComponents": "Components"
   },
   "projectMembers": {
     "title": "Members",
@@ -586,12 +587,6 @@
     "deleteError": "Could not delete organization"
   },
   "componentLibrary": {
-    "nav": "Components",
-    "title": "Component workbench",
-    "subtitle": "Interactive test bench: pick a component, tweak its props, see it in a project theme — and copy the code.",
-    "studioDefault": "Studio default",
-    "projectTheme": "Project theme",
-    "dark": "Dark",
     "railLabel": "Components",
     "search": "Search components…",
     "noMatches": "No components match.",
