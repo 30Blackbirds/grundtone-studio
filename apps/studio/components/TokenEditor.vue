@@ -4,6 +4,11 @@
   const tokens = defineModel<Tokens>({ required: true })
   const { t } = useI18n()
 
+  // Light/dark editing mode. Dark is an OVERRIDE layer (decision 2026-07-29):
+  // only colors, and only the ones that differ. The parent (preview) follows
+  // via the emitted mode.
+  const mode = defineModel<'base' | 'dark'>('mode', { default: 'base' })
+
   // Reactive sub-objects (Vue v-model proxies don't auto-create nested paths).
   // Each computed widens the optional schema field into its non-null object
   // shape so deep property access type-checks.
@@ -13,10 +18,23 @@
   type Spacing = NonNullable<Tokens['spacing']>
   type FontFamily = NonNullable<Typography['fontFamily']>
 
+  const darkOverrides = computed<Colors>(() => tokens.value.dark?.colors ?? {})
+  const darkOverrideCount = computed(() => Object.keys(darkOverrides.value).length)
+
+  // In dark mode the fields show EFFECTIVE values (base merged with the
+  // override layer), so the designer sees what dark actually renders.
   const colors = computed<Colors>({
-    get: () => tokens.value.colors ?? {},
+    get: () =>
+      mode.value === 'dark'
+        ? { ...(tokens.value.colors ?? {}), ...darkOverrides.value }
+        : (tokens.value.colors ?? {}),
     set: (v) => (tokens.value = { ...tokens.value, colors: v }),
   })
+
+  function clearDarkOverrides() {
+    const { dark: _dark, ...rest } = tokens.value
+    tokens.value = rest
+  }
   const typography = computed<Typography>({
     get: () => tokens.value.typography ?? {},
     set: (v) => (tokens.value = { ...tokens.value, typography: v }),
@@ -36,6 +54,21 @@
   })
 
   function updateColor(key: keyof NonNullable<Tokens['colors']>, value: string) {
+    if (mode.value === 'dark') {
+      // Dark writes go to the override layer. Clearing a field removes the
+      // override, falling back to the base value — that IS the reset gesture.
+      const next: Colors = value
+        ? { ...darkOverrides.value, [key]: value }
+        : (Object.fromEntries(
+            Object.entries(darkOverrides.value).filter(([k]) => k !== key),
+          ) as Colors)
+      if (Object.keys(next).length === 0) {
+        clearDarkOverrides()
+      } else {
+        tokens.value = { ...tokens.value, dark: { colors: next } }
+      }
+      return
+    }
     colors.value = { ...colors.value, [key]: value }
   }
   function updateRadius(key: keyof NonNullable<Tokens['radius']>, value: string) {
@@ -51,6 +84,40 @@
 
 <template>
   <div class="flex flex-col gap-8">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex gap-2" role="group" :aria-label="t('tokens.modeLabel')">
+        <GTButton
+          :variant="mode === 'base' ? 'primary' : 'secondary'"
+          size="sm"
+          :aria-pressed="mode === 'base'"
+          @click="mode = 'base'"
+        >
+          {{ t('tokens.modeBase') }}
+        </GTButton>
+        <GTButton
+          :variant="mode === 'dark' ? 'primary' : 'secondary'"
+          size="sm"
+          :aria-pressed="mode === 'dark'"
+          @click="mode = 'dark'"
+        >
+          {{ t('tokens.modeDark') }}
+          <template v-if="darkOverrideCount"> ({{ darkOverrideCount }})</template>
+        </GTButton>
+      </div>
+      <GTButton
+        v-if="mode === 'dark' && darkOverrideCount"
+        variant="outlined"
+        size="sm"
+        @click="clearDarkOverrides"
+      >
+        {{ t('tokens.clearDark') }}
+      </GTButton>
+    </div>
+
+    <GTAlert v-if="mode === 'dark'" variant="info" :heading="t('tokens.darkHint')">
+      <p class="m-0 text-sm">{{ t('tokens.darkHintBody') }}</p>
+    </GTAlert>
+
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.colors') }}</h3>
       <div class="grid grid-cols-2 gap-4">
@@ -157,7 +224,7 @@
       </div>
     </section>
 
-    <section>
+    <section v-if="mode === 'base'">
       <h3 class="mt-0 mb-3">{{ t('tokens.typography') }}</h3>
       <div class="grid grid-cols-2 gap-4">
         <GTInput
@@ -175,7 +242,7 @@
       </div>
     </section>
 
-    <section>
+    <section v-if="mode === 'base'">
       <h3 class="mt-0 mb-3">{{ t('tokens.radius') }}</h3>
       <div class="grid grid-cols-4 gap-4">
         <GTInput
@@ -205,7 +272,7 @@
       </div>
     </section>
 
-    <section>
+    <section v-if="mode === 'base'">
       <h3 class="mt-0 mb-3">{{ t('tokens.spacing') }}</h3>
       <p class="text-tertiary text-sm mt-0 mb-3">{{ t('tokens.spacingHint') }}</p>
       <div class="grid grid-cols-3 gap-4">

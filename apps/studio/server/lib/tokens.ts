@@ -15,28 +15,29 @@ const cssLength = z
   .max(40)
   .regex(/^[\d.]+(px|rem|em|%|vh|vw|ch|ex|cm|mm|in|pt|pc)?$/, 'must be a valid CSS length')
 
+const colorGroup = z
+  .object({
+    primary: cssColor.optional(),
+    primaryLight: cssColor.optional(),
+    primaryDark: cssColor.optional(),
+    onPrimary: cssColor.optional(),
+    secondary: cssColor.optional(),
+    success: cssColor.optional(),
+    warning: cssColor.optional(),
+    error: cssColor.optional(),
+    info: cssColor.optional(),
+    background: cssColor.optional(),
+    surface: cssColor.optional(),
+    surfaceRaised: cssColor.optional(),
+    text: cssColor.optional(),
+    textSecondary: cssColor.optional(),
+    textTertiary: cssColor.optional(),
+  })
+  .partial()
+
 export const tokensSchema = z
   .object({
-    colors: z
-      .object({
-        primary: cssColor.optional(),
-        primaryLight: cssColor.optional(),
-        primaryDark: cssColor.optional(),
-        onPrimary: cssColor.optional(),
-        secondary: cssColor.optional(),
-        success: cssColor.optional(),
-        warning: cssColor.optional(),
-        error: cssColor.optional(),
-        info: cssColor.optional(),
-        background: cssColor.optional(),
-        surface: cssColor.optional(),
-        surfaceRaised: cssColor.optional(),
-        text: cssColor.optional(),
-        textSecondary: cssColor.optional(),
-        textTertiary: cssColor.optional(),
-      })
-      .partial()
-      .optional(),
+    colors: colorGroup.optional(),
     typography: z
       .object({
         fontFamily: z
@@ -67,10 +68,26 @@ export const tokensSchema = z
       })
       .partial()
       .optional(),
+    // Dark-override layer (decision 2026-07-29: override model, not a full
+    // second set). Holds ONLY the tokens that differ in dark mode — v1 scopes
+    // that to colors, which is what realistically diverges. Absent/empty dark
+    // = the pre-existing single-set behaviour, so old payloads stay valid and
+    // old SDKs simply ignore the extra key.
+    dark: z.object({ colors: colorGroup.optional() }).strict().optional(),
   })
   .strict()
 
 export type Tokens = z.infer<typeof tokensSchema>
+
+/**
+ * Effective tokens for a mode. Dark = base with dark.colors merged over
+ * colors; the `dark` layer itself never leaks into the resolved shape.
+ */
+export function resolveMode(tokens: Tokens, mode: 'light' | 'dark'): Omit<Tokens, 'dark'> {
+  const { dark, ...base } = tokens
+  if (mode === 'light' || !dark?.colors || Object.keys(dark.colors).length === 0) return base
+  return { ...base, colors: { ...base.colors, ...dark.colors } }
+}
 
 export const DEFAULT_TOKENS: Tokens = {
   colors: {
