@@ -1,7 +1,15 @@
 <script setup lang="ts">
+  import { signOut, useSession } from '~~/lib/auth-client'
+
   const { orgs, activeOrg, activeSlug, activeProjectSlug, projects, canManageOrgMembers } =
     useOrgContext()
   const route = useRoute()
+  const session = useSession()
+
+  async function handleSignOut() {
+    await signOut()
+    await navigateTo('/login')
+  }
 
   const isDashboardActive = computed(() => route.path === '/dashboard')
   const isMembersActive = computed(() => route.path.startsWith(`/orgs/${activeSlug.value}/members`))
@@ -13,7 +21,10 @@
 </script>
 
 <template>
-  <aside class="app-sidebar border-r bg-surface p-4" :aria-label="$t('nav.menu')">
+  <aside
+    class="app-sidebar app-sidebar--column border-r bg-surface p-4"
+    :aria-label="$t('nav.menu')"
+  >
     <!-- Global section: the shell is identical on every signed-in screen
          (UX-audit finding #4) — the sidebar no longer disappears outside
          org context. -->
@@ -97,5 +108,21 @@
         </li>
       </ul>
     </nav>
+
+    <!-- User anchor pinned to the bottom (the prototype's su__user block —
+         Allan-request 2026-07-29: account/lang/sign-out live here, not in
+         the header). -->
+    <footer class="app-sidebar__user border-t pt-3 flex flex-col gap-2">
+      <p v-if="session.data?.user" class="m-0 text-sm text-tertiary truncate">
+        {{ session.data.user.email }}
+      </p>
+      <div class="flex items-center justify-between gap-2">
+        <NuxtLink to="/account" :class="linkClass">{{ $t('account.nav') }}</NuxtLink>
+        <LanguageSwitch />
+      </div>
+      <GTButton variant="outlined" size="sm" block @click="handleSignOut">
+        {{ $t('app.signOut') }}
+      </GTButton>
+    </footer>
   </aside>
 </template>
