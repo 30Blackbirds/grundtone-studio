@@ -471,7 +471,13 @@
       "config.published": "Published configuration",
       "config.activated": "Activated version",
       "organization.updated": "Updated organization"
-    }
+    },
+    "loadOlder": "Load older",
+    "exportCsv": "Export CSV",
+    "timezoneNote": "Times shown in {tz}",
+    "actorSearch": "Search actor",
+    "actorSearchPlaceholder": "email (filters loaded rows)",
+    "noMatches": "No rows match the search."
   },
   "invitation": {
     "title": "Invitation",
