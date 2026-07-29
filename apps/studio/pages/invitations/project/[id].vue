@@ -46,12 +46,27 @@
       accepting.value = false
     }
   }
+
+  // Decline parity with org invitations (UX-audit finding #11: reject used to
+  // exist only on the org flow).
+  const declining = ref(false)
+
+  async function decline() {
+    declining.value = true
+    acceptError.value = null
+    try {
+      await $fetch(`/api/invitations/project/${invitationId.value}/decline`, { method: 'POST' })
+      await navigateTo('/dashboard')
+    } catch (err) {
+      acceptError.value = (err as Error).message ?? t('invitation.acceptError')
+    } finally {
+      declining.value = false
+    }
+  }
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('projectInvitation.title') }}</h1>
-
+  <AuthCard :title="t('projectInvitation.title')">
     <GTAlert
       v-if="loadError || !invitation"
       variant="error"
@@ -90,11 +105,14 @@
 
       <GTAlert v-if="acceptError" variant="error" :heading="acceptError" class="my-4" />
 
-      <div v-if="isAuthed && !invitation.expired" class="flex justify-end mt-6">
-        <GTButton :loading="accepting" @click="accept">
+      <div v-if="isAuthed && !invitation.expired" class="flex gap-3 justify-end mt-6">
+        <GTButton variant="secondary" :loading="declining" :disabled="accepting" @click="decline">
+          {{ t('invitation.reject') }}
+        </GTButton>
+        <GTButton :loading="accepting" :disabled="declining" @click="accept">
           {{ t('invitation.accept') }}
         </GTButton>
       </div>
     </template>
-  </div>
+  </AuthCard>
 </template>

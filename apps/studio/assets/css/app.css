@@ -211,3 +211,26 @@ main {
     position: static;
   }
 }
+
+/* ── Auth shell (redesign R9) ────────────────────────────────────────────
+   Pre-login screens: vertically centered card per the R9 prototype. Layout
+   only — surfaces/borders ride on grundtone utilities. */
+
+.auth-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.auth-shell__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 28rem;
+  margin: 2.5rem auto;
+}

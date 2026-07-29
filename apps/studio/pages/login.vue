@@ -46,9 +46,7 @@
 </script>
 
 <template>
-  <div class="max-w-md mx-auto my-10 p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ t('auth.login.title') }}</h1>
-
+  <AuthCard :title="t('auth.login.title')">
     <GTAlert
       v-if="resetSuccess"
       variant="success"
@@ -82,5 +80,5 @@
       {{ t('auth.login.noAccount') }}
       <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
     </p>
-  </div>
+  </AuthCard>
 </template>
