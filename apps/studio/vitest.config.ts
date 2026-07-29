@@ -24,6 +24,7 @@ export default defineConfig({
       'composables/**/*.test.ts',
       'components/**/*.test.ts',
       'middleware/**/*.test.ts',
+      'pages/**/*.test.ts',
       'utils/**/*.test.ts',
       'tests/**/*.test.ts',
     ],

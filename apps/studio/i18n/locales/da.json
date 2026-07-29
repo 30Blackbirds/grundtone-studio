@@ -121,7 +121,15 @@
       "createAccount": "Opret en",
       "forgotPassword": "Glemt adgangskode?",
       "resetSuccess": "Din adgangskode er opdateret. Log ind med den nye adgangskode.",
-      "error": "Login mislykkedes"
+      "error": "Login mislykkedes",
+      "or": "eller",
+      "magicLink": {
+        "send": "Send mig et login-link",
+        "sentHeading": "Login-link sendt",
+        "sentBody": "Vi har sendt et login-link til {email}. Det udløber om 5 minutter.",
+        "emailRequired": "Udfyld din email først, så sender vi linket dertil.",
+        "error": "Kunne ikke sende login-link"
+      }
     },
     "signup": {
       "title": "Opret konto",
