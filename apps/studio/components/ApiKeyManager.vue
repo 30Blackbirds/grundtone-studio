@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { useToast } from '@grundtone/vue'
   const props = defineProps<{ projectId: string; canManage: boolean }>()
-  const { t } = useI18n()
+  const { t, d } = useI18n()
 
   interface ApiKeyRow {
     id: string
@@ -253,14 +253,24 @@
               <GTBadge v-if="k.keyType === 'secret'" variant="warning">
                 {{ t('apiKeys.secretBadge') }}
               </GTBadge>
+              <!-- Environment badge + explainer tooltip (UX-audit #14: the
+                   live/test distinction was shown but never explained). -->
+              <GTTooltip :content="t('apiKeys.envTooltip')" position="bottom">
+                <GTBadge :variant="k.environment === 'live' ? 'success' : 'neutral'">
+                  {{ t(`apiKeys.env${k.environment === 'live' ? 'Live' : 'Test'}`) }}
+                </GTBadge>
+              </GTTooltip>
             </span>
             <span class="text-tertiary text-sm">
-              {{ t(`apiKeys.env${k.environment === 'live' ? 'Live' : 'Test'}`) }}
               <template v-if="k.keyType !== 'secret'">
-                ·
                 {{ k.allowedOrigins.length ? k.allowedOrigins.join(', ') : t('apiKeys.anyOrigin') }}
-                · {{ t('apiKeys.rateLimitBadge', { n: k.rateLimit }) }}
+                · {{ t('apiKeys.rateLimitBadge', { n: k.rateLimit }) }} ·
               </template>
+              {{
+                k.lastUsedAt
+                  ? t('apiKeys.lastUsed', { date: d(new Date(k.lastUsedAt), 'short') })
+                  : t('apiKeys.neverUsed')
+              }}
             </span>
           </div>
           <GTButton v-if="canManage" variant="outlined" size="sm" @click="pendingRevokeId = k.id">

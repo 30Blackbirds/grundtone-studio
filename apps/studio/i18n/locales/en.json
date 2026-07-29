@@ -386,7 +386,10 @@
     "copied": "Copied!",
     "dismiss": "Done",
     "revoke": "Revoke",
-    "confirmRevoke": "Are you sure you want to revoke this key? It cannot be used again."
+    "confirmRevoke": "Are you sure you want to revoke this key? It cannot be used again.",
+    "envTooltip": "Live keys serve published tokens in production. Test keys are for development/CI — same data, but separated in access logs and rate limits.",
+    "lastUsed": "Last used {date}",
+    "neverUsed": "Never used"
   },
   "members": {
     "title": "Members",

@@ -23,12 +23,11 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
     curl: `curl ${cdnBase.value}/k/${sampleKey.value}/tokens.json`,
   }))
 
-  const copyState = ref<Record<string, 'idle' | 'copied'>>({})
-
-  async function copy(id: string, text: string) {
-    await navigator.clipboard.writeText(text)
-    copyState.value[id] = 'copied'
-    setTimeout(() => (copyState.value[id] = 'idle'), 1500)
+  const LANGUAGES: Record<string, string> = {
+    scriptTag: 'html',
+    vuePlugin: 'ts',
+    programmatic: 'ts',
+    curl: 'sh',
   }
 </script>
 
@@ -43,16 +42,12 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
       {{ t('install.noKeyBody') }}
     </GTAlert>
 
-    <div v-for="(code, id) in snippets" :key="id" class="flex flex-col gap-2">
-      <div class="flex justify-between items-center">
-        <strong class="text-sm">{{ t(`install.${id}`) }}</strong>
-        <GTButton variant="outlined" size="sm" @click="copy(id, code)">
-          {{ copyState[id] === 'copied' ? t('apiKeys.copied') : t('apiKeys.copy') }}
-        </GTButton>
-      </div>
-      <pre
-        class="m-0 p-3 bg-surface border rounded font-mono text-sm overflow-x-auto"
-      ><code>{{ code }}</code></pre>
-    </div>
+    <CodeSnippet
+      v-for="(code, id) in snippets"
+      :key="id"
+      :code="code"
+      :language="LANGUAGES[id] ?? 'txt'"
+      :label="t(`install.${id}`)"
+    />
   </section>
 </template>

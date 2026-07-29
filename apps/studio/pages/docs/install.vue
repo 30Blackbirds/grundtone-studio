@@ -46,6 +46,19 @@ import { loadByApiKey } from '@grundtone/saas-client'
 loadByApiKey({ apiKey: '${sampleKey}' })`,
   }))
 
+  const sriSnippet = computed(
+    () => `<script
+  src="${cdnBase.value}/client/v1.0.0.js"
+  integrity="sha384-<hash from cdn.grundtone.com/client/v1.0.0.js.sri>"
+  crossorigin="anonymous"
+  data-api-key="${sampleKey}">${closeScript}`,
+  )
+
+  const modeSnippet = `app.use(grundtone, {
+  apiKey: '${sampleKey}',
+  mode: 'auto',  // 'light' | 'dark' | 'auto' (follows prefers-color-scheme)
+})`
+
   type SnippetId = 'scriptTag' | 'vue' | 'nuxt' | 'react' | 'svelte'
   const tabs: Array<{ id: SnippetId; label: string; language: string }> = [
     { id: 'scriptTag', label: t('integrationGuide.scriptTag'), language: 'html' },
@@ -72,33 +85,20 @@ loadByApiKey({ apiKey: '${sampleKey}' })`,
 
     <GTTabs :tabs="tabs.map((tab) => ({ id: tab.id, label: tab.label }))">
       <GTTabPanel v-for="tab in tabs" :id="tab.id" :key="tab.id">
-        <pre
-          class="m-0 p-3 bg-surface border rounded font-mono text-sm overflow-x-auto"
-        ><code>{{ snippets[tab.id] }}</code></pre>
+        <CodeSnippet :code="snippets[tab.id]" :language="tab.language" />
       </GTTabPanel>
     </GTTabs>
 
     <section class="flex flex-col gap-3">
       <h2 class="font-heading text-2xl mt-6 mb-1">{{ t('integrationGuide.sriHeading') }}</h2>
       <p>{{ t('integrationGuide.sriBody') }}</p>
-      <pre
-        class="m-0 p-3 bg-surface border rounded font-mono text-sm overflow-x-auto"
-      ><code>&lt;script
-  src="{{ cdnBase }}/client/v1.0.0.js"
-  integrity="sha384-&lt;hash from cdn.grundtone.com/client/v1.0.0.js.sri&gt;"
-  crossorigin="anonymous"
-  data-api-key="{{ sampleKey }}"&gt;&lt;/script&gt;</code></pre>
+      <CodeSnippet :code="sriSnippet" language="html" />
     </section>
 
     <section class="flex flex-col gap-3">
       <h2 class="font-heading text-2xl mt-6 mb-1">{{ t('integrationGuide.modeHeading') }}</h2>
       <p>{{ t('integrationGuide.modeBody') }}</p>
-      <pre
-        class="m-0 p-3 bg-surface border rounded font-mono text-sm overflow-x-auto"
-      ><code>app.use(grundtone, {
-  apiKey: '{{ sampleKey }}',
-  mode: 'auto',  // 'light' | 'dark' | 'auto' (follows prefers-color-scheme)
-})</code></pre>
+      <CodeSnippet :code="modeSnippet" language="ts" />
     </section>
   </article>
 </template>
