@@ -121,7 +121,15 @@
       "createAccount": "Sign up",
       "forgotPassword": "Forgot password?",
       "resetSuccess": "Your password has been updated. Sign in with your new password.",
-      "error": "Sign in failed"
+      "error": "Sign in failed",
+      "or": "or",
+      "magicLink": {
+        "send": "Email me a login link",
+        "sentHeading": "Login link sent",
+        "sentBody": "We've sent a login link to {email}. It expires in 5 minutes.",
+        "emailRequired": "Enter your email first and we'll send the link there.",
+        "error": "Could not send the login link"
+      }
     },
     "signup": {
       "title": "Sign up",

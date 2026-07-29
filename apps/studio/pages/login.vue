@@ -14,6 +14,44 @@
   const redirect = computed(() => (route.query.redirect as string) || '/dashboard')
   const resetSuccess = computed(() => route.query.reset === 'success')
 
+  // ── Magic-link (task #13, the R9 prototype's "eller"-path) ────────────────
+  // Shares the email field with the password form. The auth service's
+  // magic-link plugin is live (POST sign-in/magic-link, 5 min expiry). The
+  // captcha header is sent defensively: the path isn't in ALTCHA's guard set
+  // today, but if [auth] adds it (flagged), studio already complies.
+  const magicPending = ref(false)
+  const magicSent = ref(false)
+  const magicError = ref<string | null>(null)
+
+  async function sendMagicLink() {
+    magicError.value = null
+    if (!email.value) {
+      magicError.value = t('auth.login.magicLink.emailRequired')
+      return
+    }
+    magicPending.value = true
+    try {
+      const captchaToken = await solveAltchaChallenge()
+      const headers: Record<string, string> = {}
+      if (captchaToken) headers['x-captcha-response'] = captchaToken
+
+      const res = await signIn.magicLink({
+        email: email.value,
+        callbackURL: redirect.value,
+        fetchOptions: { headers },
+      })
+      if (res.error) {
+        magicError.value = res.error.message ?? t('auth.login.magicLink.error')
+        return
+      }
+      magicSent.value = true
+    } catch {
+      magicError.value = t('auth.captchaError')
+    } finally {
+      magicPending.value = false
+    }
+  }
+
   async function submit() {
     pending.value = true
     error.value = null
@@ -76,6 +114,21 @@
       <GTAlert v-if="error" variant="error" :heading="error" :aria-label="t('auth.login.error')" />
       <GTButton type="submit" :loading="pending" block>{{ t('auth.login.submit') }}</GTButton>
     </form>
+
+    <!-- "eller"-separator + magic-link — the R9 prototype's secondary path. -->
+    <div class="auth-separator text-tertiary text-sm" aria-hidden="true">
+      {{ t('auth.login.or') }}
+    </div>
+    <GTAlert v-if="magicSent" variant="success" :heading="t('auth.login.magicLink.sentHeading')">
+      {{ t('auth.login.magicLink.sentBody', { email }) }}
+    </GTAlert>
+    <template v-else>
+      <GTAlert v-if="magicError" variant="error" :heading="magicError" />
+      <GTButton variant="secondary" block :loading="magicPending" @click="sendMagicLink">
+        {{ t('auth.login.magicLink.send') }}
+      </GTButton>
+    </template>
+
     <p class="mt-6 text-tertiary">
       {{ t('auth.login.noAccount') }}
       <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
