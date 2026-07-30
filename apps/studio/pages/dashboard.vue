@@ -53,7 +53,11 @@
     showCreate.value = false
     orgName.value = ''
     orgSlug.value = ''
-    await refresh()
+    // Refresh BOTH caches: the dashboard aggregate (stat cards) AND the shared
+    // org-context list the sidebar/org-switcher read — without the latter the
+    // new org is invisible in the chrome until a hard reload (Allan-bug
+    // 2026-07-30: "2 Organizations" stat, empty sidebar).
+    await Promise.all([refresh(), refreshNuxtData('org-context-orgs')])
   }
 
   function statusVariant(

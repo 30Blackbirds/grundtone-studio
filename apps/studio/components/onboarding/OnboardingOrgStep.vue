@@ -29,6 +29,9 @@
     if (state.value.orgId) {
       await organization.setActive({ organizationId: state.value.orgId })
     }
+    // The sidebar/org-switcher read the shared org-context cache — refresh it
+    // so the brand-new org is visible the moment onboarding finishes.
+    await refreshNuxtData('org-context-orgs')
     next()
   }
 </script>
