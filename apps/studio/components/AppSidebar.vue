@@ -188,11 +188,15 @@
         <NuxtLink to="/account" :class="linkClass" @click="menuOpen = false">
           {{ $t('account.nav') }}
         </NuxtLink>
-        <div class="p-2"><LanguageSwitch /></div>
         <hr class="m-0" />
         <GTButton variant="outlined" size="sm" block @click="handleSignOut">
           {{ $t('app.signOut') }}
         </GTButton>
+      </div>
+      <!-- Sprogvælgeren står PARALLELT med ankeret, ikke inde i dropdownen
+           (redesign-language-switch.html §4 — undgår nestede menuer). -->
+      <div class="mt-2">
+        <LanguageSwitch />
       </div>
     </footer>
   </aside>

@@ -66,7 +66,20 @@
         >
           <GTIcon name="menu" />
         </button>
-        <NuxtLink to="/dashboard" class="brand-link">{{ t('app.name') }}</NuxtLink>
+        <NuxtLink to="/dashboard" class="brand-link flex items-center gap-2">
+          <!-- Officielt grundtone-mærke via jsDelivrs npm-CDN (@grundtone/core
+               bundler assets/**). PINNET version med vilje — @latest ville
+               skifte mærket under os ved en fremtidig core-release
+               (redesign-language-switch.html §5). -->
+          <img
+            src="https://cdn.jsdelivr.net/npm/@grundtone/core@2.22.0/assets/logo-32x32.png"
+            width="22"
+            height="22"
+            alt=""
+            class="brand-logo"
+          />
+          {{ t('app.name') }}
+        </NuxtLink>
         <OrgSwitcher class="app-shell__org-switcher" />
       </div>
       <!-- Account/lang/sign-out moved to the sidebar's user anchor
@@ -100,7 +113,16 @@
         tabindex="-1"
       >
         <div class="flex justify-between items-center p-4 border-b">
-          <span class="brand-link">{{ t('app.name') }}</span>
+          <span class="brand-link flex items-center gap-2">
+            <img
+              src="https://cdn.jsdelivr.net/npm/@grundtone/core@2.22.0/assets/logo-32x32.png"
+              width="22"
+              height="22"
+              alt=""
+              class="brand-logo"
+            />
+            {{ t('app.name') }}
+          </span>
           <button
             type="button"
             class="app-shell__burger"

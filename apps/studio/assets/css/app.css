@@ -572,3 +572,10 @@ main {
 .billing-meter--min i {
   width: 8%;
 }
+
+/* Brand-mærket (jsDelivr-PNG) — afrundingen matcher forlæggets 5px-radius;
+   ingen token dækker billed-hjørner i denne størrelse. */
+.brand-logo {
+  border-radius: 5px;
+  flex: none;
+}
