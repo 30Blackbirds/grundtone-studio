@@ -57,7 +57,9 @@
       showCreate.value = false
       projName.value = ''
       projSlug.value = ''
-      await refresh()
+      // Also refresh the org-context projects cache the SIDEBAR reads — same
+      // staleness class as the org-list bug (Allan 2026-07-30).
+      await Promise.all([refresh(), refreshNuxtData(`org-context-projects-${slug.value}`)])
     } catch (err) {
       const data = (err as { data?: { data?: { code?: string; limit?: number } } }).data?.data
       if (data?.code === 'quota_exceeded') {

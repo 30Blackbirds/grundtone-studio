@@ -67,7 +67,13 @@ export const useOrgContext = () => {
       })
       return (res.data ?? []) as OrgListItem[]
     },
-    { default: noOrgList },
+    // Client-only: this goes through the auth client to the EXTERNAL auth
+    // service, and a failed/empty SSR result sticks — the fixed key hydrates
+    // and never refetches, leaving every consumer (sidebar, org-switcher,
+    // breadcrumbs) permanently org-less until a hard reload. Same fragility
+    // class that made /orgs/** client-rendered (see nuxt.config routeRules);
+    // chrome pops in a tick later instead, which the defaults cover.
+    { default: noOrgList, server: false },
   )
 
   const activeOrg = computed(() =>
