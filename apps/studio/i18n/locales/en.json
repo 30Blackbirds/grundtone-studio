@@ -740,5 +740,50 @@
       "limitQ": "What happens when I hit my limit?",
       "limitA": "Nothing breaks: everything live stays live. You just can’t publish MORE brands until you upgrade (or unpublish another). On plans with overage you pay per extra brand instead."
     }
+  },
+  "billing": {
+    "nav": "Billing",
+    "title": "Plan & billing",
+    "forbidden": "Requires the owner or billing role.",
+    "unavailable": "Billing is not activated yet",
+    "unavailableBody": "Plan and invoice data connects when the billing system goes live. Your usage below is already accurate.",
+    "noPlan": "No plan registered",
+    "state": {
+      "active": "Active",
+      "grace": "Grace",
+      "suspended": "Suspended",
+      "canceled": "Canceled"
+    },
+    "renews": "renews {date}",
+    "cancelsAtPeriodEnd": "ends at period end",
+    "activeBrands": "Active brands",
+    "members": "Members",
+    "unlimited": "unlimited",
+    "usageOf": "{used} of {limit}",
+    "perMonthShort": "mo",
+    "overageNote": "{n} extra brands at €{rate}/mo = +€{total}/mo this period. Not a block — just visible friction.",
+    "capReached": "Limit reached",
+    "upgradeTo": "Upgrade to {plan}",
+    "seePlans": "See plans",
+    "nextInvoice": "Next invoice",
+    "nextInvoiceSplit": "€{base} base + €{overage} overage",
+    "nextInvoiceBase": "base price, no overage",
+    "paymentMethod": "Payment method",
+    "lastRegistered": "last registered",
+    "updateViaStripe": "Update via Stripe →",
+    "updatesNextInvoice": "updates at next invoice",
+    "invoiceHistory": "Invoice history",
+    "colDate": "Date",
+    "colDescription": "Invoice no.",
+    "colAmount": "Amount",
+    "colStatus": "Status",
+    "invoiceStatus": {
+      "paid": "Paid",
+      "open": "Open",
+      "void": "Void",
+      "uncollectible": "Uncollectible"
+    },
+    "receipt": "Receipt →",
+    "noInvoices": "No invoices yet."
   }
 }

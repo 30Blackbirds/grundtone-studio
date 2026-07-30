@@ -740,5 +740,50 @@
       "limitQ": "Hvad sker der, når jeg rammer min grænse?",
       "limitA": "Ingenting går i stykker: alt der er live, forbliver live. Du kan bare ikke publicere FLERE brands, før du opgraderer (eller afpublicerer et andet). På planer med overage betaler du pr. ekstra brand i stedet."
     }
+  },
+  "billing": {
+    "nav": "Fakturering",
+    "title": "Plan & fakturering",
+    "forbidden": "Kræver owner- eller billing-rollen.",
+    "unavailable": "Fakturering er ikke aktiveret endnu",
+    "unavailableBody": "Plan- og faktura-data kobles på når faktureringssystemet går live. Dit forbrug herunder er retvisende allerede nu.",
+    "noPlan": "Ingen plan registreret",
+    "state": {
+      "active": "Aktiv",
+      "grace": "Henstand",
+      "suspended": "Suspenderet",
+      "canceled": "Opsagt"
+    },
+    "renews": "fornyer {date}",
+    "cancelsAtPeriodEnd": "udløber ved periodens slutning",
+    "activeBrands": "Aktive brands",
+    "members": "Medlemmer",
+    "unlimited": "ubegrænset",
+    "usageOf": "{used} af {limit}",
+    "perMonthShort": "md",
+    "capReached": "Grænse nået",
+    "overageNote": "{n} ekstra brands à €{rate}/md = +€{total}/md denne periode. Ikke en blokering — bare synlig friktion.",
+    "upgradeTo": "Opgradér til {plan}",
+    "seePlans": "Se planer",
+    "nextInvoice": "Næste faktura",
+    "nextInvoiceSplit": "€{base} base + €{overage} overage",
+    "nextInvoiceBase": "basispris, intet overage",
+    "paymentMethod": "Betalingsmetode",
+    "lastRegistered": "sidst registreret",
+    "updateViaStripe": "Opdatér via Stripe →",
+    "updatesNextInvoice": "opdateres ved næste faktura",
+    "invoiceHistory": "Fakturahistorik",
+    "colDate": "Dato",
+    "colDescription": "Fakturanr.",
+    "colAmount": "Beløb",
+    "colStatus": "Status",
+    "invoiceStatus": {
+      "paid": "Betalt",
+      "open": "Åben",
+      "void": "Annulleret",
+      "uncollectible": "Uerholdelig"
+    },
+    "receipt": "Kvittering →",
+    "noInvoices": "Ingen fakturaer endnu."
   }
 }
