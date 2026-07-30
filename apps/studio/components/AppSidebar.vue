@@ -1,8 +1,15 @@
 <script setup lang="ts">
   import { signOut, useSession } from '~~/lib/auth-client'
 
-  const { orgs, activeOrg, activeSlug, activeProjectSlug, projects, canManageOrgMembers } =
-    useOrgContext()
+  const {
+    orgs,
+    activeOrg,
+    activeSlug,
+    activeProjectSlug,
+    projects,
+    canManageOrgMembers,
+    canManageBilling,
+  } = useOrgContext()
   const route = useRoute()
   const session = useSession()
 
@@ -50,6 +57,7 @@
 
   const isDashboardActive = computed(() => route.path === '/dashboard')
   const isMembersActive = computed(() => route.path.startsWith(`/orgs/${activeSlug.value}/members`))
+  const isBillingActive = computed(() => route.path === `/orgs/${activeSlug.value}/billing`)
   const isAuditActive = computed(() => route.path === `/orgs/${activeSlug.value}/audit`)
   const isSettingsActive = computed(() => route.path === `/orgs/${activeSlug.value}/settings`)
 
@@ -107,6 +115,16 @@
               :class="[linkClass, { [activeClass]: isMembersActive }]"
             >
               {{ $t('members.title') }}
+            </NuxtLink>
+          </li>
+          <!-- Egen gate (wireframe-nav-ia §3): den rene billing-rolle skal se
+               Fakturering UDEN at kunne se Indstillinger/Revisionslog. -->
+          <li v-if="canManageBilling">
+            <NuxtLink
+              :to="`/orgs/${activeSlug}/billing`"
+              :class="[linkClass, { [activeClass]: isBillingActive }]"
+            >
+              {{ $t('billing.nav') }}
             </NuxtLink>
           </li>
           <li v-if="canManageOrgMembers">
