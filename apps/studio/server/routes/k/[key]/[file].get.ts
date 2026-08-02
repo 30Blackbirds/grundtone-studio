@@ -11,6 +11,7 @@ import {
 import { db } from '~~/server/db'
 import { apiKey, orgSuspension, project } from '~~/server/db/schema'
 import { hashApiKey } from '~~/server/lib/api-keys'
+import { recordCdnGraceCut } from '~~/server/lib/metrics'
 import { paths, getObjectAsString } from '~~/server/lib/storage'
 import { TTLCache } from '~~/server/lib/ttl-cache'
 import { SlidingWindowRateLimiter } from '~~/server/lib/rate-limit'
@@ -140,6 +141,7 @@ export default defineEventHandler(async (event) => {
   // clients from hammering retries.
   const cutAt = await cdnCutAt(meta.organizationId)
   if (cutAt !== null && cutAt <= Date.now()) {
+    recordCdnGraceCut()
     throw createError({ statusCode: 410, statusMessage: 'Organization suspended' })
   }
 
