@@ -1,12 +1,23 @@
+import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 
+// §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
+// aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
+// vatNumber er valgfrit (udenlandske virksomheder uden dansk CVR); VIES-
+// valideringen er accounts ansvar bag mintet.
 const bodySchema = z.object({
   organizationSlug: z.string().min(1),
   planKey: z.enum(['studio_solo', 'studio_studio', 'studio_scale']),
+  businessAttestation: z.literal(true),
+  vatNumber: z.string().trim().min(4).max(32).optional(),
+  termsAccepted: z.object({
+    version: z.string().min(1),
+    acceptedAt: z.string().datetime({ offset: true }),
+  }),
 })
 
 defineRouteMeta({
@@ -62,6 +73,13 @@ export default defineEventHandler(async (event) => {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
       planKey: parsed.data.planKey,
+      // §1a: accept-bevis + B2B-attestation følger med mintet (accounts
+      // §8-krav — de persisterer version+timestamp); locale=da så Stripes
+      // hostede side matcher flowet sprogligt.
+      businessAttestation: parsed.data.businessAttestation,
+      vatNumber: parsed.data.vatNumber,
+      termsAccepted: parsed.data.termsAccepted,
+      locale: 'da',
       successUrl: `${appUrl}/orgs/${parsed.data.organizationSlug}?upgrade=success`,
       cancelUrl: `${appUrl}/plans?org=${parsed.data.organizationSlug}&upgrade=cancelled`,
     }),

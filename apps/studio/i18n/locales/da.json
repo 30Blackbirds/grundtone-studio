@@ -712,11 +712,21 @@
       "brands": "Inkluderede brands",
       "brandsHard": "{n} (hård grænse)",
       "today": "I dag",
-      "stripeNote": "Betaling håndteres sikkert af Stripe — vi gemmer aldrig dine kortoplysninger.",
+      "stripeNote": "Betaling håndteres sikkert af Stripe (dansk betalingsside) — vi gemmer aldrig dine kortoplysninger.",
       "continue": "Fortsæt til betaling →",
       "back": "← Skift plan",
       "billing_unavailable": "Betaling er ikke åbnet endnu — planerne aktiveres snart.",
-      "checkout_failed": "Noget gik galt — prøv igen om et øjeblik."
+      "checkout_failed": "Noget gik galt — prøv igen om et øjeblik.",
+      "todayExVat": "I dag (ekskl. moms)",
+      "renewalNote": "Fornyes automatisk hver måned — opsig når som helst i selvbetjening, ingen binding.",
+      "vatNote": "Pris vist ekskl. moms (B2B) — momsbeløb fremgår på kvitteringen ved dansk kunde.",
+      "termsLink": "Abonnementsvilkår",
+      "privacyLink": "Privatlivspolitik",
+      "businessLabel": "Jeg handler som erhvervsdrivende — påkrævet for at fortsætte (Studio sælges kun B2B)",
+      "vatLabel": "CVR/momsnummer (valgfrit for udenlandske virksomheder)",
+      "vatPlaceholder": "DK12345678",
+      "tosLabel": "Jeg accepterer abonnementsvilkårene, inkl. databehandleraftalen (DPA)",
+      "checkboxHint": "Knappen aktiveres når begge checkbokse er markeret"
     }
   },
   "help": {
