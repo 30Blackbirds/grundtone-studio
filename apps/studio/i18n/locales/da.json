@@ -722,11 +722,11 @@
       "vatNote": "Pris vist ekskl. moms (B2B) — momsbeløb fremgår på kvitteringen ved dansk kunde.",
       "termsLink": "Abonnementsvilkår",
       "privacyLink": "Privatlivspolitik",
-      "businessLabel": "Jeg handler som erhvervsdrivende — påkrævet for at fortsætte (Studio sælges kun B2B)",
-      "vatLabel": "CVR/momsnummer (valgfrit for udenlandske virksomheder)",
-      "vatPlaceholder": "DK12345678",
+      "businessLabel": "Jeg handler som erhvervsdrivende — købet sker som led i min virksomheds erhverv. Grundtone Studio udbydes ikke til forbrugere, og forbrugerreglerne (herunder fortrydelsesretten) gælder derfor ikke for købet.",
+      "vatLabel": "CVR-/momsnummer",
       "tosLabel": "Jeg accepterer abonnementsvilkårene, inkl. databehandleraftalen (DPA)",
-      "checkboxHint": "Knappen aktiveres når begge checkbokse er markeret"
+      "checkboxHint": "Knappen aktiveres når begge checkbokse er markeret",
+      "vatHelp": "Obligatorisk for danske og EU-virksomheder (bruges til momsafregning). Bekræftes automatisk hos VIES efter køb — købet gennemføres uanset."
     }
   },
   "help": {

@@ -9,15 +9,19 @@ import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 // aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
 // vatNumber er valgfrit (udenlandske virksomheder uden dansk CVR); VIES-
 // valideringen er accounts ansvar bag mintet.
+const acceptProof = z.object({
+  version: z.string().min(1),
+  acceptedAt: z.string().datetime({ offset: true }),
+})
+
 const bodySchema = z.object({
   organizationSlug: z.string().min(1),
   planKey: z.enum(['studio_solo', 'studio_studio', 'studio_scale']),
-  businessAttestation: z.literal(true),
+  // Two legal effects, two proof trails (jura §0 krav 1+3) — the attestation
+  // carries its own version+timestamp exactly like the terms accept.
+  businessAttestation: acceptProof,
   vatNumber: z.string().trim().min(4).max(32).optional(),
-  termsAccepted: z.object({
-    version: z.string().min(1),
-    acceptedAt: z.string().datetime({ offset: true }),
-  }),
+  termsAccepted: acceptProof,
 })
 
 defineRouteMeta({
@@ -77,7 +81,9 @@ export default defineEventHandler(async (event) => {
       // §8-krav — de persisterer version+timestamp); locale=da så Stripes
       // hostede side matcher flowet sprogligt.
       businessAttestation: parsed.data.businessAttestation,
-      vatNumber: parsed.data.vatNumber,
+      // Kontrakt §8b: account sætter tax-id'et på Stripe-customeren
+      // (VIES-validering + reverse charge er deres side af mintet).
+      business: parsed.data.vatNumber ? { taxId: parsed.data.vatNumber } : undefined,
       termsAccepted: parsed.data.termsAccepted,
       locale: 'da',
       successUrl: `${appUrl}/orgs/${parsed.data.organizationSlug}?upgrade=success`,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue'
-  import { TERMS_URL, PRIVACY_URL, TERMS_VERSION } from '~~/lib/legal'
+  import { TERMS_URL, PRIVACY_URL, TERMS_VERSION, ATTESTATION_VERSION } from '~~/lib/legal'
   import { PLAN_CATALOG, SHOW_PRICE_LOCK_LINE, getPlan, type PlanKey } from '~~/lib/plan-catalog'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
@@ -31,11 +31,15 @@
   // the timestamp captured at the actual checkbox click) goes into the mint —
   // accounts §8-krav, server 400s without it.
   const businessConfirmed = ref(false)
+  const businessConfirmedAt = ref<string | null>(null)
   const tosAccepted = ref(false)
   const tosAcceptedAt = ref<string | null>(null)
   const vatNumber = ref('')
   watch(tosAccepted, (checked) => {
     tosAcceptedAt.value = checked ? new Date().toISOString() : null
+  })
+  watch(businessConfirmed, (checked) => {
+    businessConfirmedAt.value = checked ? new Date().toISOString() : null
   })
   const canContinue = computed(() => businessConfirmed.value && tosAccepted.value)
 
@@ -48,7 +52,13 @@
   }
 
   async function continueToCheckout() {
-    if (!confirmPlan.value || !selectedOrg.value || !canContinue.value || !tosAcceptedAt.value)
+    if (
+      !confirmPlan.value ||
+      !selectedOrg.value ||
+      !canContinue.value ||
+      !tosAcceptedAt.value ||
+      !businessConfirmedAt.value
+    )
       return
     submitting.value = true
     checkoutError.value = null
@@ -60,7 +70,10 @@
           body: {
             organizationSlug: selectedOrg.value,
             planKey: confirmPlan.value,
-            businessAttestation: true,
+            businessAttestation: {
+              version: ATTESTATION_VERSION,
+              acceptedAt: businessConfirmedAt.value,
+            },
             vatNumber: vatNumber.value.trim() || undefined,
             termsAccepted: { version: TERMS_VERSION, acceptedAt: tosAcceptedAt.value },
           },
@@ -259,7 +272,8 @@
             <GTInput
               v-model="vatNumber"
               :label="t('plans.confirm.vatLabel')"
-              :placeholder="t('plans.confirm.vatPlaceholder')"
+              :help-text="t('plans.confirm.vatHelp')"
+              placeholder="DK12345678"
               size="sm"
             />
           </div>

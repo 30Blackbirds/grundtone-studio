@@ -722,11 +722,11 @@
       "vatNote": "Price shown excl. VAT (B2B) — the VAT amount appears on the receipt for Danish customers.",
       "termsLink": "Subscription terms",
       "privacyLink": "Privacy policy",
-      "businessLabel": "I am purchasing as a business — required to continue (Studio is B2B only)",
-      "vatLabel": "CVR/VAT number (optional for non-Danish companies)",
-      "vatPlaceholder": "DK12345678",
+      "businessLabel": "I am purchasing as a business — the purchase is made in the course of my company’s trade. Grundtone Studio is not offered to consumers, and consumer rules (including the right of withdrawal) therefore do not apply to the purchase.",
+      "vatLabel": "CVR/VAT number",
       "tosLabel": "I accept the subscription terms, including the data processing agreement (DPA)",
-      "checkboxHint": "The button activates once both checkboxes are ticked"
+      "checkboxHint": "The button activates once both checkboxes are ticked",
+      "vatHelp": "Required for Danish and EU businesses (used for VAT settlement). Verified automatically with VIES after purchase — the purchase completes regardless."
     }
   },
   "help": {

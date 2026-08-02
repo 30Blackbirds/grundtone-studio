@@ -42,7 +42,10 @@ const handler = (await import('./checkout-session.post')).default as unknown as 
 const VALID_BODY = {
   organizationSlug: 'acme',
   planKey: 'studio_solo',
-  businessAttestation: true,
+  businessAttestation: {
+    version: 'studio-b2b-erklaering-2026-08-02',
+    acceptedAt: '2026-08-02T12:00:00Z',
+  },
   termsAccepted: { version: 'studio-vilkaar-2026-08-02-draft', acceptedAt: '2026-08-02T12:00:00Z' },
 }
 
@@ -70,9 +73,12 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
   })
 
-  it('400s without businessAttestation=true (Allans §0 B2B-afskæring)', async () => {
+  it('400s without a full businessAttestation proof (jura §0: eget bevisspor)', async () => {
     await expect(
-      handler(authedEvent({ ...VALID_BODY, businessAttestation: false })),
+      handler(authedEvent({ ...VALID_BODY, businessAttestation: true })),
+    ).rejects.toMatchObject({ statusCode: 400 })
+    await expect(
+      handler(authedEvent({ ...VALID_BODY, businessAttestation: { version: 'x' } })),
     ).rejects.toMatchObject({ statusCode: 400 })
     const { businessAttestation: _omitted, ...body } = VALID_BODY
     await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
