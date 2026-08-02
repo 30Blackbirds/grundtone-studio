@@ -1,10 +1,18 @@
+import { randomUUID } from 'node:crypto'
 import { createError, defineEventHandler, getHeader, readBody } from 'h3'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { orgSuspension } from '~~/server/db/schema'
 
-// Portal-side of account's TenantLifecycleCallbackService (kontrakt §8a/§9):
+// Portal-side of account's TenantLifecycleCallbackService (kontrakt §8a/§9,
+// §9a-justeret): REST-formen er eksplicit INTERIM — slutmålet er den kanoniske
+// Connect-service når @klanghaus/eventcontract er live; feltnavne holdes 1:1
+// så swappet er mekanisk. reason/actor er audit-kæden fra den ratificerede
+// proto og persisteres med suspensionen; workflowId i svaret er et syntetisk
+// id der holder accounts klient-port identisk på tværs af transporterne.
+//
+// (kontrakt §8a/§9):
 // account calls this on suspend/reactivate. cdnGraceUntil comes from ACCOUNT
 // (single source for the ToS §10.2 grace — Allan-approved 14 days); Studio
 // only enforces the stored timestamp in the /k CDN route.
@@ -18,12 +26,16 @@ const bodySchema = z.discriminatedUnion('state', [
   z.object({
     state: z.literal('suspended'),
     tenantOrgId: z.string().min(1),
+    reason: z.string().min(1),
+    actor: z.string().min(1),
     suspendedAt: z.string().datetime({ offset: true }),
     cdnGraceUntil: z.string().datetime({ offset: true }),
   }),
   z.object({
     state: z.literal('active'),
     tenantOrgId: z.string().min(1),
+    reason: z.string().min(1),
+    actor: z.string().min(1),
   }),
 ])
 
@@ -52,23 +64,24 @@ export default defineEventHandler(async (event) => {
   }
 
   if (parsed.data.state === 'suspended') {
+    const row = {
+      suspendedAt: new Date(parsed.data.suspendedAt),
+      cdnGraceUntil: new Date(parsed.data.cdnGraceUntil),
+      reason: parsed.data.reason,
+      actor: parsed.data.actor,
+    }
     await db
       .insert(orgSuspension)
-      .values({
-        organizationId: parsed.data.tenantOrgId,
-        suspendedAt: new Date(parsed.data.suspendedAt),
-        cdnGraceUntil: new Date(parsed.data.cdnGraceUntil),
-      })
-      .onConflictDoUpdate({
-        target: orgSuspension.organizationId,
-        set: {
-          suspendedAt: new Date(parsed.data.suspendedAt),
-          cdnGraceUntil: new Date(parsed.data.cdnGraceUntil),
-        },
-      })
+      .values({ organizationId: parsed.data.tenantOrgId, ...row })
+      .onConflictDoUpdate({ target: orgSuspension.organizationId, set: row })
   } else {
+    // The reactivation's audit trail lives with account (the caller); here the
+    // row simply disappears — log so the local trace still shows who/why.
+    console.info(
+      `[lifecycle] reactivate ${parsed.data.tenantOrgId} (actor=${parsed.data.actor}, reason=${parsed.data.reason})`,
+    )
     await db.delete(orgSuspension).where(eq(orgSuspension.organizationId, parsed.data.tenantOrgId))
   }
 
-  return { ok: true }
+  return { accepted: true, workflowId: randomUUID() }
 })
