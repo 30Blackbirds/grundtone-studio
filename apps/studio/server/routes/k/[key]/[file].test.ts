@@ -6,10 +6,14 @@ import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fix
 // resolves to whatever the current test pushed in.
 interface KeyRow {
   projectId: string
+  organizationId: string
   allowedOrigins: string[]
   rateLimit: number
 }
 let nextDbRows: KeyRow[] = []
+// Suspension rows (kontrakt §8a): select().from().where() without innerJoin
+// resolves to these — empty = org not suspended.
+let nextSuspensionRows: { cdnGraceUntil: Date }[] = []
 
 // Storage map: tests pre-set the bytes that getObjectAsString should return
 // for each blob key. Missing key → null (handler returns 404).
@@ -28,6 +32,7 @@ vi.mock('~~/server/db', () => ({
         innerJoin: () => ({
           where: () => Promise.resolve(nextDbRows),
         }),
+        where: () => Promise.resolve(nextSuspensionRows),
       }),
     }),
   },
@@ -40,7 +45,8 @@ vi.mock('~~/server/db/schema', () => ({
     keyHash: 'key_hash',
     revokedAt: 'revoked_at',
   },
-  project: { id: 'id' },
+  project: { id: 'id', organizationId: 'organization_id' },
+  orgSuspension: { organizationId: 'organization_id', cdnGraceUntil: 'cdn_grace_until' },
 }))
 vi.mock('~~/server/lib/storage', () => ({
   paths: (projectId: string) => ({
@@ -63,6 +69,7 @@ function fresh(opts: Partial<KeyRow> = {}): { key: string; projectId: string; ro
   const projectId = `proj-${testCounter}`
   const row: KeyRow = {
     projectId,
+    organizationId: `org-${testCounter}`,
     allowedOrigins: opts.allowedOrigins ?? [],
     rateLimit: opts.rateLimit ?? 1000,
   }
@@ -71,6 +78,7 @@ function fresh(opts: Partial<KeyRow> = {}): { key: string; projectId: string; ro
 
 beforeEach(() => {
   nextDbRows = []
+  nextSuspensionRows = []
   storage.clear()
 })
 
@@ -179,6 +187,24 @@ describe('GET /k/[key]/[file]', () => {
       headers: { origin: 'https://studio.acme.com' },
     })
     await expect(handler(event)).resolves.toBeTruthy()
+  })
+
+  it('keeps serving a suspended org while the CDN grace window is open', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    nextSuspensionRows = [{ cdnGraceUntil: new Date(Date.now() + 60_000) }]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    await expect(handler(fakeEvent({ params: { key, file: 'tokens.json' } }))).resolves.toBeTruthy()
+  })
+
+  it('410s once the CDN grace window has passed (ToS §10.2)', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    nextSuspensionRows = [{ cdnGraceUntil: new Date(Date.now() - 1_000) }]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    await expect(
+      handler(fakeEvent({ params: { key, file: 'tokens.json' } })),
+    ).rejects.toMatchObject({ statusCode: 410 })
   })
 
   it('429s after the per-key rate limit is exceeded', async () => {
