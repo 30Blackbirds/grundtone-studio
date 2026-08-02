@@ -42,6 +42,10 @@ export const orgSuspension = pgTable('org_suspension', {
   organizationId: text().primaryKey(),
   suspendedAt: timestamp({ withTimezone: true }).notNull(),
   cdnGraceUntil: timestamp({ withTimezone: true }).notNull(),
+  // §9a: audit-kæden fra accounts kanoniske TenantLifecycleCallbackService —
+  // fx actor=system:dunning m/ reason der bærer grace-udløbstidspunktet.
+  reason: text().notNull(),
+  actor: text().notNull(),
 })
 
 export const apiKey = pgTable(
