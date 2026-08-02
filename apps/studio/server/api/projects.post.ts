@@ -4,6 +4,7 @@ import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
+import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { grantProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
 
@@ -57,6 +58,14 @@ export default defineEventHandler(async (event) => {
   const entitlements = await getStudioEntitlements(org.id)
   const projectCount = await db.$count(project, eq(project.organizationId, org.id))
   const verdict = evaluateProjectQuota(entitlements, projectCount)
+  // Metrics-spec: fail_open counts only TRUE unavailability (configured but
+  // unreachable) — the dormant/unconfigured state would false-alarm the series.
+  if (entitlements === null && process.env.ACCOUNT_URL) {
+    recordQuotaFailOpen('studio.projects', 'entitlements_unavailable')
+  }
+  if (!verdict.allowed && verdict.reason === 'quota_exceeded') {
+    recordQuotaDenial('studio.projects')
+  }
   if (!verdict.allowed) {
     throw createError({
       statusCode: 403,
