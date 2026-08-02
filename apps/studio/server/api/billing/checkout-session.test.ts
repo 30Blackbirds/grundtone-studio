@@ -47,6 +47,7 @@ const VALID_BODY = {
     acceptedAt: '2026-08-02T12:00:00Z',
   },
   termsAccepted: { version: 'studio-vilkaar-2026-08-02-draft', acceptedAt: '2026-08-02T12:00:00Z' },
+  vatNumber: 'DK12345678',
 }
 
 function authedEvent(body: Record<string, unknown>): FakeEvent {
@@ -81,6 +82,11 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
       handler(authedEvent({ ...VALID_BODY, businessAttestation: { version: 'x' } })),
     ).rejects.toMatchObject({ statusCode: 400 })
     const { businessAttestation: _omitted, ...body } = VALID_BODY
+    await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('400s without vatNumber (§8c: obligatorisk)', async () => {
+    const { vatNumber: _omitted, ...body } = VALID_BODY
     await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
   })
 

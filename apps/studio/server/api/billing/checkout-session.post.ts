@@ -20,7 +20,10 @@ const bodySchema = z.object({
   // Two legal effects, two proof trails (jura §0 krav 1+3) — the attestation
   // carries its own version+timestamp exactly like the terms accept.
   businessAttestation: acceptProof,
-  vatNumber: z.string().trim().min(4).max(32).optional(),
+  // §8c-ruling (account/Allan): REQUIRED — CVR (DK), momsnummer (EU) eller
+  // virksomheds-id (øvrige); account 400'er også uden. Format-/VIES-validering
+  // er accounts side af mintet.
+  vatNumber: z.string().trim().min(4).max(32),
   termsAccepted: acceptProof,
 })
 
@@ -80,10 +83,10 @@ export default defineEventHandler(async (event) => {
       // §1a: accept-bevis + B2B-attestation følger med mintet (accounts
       // §8-krav — de persisterer version+timestamp); locale=da så Stripes
       // hostede side matcher flowet sprogligt.
+      // Flad feltform jf. §8c (account adopterede vores form 1:1); de sætter
+      // tax-id'et på Stripe-customeren (VIES + reverse charge bag mintet).
       businessAttestation: parsed.data.businessAttestation,
-      // Kontrakt §8b: account sætter tax-id'et på Stripe-customeren
-      // (VIES-validering + reverse charge er deres side af mintet).
-      business: parsed.data.vatNumber ? { taxId: parsed.data.vatNumber } : undefined,
+      vatNumber: parsed.data.vatNumber,
       termsAccepted: parsed.data.termsAccepted,
       locale: 'da',
       successUrl: `${appUrl}/orgs/${parsed.data.organizationSlug}?upgrade=success`,

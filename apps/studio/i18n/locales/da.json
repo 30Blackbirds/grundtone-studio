@@ -723,10 +723,10 @@
       "termsLink": "Abonnementsvilkår",
       "privacyLink": "Privatlivspolitik",
       "businessLabel": "Jeg handler som erhvervsdrivende — købet sker som led i min virksomheds erhverv. Grundtone Studio udbydes ikke til forbrugere, og forbrugerreglerne (herunder fortrydelsesretten) gælder derfor ikke for købet.",
-      "vatLabel": "CVR-/momsnummer",
+      "vatLabel": "CVR-/momsnummer (påkrævet)",
       "tosLabel": "Jeg accepterer abonnementsvilkårene, inkl. databehandleraftalen (DPA)",
-      "checkboxHint": "Knappen aktiveres når begge checkbokse er markeret",
-      "vatHelp": "Obligatorisk for danske og EU-virksomheder (bruges til momsafregning). Bekræftes automatisk hos VIES efter køb — købet gennemføres uanset."
+      "checkboxHint": "Knappen aktiveres når begge felter er markeret og CVR-/momsnummer er udfyldt",
+      "vatHelp": "CVR (danske virksomheder), momsnummer (EU) eller virksomheds-id (øvrige). Bekræftes automatisk hos VIES efter køb — købet gennemføres uanset."
     }
   },
   "help": {

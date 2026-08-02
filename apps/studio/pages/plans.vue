@@ -41,7 +41,9 @@
   watch(businessConfirmed, (checked) => {
     businessConfirmedAt.value = checked ? new Date().toISOString() : null
   })
-  const canContinue = computed(() => businessConfirmed.value && tosAccepted.value)
+  const canContinue = computed(
+    () => businessConfirmed.value && tosAccepted.value && vatNumber.value.trim().length >= 4,
+  )
 
   function choose(key: PlanKey) {
     checkoutError.value = null
