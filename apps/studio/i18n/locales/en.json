@@ -712,11 +712,21 @@
       "brands": "Included brands",
       "brandsHard": "{n} (hard cap)",
       "today": "Today",
-      "stripeNote": "Payment is handled securely by Stripe — we never store your card details.",
+      "stripeNote": "Payment is handled securely by Stripe (Danish payment page) — we never store your card details.",
       "continue": "Continue to payment →",
       "back": "← Change plan",
       "billing_unavailable": "Payments are not open yet — plans will be activated soon.",
-      "checkout_failed": "Something went wrong — please try again in a moment."
+      "checkout_failed": "Something went wrong — please try again in a moment.",
+      "todayExVat": "Today (excl. VAT)",
+      "renewalNote": "Renews automatically every month — cancel any time in self-service, no lock-in.",
+      "vatNote": "Price shown excl. VAT (B2B) — the VAT amount appears on the receipt for Danish customers.",
+      "termsLink": "Subscription terms",
+      "privacyLink": "Privacy policy",
+      "businessLabel": "I am purchasing as a business — the purchase is made in the course of my company’s trade. Grundtone Studio is not offered to consumers, and consumer rules (including the right of withdrawal) therefore do not apply to the purchase.",
+      "vatLabel": "CVR/VAT number (required)",
+      "tosLabel": "I accept the subscription terms, including the data processing agreement (DPA)",
+      "checkboxHint": "The button activates once both boxes are ticked and the CVR/VAT number is filled in",
+      "vatHelp": "CVR (Danish companies), VAT number (EU) or business ID (other). Verified automatically with VIES after purchase — the purchase completes regardless."
     }
   },
   "help": {

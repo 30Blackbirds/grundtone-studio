@@ -1,12 +1,30 @@
+import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 
+// §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
+// aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
+// vatNumber er valgfrit (udenlandske virksomheder uden dansk CVR); VIES-
+// valideringen er accounts ansvar bag mintet.
+const acceptProof = z.object({
+  version: z.string().min(1),
+  acceptedAt: z.string().datetime({ offset: true }),
+})
+
 const bodySchema = z.object({
   organizationSlug: z.string().min(1),
   planKey: z.enum(['studio_solo', 'studio_studio', 'studio_scale']),
+  // Two legal effects, two proof trails (jura §0 krav 1+3) — the attestation
+  // carries its own version+timestamp exactly like the terms accept.
+  businessAttestation: acceptProof,
+  // §8c-ruling (account/Allan): REQUIRED — CVR (DK), momsnummer (EU) eller
+  // virksomheds-id (øvrige); account 400'er også uden. Format-/VIES-validering
+  // er accounts side af mintet.
+  vatNumber: z.string().trim().min(4).max(32),
+  termsAccepted: acceptProof,
 })
 
 defineRouteMeta({
@@ -62,6 +80,15 @@ export default defineEventHandler(async (event) => {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
       planKey: parsed.data.planKey,
+      // §1a: accept-bevis + B2B-attestation følger med mintet (accounts
+      // §8-krav — de persisterer version+timestamp); locale=da så Stripes
+      // hostede side matcher flowet sprogligt.
+      // Flad feltform jf. §8c (account adopterede vores form 1:1); de sætter
+      // tax-id'et på Stripe-customeren (VIES + reverse charge bag mintet).
+      businessAttestation: parsed.data.businessAttestation,
+      vatNumber: parsed.data.vatNumber,
+      termsAccepted: parsed.data.termsAccepted,
+      locale: 'da',
       successUrl: `${appUrl}/orgs/${parsed.data.organizationSlug}?upgrade=success`,
       cancelUrl: `${appUrl}/plans?org=${parsed.data.organizationSlug}&upgrade=cancelled`,
     }),

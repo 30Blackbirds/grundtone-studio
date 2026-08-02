@@ -579,3 +579,14 @@ main {
   border-radius: 5px;
   flex: none;
 }
+
+/* §1a pre-checkout (forlæggets infolines + indrykket CVR-felt under
+   erhvervs-checkboxen) — layout-only, tokens via utilities. */
+.plan-confirm__info {
+  padding: 0.625rem 0;
+  line-height: 1.6;
+}
+
+.plan-confirm__cvr {
+  margin-left: 1.5rem;
+}

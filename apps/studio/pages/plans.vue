@@ -1,5 +1,6 @@
 <script setup lang="ts">
-  import { ref, computed } from 'vue'
+  import { ref, computed, watch } from 'vue'
+  import { TERMS_URL, PRIVACY_URL, TERMS_VERSION, ATTESTATION_VERSION } from '~~/lib/legal'
   import { PLAN_CATALOG, SHOW_PRICE_LOCK_LINE, getPlan, type PlanKey } from '~~/lib/plan-catalog'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
@@ -25,13 +26,42 @@
   const submitting = ref(false)
   const checkoutError = ref<'billing_unavailable' | 'checkout_failed' | null>(null)
 
+  // §1a-consent (jura-ruling + Allans §0 B2B-afskæring): business attestation
+  // + active ToS/DPA accept gate the button; the accept PROOF (terms version +
+  // the timestamp captured at the actual checkbox click) goes into the mint —
+  // accounts §8-krav, server 400s without it.
+  const businessConfirmed = ref(false)
+  const businessConfirmedAt = ref<string | null>(null)
+  const tosAccepted = ref(false)
+  const tosAcceptedAt = ref<string | null>(null)
+  const vatNumber = ref('')
+  watch(tosAccepted, (checked) => {
+    tosAcceptedAt.value = checked ? new Date().toISOString() : null
+  })
+  watch(businessConfirmed, (checked) => {
+    businessConfirmedAt.value = checked ? new Date().toISOString() : null
+  })
+  const canContinue = computed(
+    () => businessConfirmed.value && tosAccepted.value && vatNumber.value.trim().length >= 4,
+  )
+
   function choose(key: PlanKey) {
     checkoutError.value = null
+    businessConfirmed.value = false
+    tosAccepted.value = false
+    vatNumber.value = ''
     confirmPlan.value = key
   }
 
   async function continueToCheckout() {
-    if (!confirmPlan.value || !selectedOrg.value) return
+    if (
+      !confirmPlan.value ||
+      !selectedOrg.value ||
+      !canContinue.value ||
+      !tosAcceptedAt.value ||
+      !businessConfirmedAt.value
+    )
+      return
     submitting.value = true
     checkoutError.value = null
     try {
@@ -39,7 +69,16 @@
         '/api/billing/checkout-session',
         {
           method: 'POST',
-          body: { organizationSlug: selectedOrg.value, planKey: confirmPlan.value },
+          body: {
+            organizationSlug: selectedOrg.value,
+            planKey: confirmPlan.value,
+            businessAttestation: {
+              version: ATTESTATION_VERSION,
+              acceptedAt: businessConfirmedAt.value,
+            },
+            vatNumber: vatNumber.value.trim() || undefined,
+            termsAccepted: { version: TERMS_VERSION, acceptedAt: tosAcceptedAt.value },
+          },
         },
       )
       window.location.href = checkoutUrl
@@ -210,10 +249,39 @@
             </dd>
           </div>
           <div class="plan-confirm__line plan-confirm__line--total">
-            <dt>{{ t('plans.confirm.today') }}</dt>
+            <dt>{{ t('plans.confirm.todayExVat') }}</dt>
             <dd>€{{ confirmDef.priceEur?.toFixed(2) }}</dd>
           </div>
         </dl>
+
+        <!-- §1-oplysningskrav (forlæggets infolines-blok, variant A/B2B) -->
+        <p class="plan-confirm__info border-t text-tertiary text-xs m-0">
+          {{ t('plans.confirm.renewalNote') }}<br />
+          {{ t('plans.confirm.vatNote') }}<br />
+          <a :href="TERMS_URL" target="_blank" rel="noopener">{{ t('plans.confirm.termsLink') }}</a>
+          ·
+          <a :href="PRIVACY_URL" target="_blank" rel="noopener">{{
+            t('plans.confirm.privacyLink')
+          }}</a>
+        </p>
+
+        <!-- §1a-consent: hver sit felt, aldrig for-afkrydset, ingen marketing.
+             Links kan ikke bo i GTCheckbox-label (string-prop — label-slot er
+             noteret som upstream-ønske); de står i infolinjerne ovenfor. -->
+        <div class="flex flex-col gap-2 my-3">
+          <GTCheckbox v-model="businessConfirmed" :label="t('plans.confirm.businessLabel')" />
+          <div class="plan-confirm__cvr">
+            <GTInput
+              v-model="vatNumber"
+              :label="t('plans.confirm.vatLabel')"
+              :help-text="t('plans.confirm.vatHelp')"
+              placeholder="DK12345678"
+              size="sm"
+            />
+          </div>
+          <GTCheckbox v-model="tosAccepted" :label="t('plans.confirm.tosLabel')" />
+        </div>
+
         <p class="text-tertiary text-xs bg-surface rounded p-2">
           🔒 {{ t('plans.confirm.stripeNote') }}
         </p>
@@ -225,9 +293,17 @@
       </template>
       <template #footer>
         <div class="flex flex-col gap-2 w-full">
-          <GTButton block :loading="submitting" @click="continueToCheckout">
+          <GTButton
+            block
+            :loading="submitting"
+            :disabled="!canContinue"
+            @click="continueToCheckout"
+          >
             {{ t('plans.confirm.continue') }}
           </GTButton>
+          <p v-if="!canContinue" class="text-tertiary text-xs text-center m-0">
+            {{ t('plans.confirm.checkboxHint') }}
+          </p>
           <GTButton variant="unstyled" size="sm" block @click="confirmPlan = null">
             {{ t('plans.confirm.back') }}
           </GTButton>
