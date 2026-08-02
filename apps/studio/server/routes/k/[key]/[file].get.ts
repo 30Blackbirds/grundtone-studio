@@ -9,7 +9,7 @@ import {
   setResponseStatus,
 } from 'h3'
 import { db } from '~~/server/db'
-import { apiKey, project } from '~~/server/db/schema'
+import { apiKey, orgSuspension, project } from '~~/server/db/schema'
 import { hashApiKey } from '~~/server/lib/api-keys'
 import { paths, getObjectAsString } from '~~/server/lib/storage'
 import { TTLCache } from '~~/server/lib/ttl-cache'
@@ -30,10 +30,32 @@ const VALID_FILES = new Set(['tokens.json', 'tokens.css'])
 // in practice anyway.
 interface KeyMeta {
   projectId: string
+  organizationId: string
   allowedOrigins: string[]
   rateLimit: number
 }
 const keyCache = new TTLCache<string, KeyMeta>(5000, 30_000)
+
+// Org-suspension mirror (kontrakt §8a/§9, ToS §10.2): grace timestamp per org,
+// written by account's lifecycle callback. 60s TTL keeps the hot path off the
+// DB while bounding both directions: a cut lands within a minute of grace
+// expiry (well inside the "senest to timer" ToS guarantee, which also covers
+// Bunny's edge TTL), and a reactivation resumes delivery within a minute
+// ("typisk øjeblikkeligt"). graceUntil null = not suspended.
+const suspensionCache = new TTLCache<string, { graceUntil: number | null }>(5000, 60_000)
+
+async function cdnCutAt(organizationId: string): Promise<number | null> {
+  let entry = suspensionCache.get(organizationId)
+  if (!entry) {
+    const [row] = await db
+      .select({ cdnGraceUntil: orgSuspension.cdnGraceUntil })
+      .from(orgSuspension)
+      .where(eq(orgSuspension.organizationId, organizationId))
+    entry = { graceUntil: row ? row.cdnGraceUntil.getTime() : null }
+    suspensionCache.set(organizationId, entry)
+  }
+  return entry.graceUntil
+}
 
 // Maps the S3 path → { body, etag }. 60s TTL matches the public Cache-Control
 // we serve; any new publish overwrites the storage path so a stale cache entry
@@ -88,6 +110,7 @@ export default defineEventHandler(async (event) => {
     const [row] = await db
       .select({
         projectId: apiKey.projectId,
+        organizationId: project.organizationId,
         allowedOrigins: apiKey.allowedOrigins,
         rateLimit: apiKey.rateLimit,
       })
@@ -109,6 +132,15 @@ export default defineEventHandler(async (event) => {
   if (meta.allowedOrigins.length > 0 && origin) {
     const allowed = meta.allowedOrigins.some((pattern) => matchOrigin(pattern, origin))
     if (!allowed) throw createError({ statusCode: 403, statusMessage: 'Origin not allowed' })
+  }
+
+  // ToS §10.2: suspended orgs keep serving through the account-set grace
+  // window, then the CDN goes dark. 410 (not 403) — the resource is gone
+  // until reactivation, and permanent-ish semantics stop well-behaved
+  // clients from hammering retries.
+  const cutAt = await cdnCutAt(meta.organizationId)
+  if (cutAt !== null && cutAt <= Date.now()) {
+    throw createError({ statusCode: 410, statusMessage: 'Organization suspended' })
   }
 
   const p = paths(meta.projectId)

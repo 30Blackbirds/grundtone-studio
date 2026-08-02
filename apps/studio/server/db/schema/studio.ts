@@ -32,6 +32,18 @@ export const project = pgTable(
   (t) => [uniqueIndex('project_org_slug_idx').on(t.organizationId, t.slug)],
 )
 
+// Org suspension mirror (kontrakt §8a/§9 + ToS §10.2): account's
+// TenantLifecycleCallbackService writes this via POST /api/lifecycle/
+// tenant-state on suspend/reactivate. cdnGraceUntil comes FROM account
+// (single source for the 14-day grace, Allan-approved 2026-08-02) — the
+// /k CDN route serves normally until it passes, then 410s. Reactivation
+// deletes the row → delivery resumes immediately.
+export const orgSuspension = pgTable('org_suspension', {
+  organizationId: text().primaryKey(),
+  suspendedAt: timestamp({ withTimezone: true }).notNull(),
+  cdnGraceUntil: timestamp({ withTimezone: true }).notNull(),
+})
+
 export const apiKey = pgTable(
   'api_key',
   {
