@@ -129,10 +129,12 @@ export const PLAN_CATALOG: PlanDef[] = [
 ]
 
 /**
- * The 12-month intro price lock line is CONDITIONAL — it renders only while
- * this flag is on (awaiting Allan's final yes on the guarantee mechanics).
+ * 12-month intro price lock line (Allan-approved 2026-07-30). Stays a config
+ * flag + i18n string — [jura] owns the precise legal scoping in the ToS draft
+ * (per tier? on upgrade? new features?); if they scope it differently, the
+ * marketing copy must be able to follow without a code change.
  */
-export const SHOW_PRICE_LOCK_LINE = false
+export const SHOW_PRICE_LOCK_LINE = true
 
 export function getPlan(key: PlanKey): PlanDef {
   return PLAN_CATALOG.find((p) => p.key === key)!
