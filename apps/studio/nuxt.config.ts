@@ -18,7 +18,17 @@ export default defineNuxtConfig({
     // kræves for at specet også serveres i den byggede .output (experimental-
     // flaget alene er dev-only).
     experimental: { openAPI: true },
-    openAPI: { production: 'runtime' },
+    // Jura-fund 2026-08-03 (consent-spec §1a): /_swagger + /_scalar var
+    // OFFENTLIGE i prod og loadede cdn.jsdelivr.net (tredjeparts-load =
+    // consent-brud) — og /_openapi.json udstillede 36 interne API-stier
+    // (angrebsflade-beskrivelse). UI'erne er slået HELT fra (framework-
+    // default, ingen har brug for dem på Studios domæne — API-docs bor på
+    // api.klanghaus.dk); spec-ruten består til aggregatoren men gates af
+    // server/middleware/openapi-guard.ts (token, fail-closed i prod).
+    openAPI: {
+      production: 'runtime',
+      ui: { scalar: false, swagger: false },
+    },
   },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
