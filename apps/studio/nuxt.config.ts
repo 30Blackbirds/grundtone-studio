@@ -1,3 +1,9 @@
+import { createRequire } from 'node:module'
+
+// traceInclude tager FIL-stier, ikke pakkenavne — resolve til entry-filerne
+// (byggefejl "File …/@opentelemetry/sdk-metrics does not exist" ellers).
+const _require = createRequire(import.meta.url)
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
@@ -19,7 +25,10 @@ export default defineNuxtConfig({
     // (dynamiske imports + try/catch), så en regression her koster telemetri,
     // aldrig boot. CI's boot-smoke (build.yml) er den strukturelle gate.
     externals: {
-      traceInclude: ['@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/sdk-metrics'],
+      traceInclude: [
+        _require.resolve('@opentelemetry/exporter-metrics-otlp-proto'),
+        _require.resolve('@opentelemetry/sdk-metrics'),
+      ],
     },
     // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
     // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
