@@ -9,7 +9,7 @@
 // URLs are config: the public vilkår/privatliv pages ship with the
 // grundtone.com web pipeline — until then these point at the canonical
 // upcoming paths ([docs] owns publishing).
-export const TERMS_VERSION = 'studio-vilkaar-2026-08-02-draft'
+export const TERMS_VERSION = 'studio-tos-1.0'
 // B2B-erklæringen (jura §0, tekst LÅST i commit 340e4f5) har sit EGET
 // bevisspor — to retsvirkninger, to versioner (juras krav 1+3).
 export const ATTESTATION_VERSION = 'studio-b2b-erklaering-2026-08-02'
