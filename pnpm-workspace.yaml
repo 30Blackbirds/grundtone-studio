@@ -57,7 +57,9 @@ overrides:
   # GHSA — high (x2): fast-uri host confusion via literal-backslash authority
   # delimiter + failed IDN canonicalization; both patched in 3.1.4. Pulled in
   # via @sentry/nuxt > nuxt > vite-plugin-checker > stylelint > table > ajv.
-  fast-uri: '>=3.1.4'
+  # (+ opfølger i 4.x-linjen patched 4.1.2 — samme advisory-familie ramte
+  # >=4.0.0 <4.1.2; gulvet hævet så prod-audit-gaten forbliver grøn.)
+  fast-uri: '>=4.1.2'
   # GHSA — high: PostCSS path traversal in previous-source-map auto-loading
   # (sourceMappingURL) → arbitrary .map file disclosure; patched in 8.5.18.
   # Pulled in via @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite. Stable
