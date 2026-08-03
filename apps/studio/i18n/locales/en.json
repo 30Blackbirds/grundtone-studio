@@ -462,6 +462,27 @@
     "resendError": "Could not resend verification email",
     "backToLogin": "Back to sign in"
   },
+  "verify": {
+    "title": "Confirming your email…",
+    "body": "One moment — we'll sign you in automatically once it's done."
+  },
+  "verifyDone": {
+    "successTitle": "Your email is confirmed",
+    "successBody": "You're already signed in — ready to get started.",
+    "continue": "Continue to Studio →",
+    "expiredTitle": "The link has expired",
+    "expiredBody": "No need to worry — confirmation links only last a short while. We'll happily send a new one.",
+    "resend": "Send a new confirmation link",
+    "invalidTitle": "The link couldn't be recognised",
+    "invalidBody": "It may already have been used, or it was copied incompletely. Try signing in, or request a new link.",
+    "logIn": "Sign in",
+    "userGoneTitle": "The account no longer exists",
+    "userGoneBody": "The user behind this link no longer exists. Create a new account to get started.",
+    "signUp": "Create account →",
+    "wrongUserTitle": "This link belongs to another account",
+    "wrongUserBody": "You're signed in as a different user than this link belongs to. Sign out and open the link again to confirm.",
+    "signOutRetry": "Sign out and try again"
+  },
   "audit": {
     "title": "Audit log",
     "intro": "Append-only record of organization activity.",

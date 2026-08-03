@@ -462,6 +462,27 @@
     "resendError": "Kunne ikke sende verifikationsmail igen",
     "backToLogin": "Tilbage til login"
   },
+  "verify": {
+    "title": "Bekræfter din email…",
+    "body": "Et øjeblik — vi logger dig ind automatisk når det er gjort."
+  },
+  "verifyDone": {
+    "successTitle": "Din email er bekræftet",
+    "successBody": "Du er allerede logget ind — klar til at komme i gang.",
+    "continue": "Fortsæt til Studio →",
+    "expiredTitle": "Linket er udløbet",
+    "expiredBody": "Ingen grund til bekymring — bekræftelseslinks holder kun kort tid. Vi sender gerne et nyt.",
+    "resend": "Send nyt bekræftelseslink",
+    "invalidTitle": "Linket kunne ikke genkendes",
+    "invalidBody": "Det kan skyldes at det allerede er brugt, eller at det er kopieret ufuldstændigt. Prøv at logge ind, eller anmod om et nyt link.",
+    "logIn": "Log ind",
+    "userGoneTitle": "Kontoen findes ikke længere",
+    "userGoneBody": "Brugeren bag dette link eksisterer ikke længere. Opret en ny konto for at komme i gang.",
+    "signUp": "Opret konto →",
+    "wrongUserTitle": "Linket hører til en anden konto",
+    "wrongUserBody": "Du er logget ind som en anden bruger end det her link tilhører. Log ud og åbn linket igen for at bekræfte.",
+    "signOutRetry": "Log ud og prøv igen"
+  },
   "audit": {
     "title": "Revisionslog",
     "intro": "Append-only register over aktivitet i organisationen.",

@@ -606,3 +606,57 @@ main {
   border-bottom: 1px solid var(--color-border-light, var(--color-border-medium));
   font-size: 0.875rem;
 }
+
+/* Verify-flowet (/verify + /verify/done, forlæg redesign-verify-*.html):
+   grundtone har endnu ingen spinner/status-ikon-atomer — upstream-kandidater.
+   Farverne er token-slots med forlæggets faldback-ramp. */
+.verify-spinner {
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 999px;
+  border: 3px solid var(--color-surface-alt);
+  border-top-color: var(--color-primary);
+  margin: 0 auto 1.125rem;
+  animation: verify-spin 0.8s linear infinite;
+}
+
+@keyframes verify-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Designer-note i forlægget: reduced motion = statisk indikator, ingen spin. */
+@media (prefers-reduced-motion: reduce) {
+  .verify-spinner {
+    animation: none;
+    border-color: var(--color-primary);
+    opacity: 0.4;
+  }
+}
+
+.verify-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.875rem;
+  font-size: 1.25rem;
+}
+
+.verify-icon--ok {
+  background: var(--color-success-light);
+  color: var(--color-success-dark);
+}
+
+.verify-icon--warn {
+  background: var(--color-warning-light);
+  color: var(--color-warning-dark);
+}
+
+.verify-icon--neutral {
+  background: var(--color-surface-alt);
+  color: var(--color-text-tertiary);
+}
