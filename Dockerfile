@@ -28,9 +28,22 @@ RUN --mount=type=secret,id=sentry_auth_token \
     pnpm --filter @grundtone/saas-client build && \
     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
     pnpm --filter @grundtone-studio/studio build && \
-    find apps/studio/.output -name '*.map' -delete
-    # ^ belt-and-braces: Sentry sletter maps efter upload, men bygges imaget
-    #   UDEN token (upload skippet) må maps stadig aldrig shippe offentligt.
+    find apps/studio/.output -name '*.map' -delete && \
+    cp -RL apps/studio/.output /tmp/output-real && \
+    rm -rf apps/studio/.output && \
+    mv /tmp/output-real apps/studio/.output
+    # map-delete: belt-and-braces — Sentry sletter maps efter upload, men bygges
+    # imaget UDEN token (upload skippet) må maps stadig aldrig shippe offentligt.
+    #
+    # cp -RL/mv (v0.2.11-incident, runde 5): Nitro skriver multi-versions-pakker
+    # (fx @opentelemetry/core@2.8+2.10) som SYMLINKS ind i .output/server/
+    # node_modules/.nitro-storen. Dereferencéres de i et SENERE lag (runde 2-
+    # fixet), type-skifter pathen symlink→dir på tværs af layers — og CI's
+    # buildx-export (amd64-runner + registry-push) TABTE netop de paths i det
+    # endelige image, selv om builder-assertionen bestod. Lokal docker-driver
+    # rammes ikke — kun det pushede image fejlede. Deref IN-PLACE i SAMME RUN
+    # som skaber .output betyder at intet lag nogensinde indeholder symlinks
+    # der senere skal erstattes: klassen kan ikke opstå.
 
 # pnpm deploy bygger en self-contained bundle for studio-workspace.
 # OBS: vi inkluderer dev-deps fordi Nitro's .output bundle'r packages
@@ -44,16 +57,14 @@ RUN --mount=type=secret,id=node_auth_token \
     NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
     pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
 
-# v0.2.11-incident-familien, runde 2: Nitro skriver dele af runtime-
-# node_modules som RELATIVE SYMLINKS ind i .output/server/node_modules/.nitro-
-# storen (fx @opentelemetry/core -> ../.nitro/...). pnpm deploy-kopien
-# efterlader linkene knækkede i imaget → MODULE_NOT_FOUND ved boot, selv om
-# lokal .output resolver fint. Dereferencér HELE .output fra builder-træet så
-# runtime aldrig afhænger af symlinks — dræber klassen, ikke kun dette
-# tilfælde. (Boot-smoken i build.yml er gaten der fanger regressioner.)
-RUN rm -rf /deploy/.output \
- && cp -RL /app/apps/studio/.output /deploy/.output \
- && test -f /deploy/.output/server/node_modules/@opentelemetry/core/package.json
+# Assertion-only (deref sker nu in-place i build-RUN'et ovenfor, så pnpm
+# deploy kopierer rigtige filer fra fødslen): de tre multi-versions-pakker
+# der blev tabt i runde 4 SKAL findes, og .output må være 100% symlink-frit.
+# Boot-smoken i build.yml er den endelige gate på det EKSPORTEREDE image.
+RUN test -f /deploy/.output/server/node_modules/@opentelemetry/core/package.json \
+ && test -f /deploy/.output/server/node_modules/@opentelemetry/resources/package.json \
+ && test -f /deploy/.output/server/node_modules/@opentelemetry/api-logs/package.json \
+ && [ -z "$(find /deploy/.output -type l | head -1)" ]
 
 # Nitro beholder `unhead` som external men dens trace misser den transitive
 # `hookable`-dep (under pnpm er den ikke top-level-hoisted), så runtime kaster
