@@ -795,5 +795,19 @@
     },
     "receipt": "Receipt →",
     "noInvoices": "No invoices yet."
+  },
+  "legalCookies": {
+    "title": "Cookies",
+    "intro": "Grundtone Studio only uses the cookies necessary for the service to function. We use no cookies for marketing or third-party tracking.",
+    "colCookie": "Cookie",
+    "colPurpose": "Purpose",
+    "colLifetime": "Lifetime",
+    "sessionName": "Session cookie (login)",
+    "sessionPurpose": "Keeps you signed in and protects your session against misuse",
+    "sessionLifetime": "Deleted at sign-out — otherwise expires 30 days after last activity",
+    "localePurpose": "Remembers the language you selected",
+    "localeLifetime": "12 months",
+    "noConsentNote": "Because we only set necessary cookies, we do not ask for consent. Should we later need analytics cookies, we will ask first — and you can say no without it affecting your use of the service.",
+    "altchaNote": "Our bot protection (ALTCHA) runs on our own servers and sets neither cookies nor third-party scripts."
   }
 }

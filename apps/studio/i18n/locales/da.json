@@ -795,5 +795,19 @@
     },
     "receipt": "Kvittering →",
     "noInvoices": "Ingen fakturaer endnu."
+  },
+  "legalCookies": {
+    "title": "Cookies",
+    "intro": "Grundtone Studio bruger kun de cookies, der er nødvendige for at tjenesten fungerer. Vi bruger ingen cookies til markedsføring eller tredjeparts-sporing.",
+    "colCookie": "Cookie",
+    "colPurpose": "Formål",
+    "colLifetime": "Levetid",
+    "sessionName": "Session-cookie (login)",
+    "sessionPurpose": "Holder dig logget ind og beskytter mod misbrug af din session",
+    "sessionLifetime": "Slettes ved log ud — udløber ellers 30 dage efter seneste aktivitet",
+    "localePurpose": "Husker det sprog, du har valgt",
+    "localeLifetime": "12 måneder",
+    "noConsentNote": "Fordi vi kun sætter nødvendige cookies, beder vi dig ikke om samtykke. Får vi senere behov for statistik-cookies, spørger vi først — og du kan sige nej uden at det påvirker din brug af tjenesten.",
+    "altchaNote": "Vores bot-beskyttelse (ALTCHA) kører på vores egne servere og sætter hverken cookies eller tredjeparts-scripts."
   }
 }

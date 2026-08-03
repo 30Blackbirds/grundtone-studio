@@ -30,13 +30,15 @@ export default defineNuxtConfig({
         _require.resolve('@opentelemetry/sdk-metrics'),
       ],
     },
-    // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
-    // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
-    // (api.klanghaus.dk/docs / lokal localhost:8000/docs). `production: 'runtime'`
-    // kræves for at specet også serveres i den byggede .output (experimental-
-    // flaget alene er dev-only).
+    // Auto-genereret OpenAPI-spec (dev-only DX på /_openapi.json + doc-UI'er).
     experimental: { openAPI: true },
-    openAPI: { production: 'runtime' },
+    // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
+    // /_scalar var OFFENTLIGE i prod (loadede cdn.jsdelivr.net = consent-
+    // brud) og /_openapi.json udstillede 36 interne API-stier. api.klanghaus.
+    // dk/docs-aggregeringen er STATISKE filer (infra-verificeret file_server,
+    // IKKE live-fetch af denne rute) — så runtime-serving slås HELT fra:
+    // ingen production-nøgle = spec + UI'er findes kun i dev (lokal DX).
+    // Build-time spec-artefakt til docs-pipelinen er et separat [docs]-spor.
   },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],

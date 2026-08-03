@@ -67,17 +67,11 @@
           <GTIcon name="menu" />
         </button>
         <NuxtLink to="/dashboard" class="brand-link flex items-center gap-2">
-          <!-- Officielt grundtone-mærke via jsDelivrs npm-CDN (@grundtone/core
-               bundler assets/**). PINNET version med vilje — @latest ville
-               skifte mærket under os ved en fremtidig core-release
-               (redesign-language-switch.html §5). -->
-          <img
-            src="https://cdn.jsdelivr.net/npm/@grundtone/core@2.22.0/assets/logo-32x32.png"
-            width="22"
-            height="22"
-            alt=""
-            class="brand-logo"
-          />
+          <!-- Officielt grundtone-mærke, SELV-HOSTET (vendoret fra
+               @grundtone/core@2.22.0 assets) — jura-consent-notatet: ingen
+               tredjeparts-CDN-loads i appen (IP-deling ved sidevisning);
+               vendoring erstatter jsDelivr-pinningen fra forlæggets §5. -->
+          <img src="/brand/logo-32x32.png" width="22" height="22" alt="" class="brand-logo" />
           {{ t('app.name') }}
         </NuxtLink>
         <OrgSwitcher class="app-shell__org-switcher" />
@@ -114,13 +108,7 @@
       >
         <div class="flex justify-between items-center p-4 border-b">
           <span class="brand-link flex items-center gap-2">
-            <img
-              src="https://cdn.jsdelivr.net/npm/@grundtone/core@2.22.0/assets/logo-32x32.png"
-              width="22"
-              height="22"
-              alt=""
-              class="brand-logo"
-            />
+            <img src="/brand/logo-32x32.png" width="22" height="22" alt="" class="brand-logo" />
             {{ t('app.name') }}
           </span>
           <button
