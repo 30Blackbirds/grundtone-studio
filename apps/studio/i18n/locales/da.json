@@ -46,7 +46,7 @@
     "s25purpose": "Formål: fejlfinding og stabil drift.",
     "s25basis": "Retsgrundlag: art. 6, stk. 1, litra f (legitim interesse i fejlfri drift). Fejldata opbevares kortvarigt (se afsnit 7).",
     "s26h": "2.6 Statistik (Matomo) og markedsføring — kun med samtykke",
-    "s26data": "Statistik: vi bruger selv-hostet Matomo. Analytics-cookies/-måling aktiveres kun efter dit samtykke og kan til enhver tid trækkes tilbage med samme lethed.",
+    "s26data": "Statistik: vi indsamler i dag ingen statistik om din brug af Studio. Aktiverer vi det senere, sker det med en selv-hostet løsning (Matomo), og kun efter dit samtykke — som til enhver tid kan trækkes tilbage med samme lethed.",
     "s26purpose": "Markedsføring (nyhedsbreve mv.): kun med dit forudgående, aktive samtykke, jf. markedsføringslovens § 10. Samtykke er aldrig en betingelse for at bruge tjenesten og bundtes aldrig med accept af vilkår.",
     "s26basis": "Retsgrundlag: art. 6, stk. 1, litra a (samtykke).",
     "s2noTracking": "Vi bruger ingen tredjeparts-tracking. Vores bot-beskyttelse (ALTCHA) er selv-hostet og sætter ingen tredjeparts-cookies.",
@@ -106,7 +106,7 @@
     },
     "securityHeading": "Behandlingssikkerhed (art. 32)",
     "security": {
-      "encryption": "Kryptering: TLS på al transport; databaser krypteret at rest.",
+      "encryption": "Kryptering: TLS på al transport; managed databaser krypteret at rest inkl. backups.",
       "access": "Adgangsstyring: rollebaseret adgang, tenant-isolation, adgang efter arbejdsbetinget behov.",
       "audit": "Sporbarhed: revisionslog over administrative handlinger; adskilte miljøer; EU-hosting.",
       "incident": "Brud: vi underretter kunden uden unødig forsinkelse, så kunden kan overholde sin 72-timers-frist (art. 33)."

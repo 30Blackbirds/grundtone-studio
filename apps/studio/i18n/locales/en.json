@@ -46,7 +46,7 @@
     "s25purpose": "Purpose: debugging and stable operation.",
     "s25basis": "Legal basis: art. 6(1)(f). Error data is retained briefly (see section 7).",
     "s26h": "2.6 Analytics (Matomo) and marketing — consent only",
-    "s26data": "Analytics: we use self-hosted Matomo. Analytics measurement is activated only after your consent, withdrawable at any time with the same ease.",
+    "s26data": "Analytics: we currently collect no analytics about your use of Studio. If we enable it later, it will run on a self-hosted solution (Matomo) and only after your consent, withdrawable at any time with the same ease.",
     "s26purpose": "Marketing (newsletters etc.): only with your prior, active consent. Consent is never a condition for using the service and is never bundled with accepting the terms of service.",
     "s26basis": "Legal basis: art. 6(1)(a) (consent).",
     "s2noTracking": "We use no third-party tracking. Our bot protection (ALTCHA) is self-hosted and sets no third-party cookies.",
@@ -106,7 +106,7 @@
     },
     "securityHeading": "Security of processing (art. 32)",
     "security": {
-      "encryption": "Encryption: TLS on all transport; databases encrypted at rest.",
+      "encryption": "Encryption: TLS on all transport; managed databases encrypted at rest incl. backups.",
       "access": "Access control: role-based access, tenant isolation, access on a need-to-know basis.",
       "audit": "Traceability: audit log of administrative actions; separated environments; EU hosting.",
       "incident": "Breaches: we notify the customer without undue delay, enabling the customer to meet its 72-hour deadline (art. 33)."
