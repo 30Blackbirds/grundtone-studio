@@ -123,8 +123,14 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # scope=studio-v2 (2026-08-03): bust af stale buildx-gha-cache —
+          # CI-imaget manglede @opentelemetry/* komplet selv om et frisk build
+          # af samme commit indeholder dem (lokalt verificeret: identisk
+          # Dockerfile+context bygger korrekt og booter grønt). Gamle cache-
+          # layers fra før traceInclude/deref-fixene blev genbrugt på tværs af
+          # runs. Bump scope-suffikset ved fremtidige stale-cache-mistanker.
+          cache-from: type=gha,scope=studio-v2
+          cache-to: type=gha,mode=max,scope=studio-v2
           provenance: false
           # Privat @klanghaus-pakke-adgang: Dockerfile'en mounter dette som
           # `--mount=type=secret,id=node_auth_token`. Uden det fejler pnpm install
