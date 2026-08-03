@@ -22,13 +22,18 @@ overrides:
   # GHSA — critical node-tar decompression/parse DoS (unlimited input) plus a
   # high infinite-loop on negative entry size; both patched in 7.5.19. Pulled
   # in via @sentry/nuxt > nuxt > nitropack > @vercel/nft > @mapbox/node-pre-gyp.
-  tar: '>=7.5.19'
+  # (+ opfølger patched 7.5.21 — decompression-DoS-fixet i 7.5.19/20 var
+  # utilstrækkeligt; gulvet hævet så prod-audit-gaten forbliver grøn.)
+  tar: '>=7.5.21'
   # GHSA — high: js-yaml quadratic/exponential parse-time DoS. The old merge-key
   # advisory was patched in 4.3.0; a newer exponential-parse-time-in-flow-
-  # collections advisory (vuln 5.0.0–5.2.1) is patched in 5.2.2. The tree already
-  # resolves js-yaml to 5.x via @nuxtjs/i18n > @rollup/plugin-yaml, so floor to
-  # 5.2.2 to cover both. API is stable across the bump for our consumers.
-  js-yaml: '>=5.2.2'
+  # collections advisory (vuln 5.0.0–5.2.1) is patched in 5.2.2.
+  # RANGE-SCOPED, ikke blanket: read-yaml-file@1.x (changesets-kæden) deklarerer
+  # js-yaml ^3 og kalder safeLoad, som er FJERNET i v4+ — den blanke '>=5.2.2'
+  # knækkede release-workflowets changesets-publish med "yaml.safeLoad is not a
+  # function" (samme brud som grundtone#113; 3.x er ikke i advisory-spannene).
+  'js-yaml@>=5.0.0 <5.2.2': '>=5.2.2'
+  'js-yaml@>=4.0.0 <4.3.0': '>=4.3.0'
   # GHSA-mh99-v99m-4gvg — high: brace-expansion OOM-crash DoS via unbounded
   # expansion. The advisory marks EVERY version <=5.0.7 vulnerable across all
   # major lines and patches only in 5.0.8, so the earlier "keep 2.x on 2.1.2"
@@ -37,7 +42,9 @@ overrides:
   # line (<2.0.0, used by minimatch@3) is left untouched — a flat 5.x bump there
   # risks the CJS/ESM break the original scoping guarded against; no 1.x
   # brace-expansion is in the prod tree (audit confirms green).
-  'brace-expansion@>=2.0.0 <5.0.8': '>=5.0.8'
+  # (+ opfølger patched 5.0.9 — 5.0.8-mitigeringen af CVE-2026-14257 kunne
+  # omgås; span + gulv hævet tilsvarende.)
+  'brace-expansion@>=2.0.0 <5.0.9': '>=5.0.9'
   # GHSA — high (x2): Immutable.js List 32-bit trie overflow + Map/Set hash-
   # collision algorithmic-complexity DoS; both patched in 5.1.8. Pulled in via
   # @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite > sass. Remove when sass
