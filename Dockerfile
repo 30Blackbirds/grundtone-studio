@@ -44,6 +44,17 @@ RUN --mount=type=secret,id=node_auth_token \
     NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
     pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
 
+# v0.2.11-incident-familien, runde 2: Nitro skriver dele af runtime-
+# node_modules som RELATIVE SYMLINKS ind i .output/server/node_modules/.nitro-
+# storen (fx @opentelemetry/core -> ../.nitro/...). pnpm deploy-kopien
+# efterlader linkene knækkede i imaget → MODULE_NOT_FOUND ved boot, selv om
+# lokal .output resolver fint. Dereferencér HELE .output fra builder-træet så
+# runtime aldrig afhænger af symlinks — dræber klassen, ikke kun dette
+# tilfælde. (Boot-smoken i build.yml er gaten der fanger regressioner.)
+RUN rm -rf /deploy/.output \
+ && cp -RL /app/apps/studio/.output /deploy/.output \
+ && test -f /deploy/.output/server/node_modules/@opentelemetry/core/package.json
+
 # Nitro beholder `unhead` som external men dens trace misser den transitive
 # `hookable`-dep (under pnpm er den ikke top-level-hoisted), så runtime kaster
 # ERR_MODULE_NOT_FOUND. Kopiér hookable ind dér hvor unhead resolver den.
