@@ -57,49 +57,6 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # Boot-smoke (v0.2.11-incident, 2026-08-03): the image MUST come up and
-      # answer healthz + serve a real page before any deploy job may run. The
-      # v0.2.11 crashloop (Nitro dropped transitive OTel deps from the runtime
-      # node_modules) booted fine locally — only the pruned image failed, so
-      # only running the actual image catches this class. Dummy env: the app
-      # boots without real backends; pages render SSR shells. OTel endpoint is
-      # set ON so the telemetry path is exercised, not skipped.
-      - name: Boot-smoke the image
-        # Entrypointet kører migrationer FØR serveren starter (afdækket af den
-        # første boot-smoke-kørsel: dummy-DB → migrate-crash før noget andet).
-        # En rigtig Postgres-sidecar gør smoken trofast — og validerer samtidig
-        # at migrationskæden kører rent mod en tom database.
-        run: |
-          docker network create smokenet
-          docker run -d --name smokedb --network smokenet \
-            -e POSTGRES_PASSWORD=smoke postgres:16-alpine
-          for i in $(seq 1 15); do
-            docker exec smokedb pg_isready -U postgres > /dev/null 2>&1 && break
-            [ "$i" = 15 ] && { echo "✗ postgres-sidecar kom aldrig op"; exit 1; }
-            sleep 2
-          done
-          docker run -d --name bootsmoke --network smokenet -p 3000:3000 \
-            -e DATABASE_URL="postgres://postgres:smoke@smokedb:5432/postgres" \
-            -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
-            -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
-            "$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
-          for i in $(seq 1 18); do
-            if curl -sf http://127.0.0.1:3000/api/healthz > /dev/null; then
-              echo "✓ image boots (healthz)"
-              break
-            fi
-            if [ "$(docker inspect -f '{{.State.Running}}' bootsmoke)" != "true" ]; then
-              echo "✗ container died during boot"; docker logs bootsmoke | tail -50; exit 1
-            fi
-            [ "$i" = 18 ] && { echo "✗ boot-smoke timed out"; docker logs bootsmoke | tail -50; exit 1; }
-            sleep 5
-          done
-          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/login)
-          [ "$code" = "200" ] || { echo "✗ /login returned $code in boot-smoke"; docker logs bootsmoke | tail -50; exit 1; }
-          echo "✓ /login 200 in boot-smoke"
-          docker rm -f bootsmoke smokedb
-          docker network rm smokenet
-
       - name: Pick the canonical deploy tag
         id: tag
         # Tag pushes deploy the semver tag (X.Y.Z); branch pushes use the
@@ -123,12 +80,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # scope=studio-v2 (2026-08-03): bust af stale buildx-gha-cache —
-          # CI-imaget manglede @opentelemetry/* komplet selv om et frisk build
-          # af samme commit indeholder dem (lokalt verificeret: identisk
-          # Dockerfile+context bygger korrekt og booter grønt). Gamle cache-
-          # layers fra før traceInclude/deref-fixene blev genbrugt på tværs af
-          # runs. Bump scope-suffikset ved fremtidige stale-cache-mistanker.
+          # scope=studio-v2: frisk cache-scope indført under v0.2.11-runde 4
+          # på en stale-cache-hypotese der siden blev AFKRÆFTET (rodårsagen var
+          # smoke-før-push, se boot-smoke-steppet). Beholdes som harmløs
+          # hygiejne; bump suffikset ved reelle stale-cache-mistanker.
           cache-from: type=gha,scope=studio-v2
           cache-to: type=gha,mode=max,scope=studio-v2
           provenance: false
@@ -139,6 +94,60 @@ jobs:
           secrets: |
             node_auth_token=${{ secrets.GITHUB_TOKEN }}
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+
+      # Boot-smoke (v0.2.11-incident, 2026-08-03): the image MUST come up and
+      # answer healthz + serve a real page before any deploy job may run. The
+      # v0.2.11 crashloop (Nitro dropped transitive OTel deps from the runtime
+      # node_modules) booted fine locally — only the pruned image failed, so
+      # only running the actual image catches this class. Dummy env: the app
+      # boots without real backends; pages render SSR shells. OTel endpoint is
+      # set ON so the telemetry path is exercised, not skipped.
+      #
+      # PLACERING + DIGEST ER BÆRENDE (v0.2.11-runde 6): steppet SKAL stå
+      # EFTER push og teste den PUSHEDE DIGEST. Den oprindelige placering før
+      # push testede stiltiende forrige runs registry-image (container-driveren
+      # loader ikke builds i daemonen, så `docker run :main` puller) — tre
+      # runder "fejlede" på v0.2.11's gamle artefakt mens de reelle builds
+      # aldrig blev målt. Digest-pin = artefakten deploy-jobbene reelt puller;
+      # fejler smoken, fejler jobbet, og ingen deploy sker (prod pinner
+      # semver/sha-tags, aldrig :main, så et upåvist :main-tag er harmløst).
+      - name: Boot-smoke the pushed image
+        # Entrypointet kører migrationer FØR serveren starter (afdækket af den
+        # første boot-smoke-kørsel: dummy-DB → migrate-crash før noget andet).
+        # En rigtig Postgres-sidecar gør smoken trofast — og validerer samtidig
+        # at migrationskæden kører rent mod en tom database.
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          echo "smoker $IMAGE"
+          docker network create smokenet
+          docker run -d --name smokedb --network smokenet \
+            -e POSTGRES_PASSWORD=smoke postgres:16-alpine
+          for i in $(seq 1 15); do
+            docker exec smokedb pg_isready -U postgres > /dev/null 2>&1 && break
+            [ "$i" = 15 ] && { echo "✗ postgres-sidecar kom aldrig op"; exit 1; }
+            sleep 2
+          done
+          docker run -d --name bootsmoke --network smokenet -p 3000:3000 \
+            -e DATABASE_URL="postgres://postgres:smoke@smokedb:5432/postgres" \
+            -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
+            -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
+            "$IMAGE"
+          for i in $(seq 1 18); do
+            if curl -sf http://127.0.0.1:3000/api/healthz > /dev/null; then
+              echo "✓ image boots (healthz)"
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' bootsmoke)" != "true" ]; then
+              echo "✗ container died during boot"; docker logs bootsmoke | tail -50; exit 1
+            fi
+            [ "$i" = 18 ] && { echo "✗ boot-smoke timed out"; docker logs bootsmoke | tail -50; exit 1; }
+            sleep 5
+          done
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/login)
+          [ "$code" = "200" ] || { echo "✗ /login returned $code in boot-smoke"; docker logs bootsmoke | tail -50; exit 1; }
+          echo "✓ /login 200 in boot-smoke"
+          docker rm -f bootsmoke smokedb
+          docker network rm smokenet
 
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
