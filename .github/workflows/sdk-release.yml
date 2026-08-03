@@ -25,6 +25,15 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      # Privat @klanghaus-pakke-adgang (permissions-client via npm.pkg.github.com)
+      packages: read
+
+    # .npmrc auth'er @klanghaus-scope med ${NODE_AUTH_TOKEN}. Manglede her —
+    # latent 401 i install-steppet, maskeret af warm pnpm-cache indtil
+    # lockfile-ændringen i #181 bustede cache-nøglen. Job-niveau så både
+    # install, build og changesets-publish er dækket.
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
