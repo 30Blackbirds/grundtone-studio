@@ -12,23 +12,15 @@ export default defineNuxtConfig({
     '/account': { ssr: false },
   },
   nitro: {
-    // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
-    // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
-    // (api.klanghaus.dk/docs / lokal localhost:8000/docs). `production: 'runtime'`
-    // kræves for at specet også serveres i den byggede .output (experimental-
-    // flaget alene er dev-only).
+    // Auto-genereret OpenAPI-spec (dev-only DX på /_openapi.json + doc-UI'er).
     experimental: { openAPI: true },
-    // Jura-fund 2026-08-03 (consent-spec §1a): /_swagger + /_scalar var
-    // OFFENTLIGE i prod og loadede cdn.jsdelivr.net (tredjeparts-load =
-    // consent-brud) — og /_openapi.json udstillede 36 interne API-stier
-    // (angrebsflade-beskrivelse). UI'erne er slået HELT fra (framework-
-    // default, ingen har brug for dem på Studios domæne — API-docs bor på
-    // api.klanghaus.dk); spec-ruten består til aggregatoren men gates af
-    // server/middleware/openapi-guard.ts (token, fail-closed i prod).
-    openAPI: {
-      production: 'runtime',
-      ui: { scalar: false, swagger: false },
-    },
+    // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
+    // /_scalar var OFFENTLIGE i prod (loadede cdn.jsdelivr.net = consent-
+    // brud) og /_openapi.json udstillede 36 interne API-stier. api.klanghaus.
+    // dk/docs-aggregeringen er STATISKE filer (infra-verificeret file_server,
+    // IKKE live-fetch af denne rute) — så runtime-serving slås HELT fra:
+    // ingen production-nøgle = spec + UI'er findes kun i dev (lokal DX).
+    // Build-time spec-artefakt til docs-pipelinen er et separat [docs]-spor.
   },
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
