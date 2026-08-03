@@ -117,7 +117,9 @@ jobs:
         # En rigtig Postgres-sidecar gør smoken trofast — og validerer samtidig
         # at migrationskæden kører rent mod en tom database.
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          # github.repository har store bogstaver (KlangHaus/…) — docker kræver
+          # lowercase repo-navne (metadata-action lowercaser selv, rå env gør ikke)
+          IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
           echo "smoker $IMAGE"
           docker network create smokenet
           docker run -d --name smokedb --network smokenet \
