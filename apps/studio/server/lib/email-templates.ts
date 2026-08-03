@@ -99,58 +99,6 @@ export function magicLinkEmail(
   }
 }
 
-export interface VerifyEmailArgs {
-  url: string
-  name?: string
-}
-
-export function verifyEmailEmail(
-  args: VerifyEmailArgs,
-  locale: Locale = DEFAULT_LOCALE,
-): RenderedEmail {
-  const { url, name } = args
-  const greetingDa = name ? `Hej ${name},` : 'Hej,'
-  const greetingEn = name ? `Hi ${name},` : 'Hi,'
-  if (locale === 'da') {
-    return {
-      subject: 'Bekræft din e-mail til Grundtone Studio',
-      text: [
-        greetingDa,
-        '',
-        'Velkommen til Grundtone Studio. Bekræft din e-mailadresse ved at klikke på linket nedenfor:',
-        '',
-        url,
-        '',
-        'Linket udløber om 1 time. Hvis du ikke har oprettet en konto, kan du ignorere e-mailen.',
-      ].join('\n'),
-      html: `
-        <p>${esc(greetingDa)}</p>
-        <p>Velkommen til Grundtone Studio. Bekræft din e-mailadresse ved at klikke på linket nedenfor:</p>
-        <p><a href="${esc(url)}">Bekræft min e-mail</a></p>
-        <p>Linket udløber om 1 time. Hvis du ikke har oprettet en konto, kan du ignorere e-mailen.</p>
-      `,
-    }
-  }
-  return {
-    subject: 'Verify your email for Grundtone Studio',
-    text: [
-      greetingEn,
-      '',
-      'Welcome to Grundtone Studio. Verify your email address by clicking the link below:',
-      '',
-      url,
-      '',
-      `The link expires in 1 hour. If you didn't create an account, ignore this email.`,
-    ].join('\n'),
-    html: `
-      <p>${esc(greetingEn)}</p>
-      <p>Welcome to Grundtone Studio. Verify your email address by clicking the link below:</p>
-      <p><a href="${esc(url)}">Verify my email</a></p>
-      <p>The link expires in 1 hour. If you didn't create an account, ignore this email.</p>
-    `,
-  }
-}
-
 export interface OrgInviteArgs {
   acceptUrl: string
   orgName: string
