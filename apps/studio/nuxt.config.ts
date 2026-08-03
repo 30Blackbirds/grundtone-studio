@@ -1,3 +1,9 @@
+import { createRequire } from 'node:module'
+
+// traceInclude tager FIL-stier, ikke pakkenavne — resolve til entry-filerne
+// (byggefejl "File …/@opentelemetry/sdk-metrics does not exist" ellers).
+const _require = createRequire(import.meta.url)
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-21',
@@ -12,6 +18,18 @@ export default defineNuxtConfig({
     '/account': { ssr: false },
   },
   nitro: {
+    // v0.2.11-incident: Nitros externals-tracing missede transitive CJS-deps i
+    // OTel-exporter-kæden (exporter-metrics-otlp-proto → -otlp-http → …) —
+    // imaget bootede med MODULE_NOT_FOUND. traceInclude tvinger hele grafen
+    // med i .output/server/node_modules. Plugin'en er derudover fail-soft
+    // (dynamiske imports + try/catch), så en regression her koster telemetri,
+    // aldrig boot. CI's boot-smoke (build.yml) er den strukturelle gate.
+    externals: {
+      traceInclude: [
+        _require.resolve('@opentelemetry/exporter-metrics-otlp-proto'),
+        _require.resolve('@opentelemetry/sdk-metrics'),
+      ],
+    },
     // Auto-genereret OpenAPI-spec (dev-only DX på /_openapi.json + doc-UI'er).
     experimental: { openAPI: true },
     // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
