@@ -19,83 +19,163 @@
     "subProcessors": "Sub-processors"
   },
   "privacy": {
-    "title": "Privacy policy",
-    "updated": "Last updated: May 2026",
-    "intro": "Grundtone Studio is a platform for configuring and distributing design tokens. We process the minimum personal data required to deliver that service. This page summarises what we collect, why, how long we keep it, and how to contact us.",
-    "controllerHeading": "Data controller",
-    "controller": "ASP Productions ApS, CVR pending — operating as KlangHaus. The data controller is responsible for what's described below; for questions, write to the contact address at the bottom.",
-    "dataHeading": "What we collect",
-    "data": {
-      "account": "Account data: name, email, hashed password (Better Auth). Used to authenticate and to label content you create.",
-      "session": "Session data: a strictly necessary session cookie + the IP address and user-agent of your login. Used to keep you signed in and to detect suspicious activity.",
-      "tokens": "Project data: design tokens, version history, API keys (hashed), member roles. Stored to deliver the product.",
-      "cdn": "CDN access logs: API key prefix, origin, request timing. Retained 30 days for abuse detection."
-    },
-    "legalHeading": "Legal basis",
-    "legal": "Contract (delivering Studio to you) for account, session, and project data. Legitimate interest (security + abuse prevention) for access logs. We do not run marketing tracking and have no advertising cookies.",
-    "retentionHeading": "Retention",
-    "retention": {
-      "account": "Account data: until you delete the account, then deleted within 30 days.",
-      "session": "Sessions: 30 days of inactivity, then expired automatically.",
-      "tokens": "Project data: kept while the org exists. Deleting the org cascades.",
-      "logs": "Access logs: 30 days, then dropped."
-    },
-    "rightsHeading": "Your rights",
-    "rights": "You can request access, correction, deletion, restriction, and data portability under GDPR. We respond within one month. Write to the contact address below or use the account page in Studio (/account).",
-    "subProcessorsHeading": "Sub-processors",
-    "subProcessors": "We use a small set of EU-located processors to operate Studio. The full list is at",
-    "subProcessorsLink": "Sub-processors",
-    "contactHeading": "Contact"
+    "title": "Privacy Policy",
+    "versionLine": "Version 1.0 · Last updated: 3 August 2026 · The Danish version is authoritative",
+    "s1h": "Controller",
+    "s1controller": "Asp Productions ApS, Danish company reg. no. (CVR) 36708077, Raffinaderivej 20, DK-2300 Copenhagen S, Denmark. KlangHaus is a trading name of Asp Productions ApS.",
+    "s1contactLabel": "Data protection contact:",
+    "s1dpoNote": "We are not required to appoint a Data Protection Officer and have not done so; inquiries are handled by management.",
+    "s2h": "What we process, and why",
+    "s21h": "2.1 Account and login",
+    "s21data": "Data: name, email address, password (hashed), organisation membership, roles, login timestamps, session and security logs, 2FA data where enabled.",
+    "s21purpose": "Purpose: account creation and operation, access control, security.",
+    "s21basis": "Legal basis: GDPR art. 6(1)(b) (contract) and 6(1)(f) (legitimate interest in secure operation and abuse prevention).",
+    "s22h": "2.2 Use of Grundtone Studio",
+    "s22data": "Data: your projects, tokens and configurations to the extent they contain personal data (typically they do not), member lists, audit log of actions, API-key metadata.",
+    "s22purpose": "Purpose: providing the service, version history, traceability, security.",
+    "s22basis": "Legal basis: art. 6(1)(b) and 6(1)(f).",
+    "s23h": "2.3 Payments and invoicing",
+    "s23data": "Data: billing name and address, VAT number, plan and payment history, masked card details (e.g. card brand + last 4 digits). Full card data is processed solely by our payment provider (Stripe) — we never store it ourselves.",
+    "s23purpose": "Purpose: charging, invoicing, bookkeeping, VAT reporting.",
+    "s23basis": "Legal basis: art. 6(1)(b) and 6(1)(c) (legal obligations under Danish bookkeeping and tax law).",
+    "s24h": "2.4 Support",
+    "s24data": "Data: your inquiry and the information you provide.",
+    "s24purpose": "Purpose: answering and documenting the inquiry.",
+    "s24basis": "Legal basis: art. 6(1)(b) or (f).",
+    "s25h": "2.5 Error logging and operations",
+    "s25data": "Data: technical error events (may include user ID and IP address), operational metrics. Error reports are sent from your browser directly to our error-reporting provider (Sentry, EU region). No cookies are set, and the data is not used to track you across websites.",
+    "s25purpose": "Purpose: debugging and stable operation.",
+    "s25basis": "Legal basis: art. 6(1)(f). Error data is retained briefly (see section 7).",
+    "s26h": "2.6 Analytics (Matomo) and marketing — consent only",
+    "s26data": "Analytics: we currently collect no analytics about your use of Studio. If we enable it later, it will run on a self-hosted solution (Matomo) and only after your consent, withdrawable at any time with the same ease.",
+    "s26purpose": "Marketing (newsletters etc.): only with your prior, active consent. Consent is never a condition for using the service and is never bundled with accepting the terms of service.",
+    "s26basis": "Legal basis: art. 6(1)(a) (consent).",
+    "s2noTracking": "We use no third-party tracking. Our bot protection (ALTCHA) is self-hosted and sets no third-party cookies.",
+    "s3h": "Where the data comes from",
+    "s3p": "We collect data from you and from your use of the service. If you were added as a member of an organisation by someone else (e.g. your employer or a client who invited you), we received your name and email from that organisation (an art. 14 situation) — the organisation is responsible for having a basis for inviting you.",
+    "s4h": "Roles: controller vs. processor",
+    "s4controller": "For account, payment, support and operational data we are the controller.",
+    "s4processor": "For content our B2B customers place in the service (e.g. their end-users' data in customer-controlled projects) the customer is the controller and we act as processor under a data processing agreement (art. 28).",
+    "s5h": "Disclosure",
+    "s5p": "We never sell your data. We disclose it only to: (a) our processors (section 6), (b) public authorities where legally required, (c) our auditor/advisers under confidentiality, and (d) the payment provider Stripe, which for the payment transaction itself also acts as an independent controller (e.g. fraud prevention under its own rules).",
+    "s6h": "Processors (sub-suppliers)",
+    "s6intro": "This list is verified against our actual systems. Business customers: see also our data processing agreement.",
+    "s6vimeoNote": "Vimeo removed from the list: not used in Studio (other products' video surfaces only — revisit at their launch).",
+    "s6currentList": "The list in force at any time appears on",
+    "subProcessorsLink": "the sub-processors page",
+    "s7h": "Retention",
+    "s7colCategory": "Category",
+    "s7colRetention": "Retention",
+    "s7r1cat": "Account data",
+    "s7r1val": "While the account exists; deleted on account deletion (art. 17 cascade) and out of all backups no later than 90 days afterwards",
+    "s7r2cat": "Content (projects/tokens)",
+    "s7r2val": "Until termination + 30-day export window, cf. Terms §12",
+    "s7r3cat": "Audit log",
+    "s7r3val": "12 months",
+    "s7r4cat": "Accounting records (invoices etc.)",
+    "s7r4val": "5 years from end of financial year (Danish Bookkeeping Act)",
+    "s7r5cat": "Error events (Sentry)",
+    "s7r5val": "No more than 90 days",
+    "s7r6cat": "Support correspondence",
+    "s7r6val": "24 months",
+    "s7r7cat": "Consent records",
+    "s7r7val": "While consent is active + 3 years (proof of lawful processing)",
+    "s8h": "Your rights",
+    "s8rights": "Under the GDPR you have the right of access (art. 15), rectification (art. 16), erasure (art. 17), restriction (art. 18), data portability (art. 20) and objection (art. 21), and the right to withdraw consent at any time (without affecting processing before withdrawal).",
+    "s8selfService": "Account deletion and data export are available directly in the service's self-service. Other requests:",
+    "s8responseTime": "We respond within one month.",
+    "s8noAutomated": "We make no decisions based solely on automated processing that produce legal effects concerning you (art. 22).",
+    "s9h": "Complaints",
+    "s9p": "You may lodge a complaint with the Danish Data Protection Agency (Datatilsynet), Carl Jacobsens Vej 35, DK-2500 Valby, www.datatilsynet.dk. We would appreciate the chance to resolve the matter first.",
+    "s10h": "Changes",
+    "s10p": "Material changes to this policy are notified by email or in the service. This policy's version and date appear at the top."
   },
   "dpa": {
-    "title": "Data processing agreement",
-    "updated": "Last updated: May 2026",
-    "intakeHeading": "Need a signed copy?",
-    "intakeBody": "This page is a public template covering what our DPA contains. To get a signed copy on your company letterhead, write to",
-    "intro": "This template summarises the Data Processing Agreement (DPA) Grundtone (ASP Productions ApS) offers to organisations that use Studio as a data processor under GDPR art. 28. The full signable contract is provided on request.",
-    "scopeHeading": "Scope",
-    "scope": "Grundtone acts as data processor for design tokens, organisation membership data, and project content that your team uploads. You remain the data controller for that data.",
-    "processingHeading": "Processing",
+    "title": "Data Processing Agreement (DPA)",
+    "updated": "Last updated: 3 August 2026",
+    "intakeHeading": "Business customer?",
+    "intakeBody": "The data processing agreement is concluded as an annex to the Grundtone Studio subscription agreement. The agreement text is undergoing external legal review and is available on request via",
+    "intro": "When your organisation places content containing personal data in Grundtone Studio, your organisation is the controller and Asp Productions ApS (Danish CVR 36708077, trading as KlangHaus) is the processor under GDPR art. 28. This page describes the framework — it is not the agreement itself.",
+    "scopeHeading": "Scope and instructions",
+    "scope": "We process solely on documented instructions from the customer. The instructions consist of the subscription agreement, the data processing agreement and the customer's configuration and use of the service's features.",
+    "processingHeading": "Subject matter of processing",
     "processing": {
-      "purpose": "Purpose: deliver Studio's design-token configuration and CDN distribution service.",
-      "duration": "Duration: until contract termination or your written request to delete.",
-      "dataTypes": "Data types: account info, design tokens, API keys (hashed), CDN access logs.",
-      "subjects": "Data subjects: your organisation's admins, designers, and end users whose browsers fetch tokens via your API key."
+      "purpose": "Subject matter: operating Grundtone Studio — hosting, versioning and CDN publication of the customer's design tokens/brand configurations plus associated user and access management.",
+      "duration": "Duration: the term of the subscription agreement plus the export window and deletion at termination.",
+      "dataTypes": "Data types: name, email, role/membership, action log (audit), technical identifiers (IP, session ID). No special categories (art. 9) — the service is not intended for them.",
+      "subjects": "Categories of data subjects: the customer's employees/members in the service."
     },
-    "securityHeading": "Security measures",
+    "securityHeading": "Security of processing (art. 32)",
     "security": {
-      "encryption": "TLS in transit, AES-256 at rest on UpCloud Managed Postgres + Object Storage.",
-      "access": "Role-based access: only authorised KlangHaus personnel can access production systems; access is logged.",
-      "audit": "Audit log of admin actions retained for 12 months.",
-      "incident": "Personal data breach notification to you within 72 hours of discovery."
+      "encryption": "Encryption: TLS on all transport; managed databases encrypted at rest incl. backups.",
+      "access": "Access control: role-based access, tenant isolation, access on a need-to-know basis.",
+      "audit": "Traceability: audit log of administrative actions; separated environments; EU hosting.",
+      "incident": "Breaches: we notify the customer without undue delay, enabling the customer to meet its 72-hour deadline (art. 33)."
     },
     "subProcessorsHeading": "Sub-processors",
-    "subProcessors": "We use the EU-located sub-processors listed at",
+    "subProcessors": "The customer gives general prior authorisation for the sub-processors on our list; changes are notified in writing at least 30 days before use. See",
     "terminationHeading": "Termination",
-    "termination": "On termination, all your data is deleted from production systems within 30 days. Backups are purged on their normal rotation, max 90 days. A deletion certificate is available on request.",
+    "termination": "At termination we delete or return (at the customer's choice) all personal data, unless law requires retention. The service includes self-service export (art. 20) and deletion (art. 17); the export window appears in the Terms §12.",
     "lawHeading": "Governing law",
-    "law": "Danish law. Disputes go to the Court of Copenhagen unless mandatory consumer-protection rules apply differently."
+    "law": "The agreement follows the subscription agreement's provisions on governing law and venue (Danish law)."
   },
   "subProcessors": {
     "title": "Sub-processors",
-    "updated": "Last updated: May 2026",
-    "intro": "Grundtone uses the following EU-located sub-processors to operate Studio. Each provider has its own DPA + GDPR commitments — links below.",
-    "dpaLink": "Their DPA →",
-    "notification": "We notify customers 30 days before adding a new sub-processor unless an urgent security replacement is required. Material objections can lead to contract termination per the DPA.",
-    "upcloud": {
-      "role": "Application hosting, Managed PostgreSQL, Object Storage"
-    },
-    "bunny": {
-      "role": "CDN edge caching for /k/ endpoints (public API key in URL)"
-    },
-    "postmark": {
-      "role": "Transactional email delivery (magic links, invitations)"
-    },
-    "sentry": {
-      "role": "Error tracking + performance monitoring"
-    },
-    "github": {
-      "role": "Source code hosting + CI; no production customer data"
+    "updated": "Last updated: 3 August 2026",
+    "intro": "These are the sub-processors that process personal data on our behalf. The list is verified against our actual systems and is identical to section 6 of the privacy policy.",
+    "sentrySubNote": "Sentry's own sub-processors appear in Sentry's subprocessor list, which we reference rather than copy.",
+    "notification": "Business customers are notified in writing at least 30 days before planned additions or replacements of sub-processors, cf. the data processing agreement.",
+    "backToPrivacy": "Back to the privacy policy"
+  },
+  "processors": {
+    "colVendor": "Vendor",
+    "colService": "Service",
+    "colEstablished": "Established",
+    "colLocation": "Data location",
+    "colTransfer": "Transfer mechanism",
+    "rows": {
+      "upcloud": {
+        "name": "UpCloud Oy",
+        "service": "Server hosting (incl. our self-hosted analytics/support systems)",
+        "established": "Finland",
+        "location": "EU",
+        "transfer": "— (EU)"
+      },
+      "bunny": {
+        "name": "BunnyWay d.o.o. (bunny.net)",
+        "service": "CDN, DNS",
+        "established": "Slovenia",
+        "location": "EU",
+        "transfer": "— (EU)"
+      },
+      "stripe": {
+        "name": "Stripe Payments Europe, Ltd.",
+        "service": "Payments",
+        "established": "Ireland",
+        "location": "Global incl. US (Stripe offers no EU-only residency)",
+        "transfer": "EU-US Data Privacy Framework with SCC fallback"
+      },
+      "postmark": {
+        "name": "Postmark (ActiveCampaign)",
+        "service": "Transactional email (password resets, invitations etc.)",
+        "established": "USA",
+        "location": "USA",
+        "transfer": "EU-US Data Privacy Framework (ActiveCampaign is DPF-certified) with SCCs in the DPA"
+      },
+      "sentry": {
+        "name": "Sentry (Functional Software, Inc.)",
+        "service": "Error logging",
+        "established": "USA",
+        "location": "EU region (Frankfurt, incl. backups); US support access possible",
+        "transfer": "DPF with SCC fallback"
+      },
+      "proton": {
+        "name": "Proton AG",
+        "service": "Company email (support mailbox)",
+        "established": "Switzerland",
+        "location": "CH/EU",
+        "transfer": "Adequacy decision (Switzerland)"
+      }
     }
   },
   "integrationGuide": {

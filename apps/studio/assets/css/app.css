@@ -660,3 +660,9 @@ main {
   background: var(--color-surface-alt);
   color: var(--color-text-tertiary);
 }
+
+/* Legal-tabellerne (privacy §6/§7 + sub-processors) er bredere end prosa-
+   containeren på smal skærm — scroll i egen wrapper, aldrig hele siden. */
+.legal-table-wrap {
+  overflow-x: auto;
+}
