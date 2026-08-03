@@ -12,6 +12,15 @@ export default defineNuxtConfig({
     '/account': { ssr: false },
   },
   nitro: {
+    // v0.2.11-incident: Nitros externals-tracing missede transitive CJS-deps i
+    // OTel-exporter-kæden (exporter-metrics-otlp-proto → -otlp-http → …) —
+    // imaget bootede med MODULE_NOT_FOUND. traceInclude tvinger hele grafen
+    // med i .output/server/node_modules. Plugin'en er derudover fail-soft
+    // (dynamiske imports + try/catch), så en regression her koster telemetri,
+    // aldrig boot. CI's boot-smoke (build.yml) er den strukturelle gate.
+    externals: {
+      traceInclude: ['@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/sdk-metrics'],
+    },
     // Auto-genereret OpenAPI-spec over studios server/api/*-endpoints. Serveres
     // på /_openapi.json og aggregeres i KlangHaus' samlede API-docs-portal
     // (api.klanghaus.dk/docs / lokal localhost:8000/docs). `production: 'runtime'`

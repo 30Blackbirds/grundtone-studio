@@ -57,6 +57,36 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # Boot-smoke (v0.2.11-incident, 2026-08-03): the image MUST come up and
+      # answer healthz + serve a real page before any deploy job may run. The
+      # v0.2.11 crashloop (Nitro dropped transitive OTel deps from the runtime
+      # node_modules) booted fine locally — only the pruned image failed, so
+      # only running the actual image catches this class. Dummy env: the app
+      # boots without real backends; pages render SSR shells. OTel endpoint is
+      # set ON so the telemetry path is exercised, not skipped.
+      - name: Boot-smoke the image
+        run: |
+          docker run -d --name bootsmoke -p 3000:3000 \
+            -e DATABASE_URL="postgres://smoke:smoke@127.0.0.1:9/smoke" \
+            -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
+            -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
+            "$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          for i in $(seq 1 18); do
+            if curl -sf http://127.0.0.1:3000/api/healthz > /dev/null; then
+              echo "✓ image boots (healthz)"
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' bootsmoke)" != "true" ]; then
+              echo "✗ container died during boot"; docker logs bootsmoke | tail -50; exit 1
+            fi
+            [ "$i" = 18 ] && { echo "✗ boot-smoke timed out"; docker logs bootsmoke | tail -50; exit 1; }
+            sleep 5
+          done
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/login)
+          [ "$code" = "200" ] || { echo "✗ /login returned $code in boot-smoke"; docker logs bootsmoke | tail -50; exit 1; }
+          echo "✓ /login 200 in boot-smoke"
+          docker rm -f bootsmoke
+
       - name: Pick the canonical deploy tag
         id: tag
         # Tag pushes deploy the semver tag (X.Y.Z); branch pushes use the
