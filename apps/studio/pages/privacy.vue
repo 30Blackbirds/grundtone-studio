@@ -17,7 +17,13 @@
     </header>
 
     <h2 class="font-heading text-2xl mt-6 mb-3">1. {{ t('privacy.s1h') }}</h2>
-    <p>{{ t('privacy.s1controller') }}</p>
+    <!-- Mail-adressen ligger i templaten, ikke i i18n-strengen: rå @ i en
+         vue-i18n-message er linked-message-syntaks og knækker builden (code 10). -->
+    <p>
+      {{ t('privacy.s1controller') }}
+      {{ t('privacy.s1contactLabel') }}
+      <a href="mailto:privacy@klanghaus.dk" class="text-primary">privacy@klanghaus.dk</a>.
+    </p>
     <p class="text-tertiary text-sm">{{ t('privacy.s1dpoNote') }}</p>
 
     <h2 class="font-heading text-2xl mt-6 mb-3">2. {{ t('privacy.s2h') }}</h2>
