@@ -606,3 +606,9 @@ main {
   border-bottom: 1px solid var(--color-border-light, var(--color-border-medium));
   font-size: 0.875rem;
 }
+
+/* Legal-tabellerne (privacy §6/§7 + sub-processors) er bredere end prosa-
+   containeren på smal skærm — scroll i egen wrapper, aldrig hele siden. */
+.legal-table-wrap {
+  overflow-x: auto;
+}

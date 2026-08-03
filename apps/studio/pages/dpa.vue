@@ -1,4 +1,9 @@
 <script setup lang="ts">
+  // Informations-side om databehandleraftalen. Indholdet spejler [jura]s
+  // dpa-skabelon.md (849ca2f) — men skabelonen er selv markeret UDKAST med
+  // krav om ekstern advokat-review før underskrift, så siden PUBLICERER IKKE
+  // kontraktteksten; den beskriver rammen faktuelt korrekt og henviser til
+  // privacy@klanghaus.dk. Fuld tekst-publicering afventer juras/advokatens go.
   definePageMeta({ layout: 'auth' })
   const { t } = useI18n()
 </script>
@@ -12,7 +17,7 @@
 
     <GTAlert variant="info" :heading="t('dpa.intakeHeading')">
       {{ t('dpa.intakeBody') }}
-      <a href="mailto:legal@grundtone.com" class="text-primary">legal@grundtone.com</a>
+      <a href="mailto:privacy@klanghaus.dk" class="text-primary">privacy@klanghaus.dk</a>
     </GTAlert>
 
     <p>{{ t('dpa.intro') }}</p>
