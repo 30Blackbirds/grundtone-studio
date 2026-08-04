@@ -20,7 +20,7 @@
   },
   "privacy": {
     "title": "Privatlivspolitik",
-    "versionLine": "Version 1.0 · Senest opdateret: 3. august 2026",
+    "versionLine": "Version 1.0 · Senest opdateret: 4. august 2026",
     "s1h": "Dataansvarlig",
     "s1controller": "Asp Productions ApS, CVR-nr. 36708077, Raffinaderivej 20, 2300 København S, Danmark. KlangHaus er et handelsnavn for Asp Productions ApS.",
     "s1contactLabel": "Kontakt om databeskyttelse:",
@@ -92,7 +92,7 @@
   },
   "dpa": {
     "title": "Databehandleraftale (DPA)",
-    "updated": "Senest opdateret: 3. august 2026",
+    "updated": "Senest opdateret: 4. august 2026",
     "intakeHeading": "Erhvervskunde?",
     "intakeBody": "Databehandleraftalen indgås som bilag til abonnementsaftalen om Grundtone Studio. Aftaleteksten er under ekstern juridisk gennemgang og udleveres ved henvendelse til",
     "intro": "Når din organisation lægger indhold i Grundtone Studio, der indeholder personoplysninger, er din organisation dataansvarlig, og Asp Productions ApS (CVR 36708077, handelsnavn KlangHaus) er databehandler efter GDPR art. 28. Denne side beskriver rammerne — den er ikke selve aftalen.",
@@ -121,7 +121,7 @@
   },
   "subProcessors": {
     "title": "Underleverandører (databehandlere)",
-    "updated": "Senest opdateret: 3. august 2026",
+    "updated": "Senest opdateret: 4. august 2026",
     "intro": "Her er de underleverandører, der behandler personoplysninger på vores vegne. Listen er verificeret mod vores faktiske systemer og er identisk med privatlivspolitikkens afsnit 6.",
     "sentrySubNote": "Sentrys egne underdatabehandlere fremgår af Sentrys subprocessor-liste, som vi henviser til frem for at kopiere.",
     "notification": "Erhvervskunder varsles skriftligt mindst 30 dage før planlagte tilføjelser eller udskiftninger af underleverandører, jf. databehandleraftalen.",
