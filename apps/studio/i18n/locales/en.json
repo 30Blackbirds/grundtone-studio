@@ -443,7 +443,7 @@
     "weightsLabel": "Weights to include",
     "weightsHint": "— only the selected ones load from the CDN",
     "weightForFile": "Which weight is this file?",
-    "license": "I have the right to use this typeface and to let Grundtone distribute it to the users who visit my brands.",
+    "license": "I warrant that I have the right to use this typeface and to let Grundtone distribute it to the users who visit my brands.",
     "licenseHelp": "Web distribution usually requires a different licence from the one that comes with a typeface bought for your own computer. Check your licence for webfont, web embedding or web use.",
     "licenseMore": "Read more about font licences",
     "errTooLarge": "The file is too large — reduce it to under 512 KB and try again.",

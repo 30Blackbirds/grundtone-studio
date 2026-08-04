@@ -9,17 +9,27 @@ const AUTH_PATHS: ReadonlySet<string> = new Set(['/login', '/signup'])
 const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   ...AUTH_PATHS,
   '/verify-email',
+  // Verify-tillidsflowet (#183): mail-linket rammer /verify, og modtageren er
+  // per definition IKKE logget ind — uden disse to sender middlewaren dem til
+  // /login, og flowet kan aldrig fuldføres. /verify/done skal ligeledes kunne
+  // vise fejl-states (udløbet/ugyldigt link) uden session.
+  '/verify',
+  '/verify/done',
   '/forgot-password',
   '/reset-password',
   '/privacy',
   '/dpa',
   '/sub-processors',
+  '/legal',
   '/docs/install',
 ])
 
 // Path prefixes that count as public — anything under /invitations/ (so
-// invite-accept landings work unauthed) or /docs/ (any docs sub-page).
-const PUBLIC_PREFIXES: readonly string[] = ['/invitations/', '/docs/']
+// invite-accept landings work unauthed), /docs/ (any docs sub-page), or
+// /legal/ (cookie-siden og fremtidige juridiske undersider: en legal-flade
+// bag login giver aldrig mening, og prefikset gør at listen ikke driver fra
+// ruterne når [jura] tilføjer en side).
+const PUBLIC_PREFIXES: readonly string[] = ['/invitations/', '/docs/', '/legal/']
 
 // Discriminated union so TypeScript narrows `to` to string in the
 // 'redirect' branch — callers don't need an `&& decision.to` guard.

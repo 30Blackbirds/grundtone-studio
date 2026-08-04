@@ -130,3 +130,67 @@ describe('resolveAuthAction — authenticated', () => {
     ).toEqual({ type: 'allow' })
   })
 })
+
+// Drift-sikring (projektleder-krav 2026-08-04 efter [review]s bifund, udvidet
+// med et prod-fund undervejs): PUBLIC_PATHS er en håndholdt liste, og hver
+// gang nogen tilføjer en side der skal kunne nås UDEN login, kan listen glide
+// fra ruterne. Det skete to gange: /legal (nyt indeks) og — alvorligere —
+// /verify + /verify/done fra verify-tillidsflowet, hvor modtageren af
+// mail-linket per definition ikke er logget ind. Testen læser pages/-træet,
+// så en ny fil under de her mapper tvinger et bevidst valg.
+describe('unauthed reachability (drift guard)', () => {
+  const MUST_BE_PUBLIC = [
+    '/privacy',
+    '/dpa',
+    '/sub-processors',
+    '/legal',
+    '/legal/cookies',
+    '/verify',
+    '/verify/done',
+    '/verify-email',
+    '/forgot-password',
+    '/reset-password',
+    '/login',
+    '/signup',
+  ]
+
+  it.each(MUST_BE_PUBLIC)('%s is reachable without a session', (path) => {
+    expect(resolveAuthAction({ path, fullPath: path, authed: false })).toEqual({ type: 'allow' })
+  })
+
+  it('every page under pages/legal/ is public', async () => {
+    const { readdirSync } = await import('node:fs')
+    const files = readdirSync(new URL('../pages/legal', import.meta.url))
+    const routes = files
+      .filter((f) => f.endsWith('.vue'))
+      .map((f) => (f === 'index.vue' ? '/legal' : `/legal/${f.replace(/\.vue$/, '')}`))
+    expect(routes.length).toBeGreaterThan(0)
+    for (const route of routes) {
+      expect(
+        resolveAuthAction({ path: route, fullPath: route, authed: false }),
+        `${route} must be public — a legal page behind login is never right`,
+      ).toEqual({ type: 'allow' })
+    }
+  })
+
+  it('every page under pages/verify/ is public (mail recipients have no session)', async () => {
+    const { readdirSync } = await import('node:fs')
+    const files = readdirSync(new URL('../pages/verify', import.meta.url))
+    const routes = files
+      .filter((f) => f.endsWith('.vue'))
+      .map((f) => (f === 'index.vue' ? '/verify' : `/verify/${f.replace(/\.vue$/, '')}`))
+    expect(routes.length).toBeGreaterThan(0)
+    for (const route of routes) {
+      expect(
+        resolveAuthAction({ path: route, fullPath: route, authed: false }),
+        `${route} must be public — the verify link lands here before any session exists`,
+      ).toEqual({ type: 'allow' })
+    }
+  })
+
+  it('still protects the authenticated app', () => {
+    for (const path of ['/dashboard', '/account', '/orgs/acme', '/plans']) {
+      expect(resolveAuthAction({ path, fullPath: path, authed: false }).type).toBe('redirect')
+    }
+  })
+})
