@@ -295,9 +295,7 @@
         />
         <label :for="`font-license-${slotKey}`" class="text-sm">
           {{ t('brandAssets.license') }}
-          <NuxtLink to="/legal/cookies" class="text-primary">{{
-            t('brandAssets.licenseMore')
-          }}</NuxtLink>
+          <NuxtLink to="/legal" class="text-primary">{{ t('brandAssets.licenseMore') }}</NuxtLink>
         </label>
       </div>
       <template v-if="!budgetFull">
