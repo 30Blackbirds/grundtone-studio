@@ -12,6 +12,28 @@ import {
 
 const REDACTED_EMAIL = 'deleted@redacted'
 
+// ⚠️ TILFØJ IKKE font_licence_attestation HER — heller ikke "for konsistens".
+//
+// [jura] 2026-08-04 (§16): bevisregistret for font-licens-erklæringer er
+// undtaget efter art. 17(3), og dets levetid hører til FILENS leverance +
+// forældelsesfristen — ikke til brugerens konto. Modparten er en tredjepart
+// (skriftproducenten), og krænkelsen er vedvarende så længe vi serverer
+// filen: "en attestation for en font, vi stadig serverer, skal ikke udløbe,
+// fordi den medarbejder der uploadede den, har forladt virksomheden."
+//
+// Dataminimering håndteres i stedet ved TIDSBEGRÆNSNING, ikke ved redaktion:
+// rækken bærer klartekst-e-mail som bevis og slettes HELT når
+// servingEndedAt + ATTESTATION_RETENTION_YEARS er passeret (jura §16a).
+//
+// E-mailen står bevidst i klartekst — jura omgjorde et tidligere hash-krav
+// (§16 rev.): en hash kan bekræfte en formodning, men ikke FREMVISE en
+// identitet, og efter en art. 17-sletning er userId heller ikke opløseligt.
+// Hash + uopløseligt id ville give en række der peger på en identitet ingen
+// kan slå op — vi ville have bevaret rækken for bevisværdiens skyld og
+// samtidig fjernet netop den. Genopfind ikke den diskussion her.
+//
+// deleted.post.test.ts pinner at denne webhook lader tabellen være.
+
 const bodySchema = z.object({
   userId: z.string().min(1),
 })
