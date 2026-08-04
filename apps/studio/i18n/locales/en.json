@@ -432,12 +432,10 @@
     "dropzone": "📁 Drag a file here, or click to choose",
     "fontDropzone": "📁 Drag a .woff2 file here, or click to choose",
     "logoRules": "SVG/PNG · max 512 KB · sanitized automatically (scripts/external references removed from SVG)",
-    "fontRules": "Only .woff2 · max 512 KB · one file = one weight (upload again for more weights) · max 4 weights per font",
+    "fontRules": "Only .woff2 · max 512 KB · one file = one weight (upload again for more weights)",
     "removeLogo": "Remove logo",
     "remove": "Remove",
     "uploading": "Uploading…",
-    "fontTitle": "Typeface",
-    "fontSub": "Used across the product and in email templates.",
     "modeCurated": "Choose from library",
     "modeCustom": "Upload your own font",
     "familyLabel": "Typeface",
@@ -445,7 +443,6 @@
     "weightsLabel": "Weights to include",
     "weightsHint": "— only the selected ones load from the CDN",
     "weightForFile": "Which weight is this file?",
-    "maxWeights": "Max 4 weights reached — remove one to upload another.",
     "license": "I confirm that I am licensed to use this font commercially and to upload it to this service.",
     "licenseMore": "Read more about font licences",
     "errTooLarge": "The file is too large — reduce it to under 512 KB and try again.",
@@ -454,7 +451,34 @@
     "errFamilyFirst": "Enter the font name before uploading.",
     "previewLabel": "Live preview — brand context",
     "previewHeading": "Why we built our own CMS",
-    "previewBody": "Aa Bb Cc · Resonans started as an internal necessity and became a product. Here are the five decisions that shaped it."
+    "previewBody": "Aa Bb Cc · Resonans started as an internal necessity and became a product. Here are the five decisions that shaped it.",
+    "slot": {
+      "heading": {
+        "title": "Font 1",
+        "role": "The heading role — used for titles and headings.",
+        "fallbackExpl": "Used while the font loads, and if the CDN is unavailable. Choose from curated stacks — not free text."
+      },
+      "body": {
+        "title": "Font 2",
+        "role": "The body role — used for running text.",
+        "fallbackExpl": "Same curated list as Font 1 — chosen independently per slot."
+      }
+    },
+    "fallbackTitle": "System fallbacks",
+    "fallback1": "Fallback 1",
+    "fallback2": "Fallback 2",
+    "fallbackNone": "None",
+    "stacks": {
+      "system-grotesk": "System grotesque (Segoe UI, Roboto…)",
+      "neutral-grotesk": "Neutral grotesque (Helvetica Neue, Arial…)",
+      "humanist": "Humanist (Verdana, Geneva…)",
+      "serif-classic": "Serif — classic (Georgia, Cambria…)",
+      "serif-typewriter": "Serif — typewriter (Times New Roman…)",
+      "monospace": "Monospace (SF Mono, Consolas…)"
+    },
+    "budgetFull": "Max 4 font files in total across Font 1 and Font 2 — remove one to add another.",
+    "previewTitle": "Live preview — combined brand context",
+    "previewSub": "How Font 1 (heading) and Font 2 (body) play together."
   },
   "contrast": {
     "unparseable": "Can't read this color — use #RRGGBB",

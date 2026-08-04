@@ -45,6 +45,7 @@ export async function readCuratedFont(family: string, weight: number): Promise<B
 export function curatedFontFiles(
   family: string,
   weights: number[],
+  slot: 'heading' | 'body',
 ): Array<{ name: string; weight: number }> {
-  return weights.map((weight) => ({ name: fontFileName(family, weight), weight }))
+  return weights.map((weight) => ({ name: fontFileName(family, weight, slot), weight }))
 }

@@ -42,34 +42,84 @@ export const CURATED_FONTS = [
   'Public Sans',
 ] as const
 
-export const FONT_WEIGHTS = [400, 500, 600, 700] as const
+export const FONT_WEIGHTS = [400, 500, 600, 700, 800] as const
 
-const fontWeight = z.union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)])
+// Per-familie vægt-katalog for de kuraterede fonte — IBM Plex Sans stopper
+// ved 700 (@fontsource shipper ingen 800), resten dækker hele spændet.
+// Curated-slot-validering håndhæver kataloget så et publish aldrig kan bede
+// om en fil der ikke findes i pakken.
+export const CURATED_FONT_WEIGHTS: Record<(typeof CURATED_FONTS)[number], readonly number[]> = {
+  'IBM Plex Sans': [400, 500, 600, 700],
+  Inter: [400, 500, 600, 700, 800],
+  'Source Sans 3': [400, 500, 600, 700, 800],
+  'Work Sans': [400, 500, 600, 700, 800],
+  Manrope: [400, 500, 600, 700, 800],
+  'Public Sans': [400, 500, 600, 700, 800],
+}
 
-// Discriminated på source: kurateret = family fra v1-listen, filer leveres af
-// os; custom = én .woff2 pr. vægt (schemaets file er singular by design —
-// flere vægte = flere uploads, maks. 4), og files-nøglerne skal matche weights.
-const webFont = z
+const fontWeight = z.union([
+  z.literal(400),
+  z.literal(500),
+  z.literal(600),
+  z.literal(700),
+  z.literal(800),
+])
+
+// System-fallback-stakke (to-slot-revisionen 2026-08-04): kuraterede NØGLER,
+// aldrig frie CSS-strenge fra klienten — serveren ejer resolutionen til den
+// faktiske stak, og det generiske nøgleord udledes af SIDSTE valgte fallback
+// (forlæggets kæde-eksempler). Labels bor i i18n; her bor kun CSS-data.
+export const FALLBACK_STACKS = {
+  'system-grotesk': { fonts: ["'Segoe UI'", 'Roboto'], generic: 'sans-serif' },
+  'neutral-grotesk': { fonts: ["'Helvetica Neue'", 'Arial'], generic: 'sans-serif' },
+  humanist: { fonts: ['Verdana', 'Geneva'], generic: 'sans-serif' },
+  'serif-classic': { fonts: ['Georgia', 'Cambria'], generic: 'serif' },
+  'serif-typewriter': { fonts: ["'Times New Roman'", 'Times'], generic: 'serif' },
+  monospace: { fonts: ["'SF Mono'", 'Consolas'], generic: 'monospace' },
+} as const
+
+export type FallbackKey = keyof typeof FALLBACK_STACKS
+
+const fallbackKey = z.enum(Object.keys(FALLBACK_STACKS) as [FallbackKey, ...FallbackKey[]])
+
+// Én font-SLOT (Allan-produktretning 2026-08-04: Font 1/overskrift + Font 2/
+// brødtekst). Discriminated på source: kurateret = family fra v1-listen,
+// filer leveres af os; custom = én .woff2 pr. vægt, files-nøglerne skal
+// matche weights. 1-2 fallbacks pr. slot, kuraterede nøgler.
+const fontSlot = z
   .discriminatedUnion('source', [
     z
       .object({
         source: z.literal('curated'),
         family: z.enum(CURATED_FONTS),
-        weights: z.array(fontWeight).min(1).max(4),
+        weights: z.array(fontWeight).min(1),
+        fallbacks: z.array(fallbackKey).min(1).max(2),
       })
       .strict(),
     z
       .object({
         source: z.literal('custom'),
         family: z.string().min(1).max(100),
-        weights: z.array(fontWeight).min(1).max(4),
+        weights: z.array(fontWeight).min(1),
         files: z.record(z.string(), fontFile),
+        fallbacks: z.array(fallbackKey).min(1).max(2),
       })
       .strict(),
   ])
   .superRefine((font, ctx) => {
     if (new Set(font.weights).size !== font.weights.length) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'weights must be unique' })
+    }
+    if (font.source === 'curated') {
+      const available = CURATED_FONT_WEIGHTS[font.family]
+      for (const w of font.weights) {
+        if (!available.includes(w)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${font.family} does not ship weight ${w}`,
+          })
+        }
+      }
     }
     if (font.source === 'custom') {
       const fileWeights = Object.keys(font.files).sort()
@@ -82,6 +132,16 @@ const webFont = z
       }
     }
   })
+
+export type FontSlot = z.infer<typeof fontSlot>
+
+/** Antal fontfiler ét slot bidrager med (kurateret vægt = én fil fra CDN'et). */
+export function slotFileCount(slot: FontSlot): number {
+  return slot.source === 'custom' ? Object.keys(slot.files).length : slot.weights.length
+}
+
+/** Allan-låst loft 2026-08-04: "4 fontfiler i alt" på tværs af BEGGE slots. */
+export const MAX_FONT_FILES_TOTAL = 4
 
 export const tokensSchema = z
   .object({
@@ -108,7 +168,13 @@ export const tokensSchema = z
           })
           .partial()
           .optional(),
-        webFont: webFont.optional(),
+        slots: z
+          .object({
+            heading: fontSlot.optional(),
+            body: fontSlot.optional(),
+          })
+          .strict()
+          .optional(),
       })
       .partial()
       .optional(),
@@ -137,6 +203,20 @@ export const tokensSchema = z
     dark: z.object({ colors: colorGroup.optional() }).strict().optional(),
   })
   .strict()
+  .superRefine((tokens, ctx) => {
+    const slots = tokens.typography?.slots
+    if (!slots) return
+    const total = (['heading', 'body'] as const).reduce(
+      (sum, key) => sum + (slots[key] ? slotFileCount(slots[key]) : 0),
+      0,
+    )
+    if (total > MAX_FONT_FILES_TOTAL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `at most ${MAX_FONT_FILES_TOTAL} font files in total across both slots`,
+      })
+    }
+  })
 
 export type Tokens = z.infer<typeof tokensSchema>
 

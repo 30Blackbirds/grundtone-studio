@@ -153,34 +153,87 @@ describe('dark-override block', () => {
   })
 })
 
-describe('@font-face generation (brand-assets webFont)', () => {
-  it('renders one block per weight with relative urls (curated)', () => {
+describe('@font-face + font-family chains (two-slot revision)', () => {
+  it('renders blocks per weight with slot-prefixed relative urls (curated)', () => {
     const css = renderTokensCss({
-      typography: { webFont: { source: 'curated', family: 'Manrope', weights: [700, 400] } },
+      typography: {
+        slots: {
+          heading: {
+            source: 'curated',
+            family: 'Manrope',
+            weights: [700, 400],
+            fallbacks: ['neutral-grotesk', 'system-grotesk'],
+          },
+        },
+      },
     })
     expect(css).toContain("font-family: 'Manrope';")
-    expect(css).toContain("src: url('fonts/manrope-400.woff2') format('woff2');")
-    expect(css).toContain("src: url('fonts/manrope-700.woff2') format('woff2');")
+    expect(css).toContain("src: url('fonts/heading-manrope-400.woff2') format('woff2');")
+    expect(css).toContain("src: url('fonts/heading-manrope-700.woff2') format('woff2');")
     expect(css.indexOf('font-weight: 400')).toBeLessThan(css.indexOf('font-weight: 700'))
     expect(css).toContain('font-display: swap;')
+  })
+
+  it('emits the forlæg chain: primary, fallback stacks in order, generic from LAST fallback', () => {
+    const css = renderTokensCss({
+      typography: {
+        slots: {
+          heading: {
+            source: 'curated',
+            family: 'Manrope',
+            weights: [700],
+            fallbacks: ['neutral-grotesk', 'system-grotesk'],
+          },
+          body: {
+            source: 'custom',
+            family: 'IBM Plex Sans',
+            weights: [400],
+            files: { '400': 'fonts/body-ibm-plex-sans-400.woff2' },
+            fallbacks: ['system-grotesk', 'serif-classic'],
+          },
+        },
+      },
+    })
+    expect(css).toContain(
+      "--font-family-heading: 'Manrope', 'Helvetica Neue', Arial, 'Segoe UI', Roboto, sans-serif;",
+    )
+    expect(css).toContain(
+      "--font-family-base: 'IBM Plex Sans', 'Segoe UI', Roboto, Georgia, Cambria, serif;",
+    )
+  })
+
+  it('slot chains WIN over manual fontFamily strings for their vars', () => {
+    const css = renderTokensCss({
+      typography: {
+        fontFamily: { heading: 'Comic Sans MS' },
+        slots: {
+          heading: { source: 'curated', family: 'Inter', weights: [700], fallbacks: ['humanist'] },
+        },
+      },
+    })
+    const lastHeading = css.lastIndexOf('--font-family-heading:')
+    expect(css.slice(lastHeading)).toContain("'Inter'")
   })
 
   it('uses the uploaded file map for custom fonts', () => {
     const css = renderTokensCss({
       typography: {
-        webFont: {
-          source: 'custom',
-          family: 'Asp Grotesk',
-          weights: [400],
-          files: { '400': 'fonts/asp-grotesk-400.woff2' },
+        slots: {
+          body: {
+            source: 'custom',
+            family: 'Asp Grotesk',
+            weights: [400],
+            files: { '400': 'fonts/body-asp-grotesk-400.woff2' },
+            fallbacks: ['humanist'],
+          },
         },
       },
     })
     expect(css).toContain("font-family: 'Asp Grotesk';")
-    expect(css).toContain("src: url('fonts/asp-grotesk-400.woff2') format('woff2');")
+    expect(css).toContain("src: url('fonts/body-asp-grotesk-400.woff2') format('woff2');")
   })
 
-  it('emits no @font-face without a webFont', () => {
+  it('emits no @font-face without slots', () => {
     expect(renderTokensCss({ colors: { primary: '#000' } })).not.toContain('@font-face')
   })
 })

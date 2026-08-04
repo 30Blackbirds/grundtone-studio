@@ -85,16 +85,21 @@ export default defineEventHandler(async (event) => {
   // Kuraterede fonte: de VALGTE vægte læses fra @fontsource-pakkerne på disk
   // og skrives ind i projektets eget fonts/-præfiks, så kurateret og custom
   // serveres uniformt via /k og CSS'ens relative url()'er bare virker.
-  const webFont = tokens.typography?.webFont
-  const curated =
-    webFont?.source === 'curated'
-      ? await Promise.all(
-          curatedFontFiles(webFont.family, webFont.weights).map(async (f) => ({
+  const slots = tokens.typography?.slots
+  const curated = (
+    await Promise.all(
+      (['heading', 'body'] as const).map(async (slotKey) => {
+        const slot = slots?.[slotKey]
+        if (slot?.source !== 'curated') return []
+        return Promise.all(
+          curatedFontFiles(slot.family, slot.weights, slotKey).map(async (f) => ({
             name: f.name,
-            body: await readCuratedFont(webFont.family, f.weight),
+            body: await readCuratedFont(slot.family, f.weight),
           })),
         )
-      : []
+      }),
+    )
+  ).flat()
   await Promise.all([
     putObject(p.versionedJson(nextVersion), json, {
       contentType: 'application/json',
