@@ -191,6 +191,12 @@
             </ClientOnly>
           </div>
         </div>
+        <!-- Brand-assets (logo + skrifttype) — sektion HER, ikke egen fane:
+             assets publiceres med farve-tokens i samme kladde/publicér-cyklus
+             (forlæg redesign-brand-assets.html). -->
+        <ClientOnly>
+          <BrandAssetsSection v-model="tokens" :project-id="project.id" :can-edit="canEdit" />
+        </ClientOnly>
       </GTTabPanel>
 
       <!-- Workbench renders the LIVE editor state (previewTokens), so
