@@ -286,7 +286,14 @@
         :disabled="!canEdit"
         class="mb-3"
       />
-      <div class="brand-license mb-3">
+      <!-- [jura]-låst form (§5a, 69ec051): selve ERKLÆRINGEN står alene i
+           labelen — hjælpetekst og link ligger UDENFOR, fordi en lang
+           afkrydsningstekst ikke bliver læst og dermed svækker erklæringen.
+           🔴 De to led i license-strengen ("ret til at bruge" OG "lade
+           Grundtone distribuere den til brugerne") må ALDRIG slås sammen
+           eller forkortes: første led alene er præcis hvad en desktop-licens
+           giver, så det er ANDET led der bærer hele erklæringen. -->
+      <div class="brand-license mb-1">
         <input
           :id="`font-license-${slotKey}`"
           v-model="licenseAccepted"
@@ -295,9 +302,12 @@
         />
         <label :for="`font-license-${slotKey}`" class="text-sm">
           {{ t('brandAssets.license') }}
-          <NuxtLink to="/legal" class="text-primary">{{ t('brandAssets.licenseMore') }}</NuxtLink>
         </label>
       </div>
+      <p class="text-tertiary text-xs mt-0 mb-3">
+        {{ t('brandAssets.licenseHelp') }}
+        <NuxtLink to="/legal" class="text-primary">{{ t('brandAssets.licenseMore') }}</NuxtLink>
+      </p>
       <template v-if="!budgetFull">
         <GTSelect
           v-model="customWeight"
