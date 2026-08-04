@@ -59,6 +59,21 @@ export const orgSuspension = pgTable('org_suspension', {
 // og slettes ALDRIG med filen — det er erklæringen, ikke filen, der er
 // dokumentationen. Derfor også denormaliseret bruger-email og fil-reference
 // som ren tekst: sporet skal kunne læses år efter at alt andet er væk.
+//
+// ⚠️ TIL DIG DER RYDDER OP HER SENERE (jura §7a.1):
+// `projectId` og `organizationId` er BEVIDST uden fremmednøgle. Slettes
+// projektet eller organisationen, bliver rækken stående med en reference der
+// ikke peger på noget. **Det ligner en defekt. Det er det ikke — det er hele
+// pointen.** Bevisregistret skal overleve at alt andet forsvinder, fordi det
+// er vores forsvar hvis en skriftproducent rejser krav over videredistribution
+// af en font vi har serveret.
+//
+// Gør derfor IKKE følgende, heller ikke "for konsistens":
+//   · tilføj en fremmednøgle (en CASCADE ville slette beviset lydløst)
+//   · slet "forældreløse" rækker i en oprydning
+//   · koble levetiden til kontosletning (levetiden er servingEndedAt +
+//     ATTESTATION_RETENTION_YEARS, jura §16a — se lib/legal.ts)
+// Verificeret 2026-08-04: ingen af skemaets cascades kan nå denne tabel.
 // Erklæringen genafgives pr. fil (jura: den knytter sig til den enkelte
 // skrifttypes licens, ikke til kontoen), så der er bevidst INGEN unique
 // constraint der ville kollapse gentagne uploads af samme vægt.
