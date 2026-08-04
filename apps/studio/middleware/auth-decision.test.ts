@@ -188,7 +188,11 @@ describe('unauthed reachability (drift guard)', () => {
     }
   })
 
-  it('still protects the authenticated app', () => {
+  // NB: dette er en UX-assertion, ikke en sikkerheds-assertion. Den beviser
+  // at en uautentificeret besøgende bliver SENDT til login — ikke at data er
+  // beskyttet. Data-grænsen er server/middleware/auth.ts + per-endpoint
+  // 401-tjek, og den testes dér. Se filhovedet i auth-decision.ts.
+  it('still routes the authenticated app to login (UX layer, not the data boundary)', () => {
     for (const path of ['/dashboard', '/account', '/orgs/acme', '/plans']) {
       expect(resolveAuthAction({ path, fullPath: path, authed: false }).type).toBe('redirect')
     }

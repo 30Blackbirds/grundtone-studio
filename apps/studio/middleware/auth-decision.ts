@@ -3,6 +3,25 @@
 // Nuxt-specific side effects (session fetch + navigateTo); this function
 // just answers "given the current path, fullPath, and auth state, what
 // should happen?".
+//
+// ⚠️ THIS FILE IS THE UX LAYER, NOT THE SECURITY BOUNDARY.
+// auth.global.ts starts with `if (import.meta.server) return`, so these
+// decisions only run in the browser after hydration — they shape where a
+// visitor is SENT, never what data they can obtain. Adding or removing a
+// path here cannot expose anything.
+//
+// The real boundary for DATA is server/middleware/auth.ts plus the
+// per-endpoint `if (!event.context.auth) throw 401` checks (~18 endpoints).
+// That is why an unauthed SSR render of /dashboard or /plans returns an
+// EMPTY shell rather than leaked content: the page renders, its data fetch
+// 401s, and the UI falls back to defaults. /account and /orgs/** don't even
+// SSR (routeRules ssr:false).
+//
+// Keep the two layers separate — that separation IS the defence in depth.
+// A test asserting resolveAuthAction() returns 'redirect' proves the routing
+// decision, never that data is protected; verify that at the endpoint layer.
+// (Documented after [review]'s analysis of #194, 2026-08-04, so the next
+// reader doesn't have to rediscover the distinction.)
 
 const AUTH_PATHS: ReadonlySet<string> = new Set(['/login', '/signup'])
 
