@@ -152,3 +152,35 @@ describe('dark-override block', () => {
     )
   })
 })
+
+describe('@font-face generation (brand-assets webFont)', () => {
+  it('renders one block per weight with relative urls (curated)', () => {
+    const css = renderTokensCss({
+      typography: { webFont: { source: 'curated', family: 'Manrope', weights: [700, 400] } },
+    })
+    expect(css).toContain("font-family: 'Manrope';")
+    expect(css).toContain("src: url('fonts/manrope-400.woff2') format('woff2');")
+    expect(css).toContain("src: url('fonts/manrope-700.woff2') format('woff2');")
+    expect(css.indexOf('font-weight: 400')).toBeLessThan(css.indexOf('font-weight: 700'))
+    expect(css).toContain('font-display: swap;')
+  })
+
+  it('uses the uploaded file map for custom fonts', () => {
+    const css = renderTokensCss({
+      typography: {
+        webFont: {
+          source: 'custom',
+          family: 'Asp Grotesk',
+          weights: [400],
+          files: { '400': 'fonts/asp-grotesk-400.woff2' },
+        },
+      },
+    })
+    expect(css).toContain("font-family: 'Asp Grotesk';")
+    expect(css).toContain("src: url('fonts/asp-grotesk-400.woff2') format('woff2');")
+  })
+
+  it('emits no @font-face without a webFont', () => {
+    expect(renderTokensCss({ colors: { primary: '#000' } })).not.toContain('@font-face')
+  })
+})

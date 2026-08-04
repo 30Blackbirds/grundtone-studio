@@ -70,6 +70,24 @@ importers:
       '@connectrpc/connect-node':
         specifier: ^1.6.0
         version: 1.7.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/inter':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/manrope':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/public-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/source-sans-3':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/work-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@grundtone/core':
         specifier: ^2.22.0
         version: 2.22.0(vue@3.5.38(typescript@6.0.3))
@@ -1073,6 +1091,24 @@ packages:
     resolution: {integrity: sha512-+CNAzxglkrpNf/kKywqQfk74QjtceuOE7Qm+AF8miRvPF/wmmK5+OJOgVh3AVTT3RP2mH3+FOaxlE5v72owk0A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
+  '@fontsource/ibm-plex-sans@5.3.0':
+    resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
+
+  '@fontsource/inter@5.3.0':
+    resolution: {integrity: sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==}
+
+  '@fontsource/manrope@5.3.0':
+    resolution: {integrity: sha512-obJ1Dv3+uCA6HlHgW8u4BGYxJR9In2HW7gjJhlflEvkrj1X1iSEwu0fToL+JYGC/FEKFfIz1sBuPduvcL2gIAA==}
+
+  '@fontsource/public-sans@5.3.0':
+    resolution: {integrity: sha512-kjODI0S3zdv0mBYCIQ8TbBayaiqszpc2UbhJiO3bjIqVVXzcWfHSt2o3WBCLOY3juaGaQoy4MoWCcgmfI5hCuA==}
+
+  '@fontsource/source-sans-3@5.3.0':
+    resolution: {integrity: sha512-VrWixSgF93kOVSEkwjs9ImnAbxrBew4PgcnaJYEitG9TyJSwxjFUNJIgzB1XFP/acyAWcTDg7+sWe7JI8LTB9w==}
+
+  '@fontsource/work-sans@5.3.0':
+    resolution: {integrity: sha512-3cKV28+bEiLGdyOl0VgEGCFWE1XdZJu/K+nH4Jt76XC3T//XrRtm2EF7jA61GSMIy8sYp6ZFTE01nD3lLaBV9A==}
+
   '@grundtone/core@2.22.0':
     resolution: {integrity: sha512-NDF8Q8M4NDfrKCZajLleE2FdFbchhgNdV6BfRi9YbJVzsjpEaQ/Yh4ubM/Rt3mPJkuBNyub2YCERsZ8F6OWQQA==}
     peerDependencies:
@@ -1247,11 +1283,6 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
       hono: ^4.0.0
-    peerDependenciesMeta:
-      '@opentelemetry/api':
-        optional: true
-      hono:
-        optional: true
 
   '@klanghaus/permissions-client@0.3.0-local.0':
     resolution: {integrity: sha512-9Kao+ffDe1WY3dZXfO9U+YqBcW9HEg6ofrrIY4AD05hKuDlamXhPFIDXx64Asnwt5MgiNx6x6k1aMaZJdhCiGQ==, tarball: https://npm.pkg.github.com/download/@klanghaus/permissions-client/0.3.0-local.0/70ea6f63bf2cf712388e47c4c8569e64e0a8fcdb}
@@ -8204,6 +8235,18 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
+  '@fontsource/ibm-plex-sans@5.3.0': {}
+
+  '@fontsource/inter@5.3.0': {}
+
+  '@fontsource/manrope@5.3.0': {}
+
+  '@fontsource/public-sans@5.3.0': {}
+
+  '@fontsource/source-sans-3@5.3.0': {}
+
+  '@fontsource/work-sans@5.3.0': {}
+
   '@grundtone/core@2.22.0(vue@3.5.38(typescript@6.0.3))':
     dependencies:
       vue: 3.5.38(typescript@6.0.3)
@@ -8393,10 +8436,9 @@ snapshots:
 
   '@klanghaus/auth-jwt@0.1.0-local.0(@opentelemetry/api@1.9.1)(hono@4.12.27)':
     dependencies:
-      jose: 6.2.3
-    optionalDependencies:
       '@opentelemetry/api': 1.9.1
       hono: 4.12.27
+      jose: 6.2.3
 
   '@klanghaus/permissions-client@0.3.0-local.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))':
     dependencies:
@@ -10435,7 +10477,7 @@ snapshots:
       obug: 2.1.3
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@22.20.0)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@22.19.17)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(vite@7.3.5(@types/node@22.19.17)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/expect@4.1.9':
     dependencies:
@@ -12028,8 +12070,7 @@ snapshots:
 
   he@1.2.0: {}
 
-  hono@4.12.27:
-    optional: true
+  hono@4.12.27: {}
 
   hookable@5.5.3: {}
 

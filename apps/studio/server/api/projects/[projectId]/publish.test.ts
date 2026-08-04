@@ -131,6 +131,13 @@ vi.mock('~~/server/lib/tokens', () => ({
   tokensSchema: { parse: (v: unknown) => v },
 }))
 
+// ─── curated fonts — rene buffers, pakke-læsning testes i curated-fonts.test.ts ──
+vi.mock('~~/server/lib/curated-fonts', () => ({
+  curatedFontFiles: (family: string, weights: number[]) =>
+    weights.map((weight) => ({ name: `fonts/${family.toLowerCase()}-${weight}.woff2`, weight })),
+  readCuratedFont: () => Promise.resolve(Buffer.from('wOF2mock')),
+}))
+
 // ─── audit ────────────────────────────────────────────────────────────────
 vi.mock('~~/server/lib/audit', () => ({
   recordAuditEvent: (_event: unknown, payload: { action: string }) => {
@@ -326,5 +333,38 @@ describe('POST /api/projects/[projectId]/publish', () => {
     expect(currentLogo?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/logo.svg`)
     // 4 token-writes + 3 arkiv-copies + 3 current-copies
     expect(spies.storage).toHaveLength(10)
+  })
+
+  it('writes selected curated font weights from disk into v{n} and current', async () => {
+    draft.push({
+      id: 'draft-3',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: {
+        typography: { webFont: { source: 'curated', family: 'Inter', weights: [400, 700] } },
+      },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-08-04T11:00:00Z'),
+    })
+
+    await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
+
+    const keys = spies.storage.map((o) => o.key)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/inter-700.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/inter-400.woff2`)
+    const v1 = spies.storage.find((o) => o.key === `p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
+    expect(v1?.contentType).toBe('font/woff2')
+    // arkivet er en PUT fra disk-bufferen (spy'en slicer Buffer → Buffer);
+    // current er en copy af arkivet
+    expect(String(v1?.bodyPreview)).toBe('wOF2mock')
+    const current = spies.storage.find(
+      (o) => o.key === `p/${PROJECT.id}/current/fonts/inter-400.woff2`,
+    )
+    expect(current?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
+    // 4 token-writes + 2 arkiv-puts + 2 current-copies
+    expect(spies.storage).toHaveLength(8)
   })
 })

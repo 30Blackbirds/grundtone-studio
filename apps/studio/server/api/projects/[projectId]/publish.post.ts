@@ -8,6 +8,7 @@ import { requireProjectAccess } from '~~/server/lib/project-access'
 import { copyObject, paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
 import { referencedAssets } from '~~/server/lib/asset-upload'
+import { curatedFontFiles, readCuratedFont } from '~~/server/lib/curated-fonts'
 import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
 
 // Publish ordering — four phases, each recoverable if the next one fails.
@@ -81,6 +82,19 @@ export default defineEventHandler(async (event) => {
 
   // ─── Phase B — upload immutable archive blobs ───────────────────────────
   const assets = referencedAssets(tokens)
+  // Kuraterede fonte: de VALGTE vægte læses fra @fontsource-pakkerne på disk
+  // og skrives ind i projektets eget fonts/-præfiks, så kurateret og custom
+  // serveres uniformt via /k og CSS'ens relative url()'er bare virker.
+  const webFont = tokens.typography?.webFont
+  const curated =
+    webFont?.source === 'curated'
+      ? await Promise.all(
+          curatedFontFiles(webFont.family, webFont.weights).map(async (f) => ({
+            name: f.name,
+            body: await readCuratedFont(webFont.family, f.weight),
+          })),
+        )
+      : []
   await Promise.all([
     putObject(p.versionedJson(nextVersion), json, {
       contentType: 'application/json',
@@ -97,6 +111,12 @@ export default defineEventHandler(async (event) => {
     ...assets.map((a) =>
       copyObject(p.draftAsset(a.name), p.versionedAsset(nextVersion, a.name), {
         contentType: a.contentType,
+        cacheControl: 'public, max-age=31536000, immutable',
+      }),
+    ),
+    ...curated.map((f) =>
+      putObject(p.versionedAsset(nextVersion, f.name), f.body, {
+        contentType: 'font/woff2',
         cacheControl: 'public, max-age=31536000, immutable',
       }),
     ),
@@ -117,6 +137,12 @@ export default defineEventHandler(async (event) => {
     ...assets.map((a) =>
       copyObject(p.versionedAsset(nextVersion, a.name), p.currentAsset(a.name), {
         contentType: a.contentType,
+        cacheControl: 'public, max-age=60, must-revalidate',
+      }),
+    ),
+    ...curated.map((f) =>
+      copyObject(p.versionedAsset(nextVersion, f.name), p.currentAsset(f.name), {
+        contentType: 'font/woff2',
         cacheControl: 'public, max-age=60, must-revalidate',
       }),
     ),
