@@ -1,30 +1,28 @@
 import { fontFileName } from './asset-upload'
-import type { Tokens } from './tokens'
+import { FALLBACK_STACKS, type FontSlot, type Tokens } from './tokens'
 
 function camelToKebab(s: string): string {
   return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)
 }
 
 /**
- * @font-face-blokke for webFont (brand-assets). url()'erne er RELATIVE —
- * de resolver mod CSS-filens egen placering (/k/{key}/tokens.css →
- * /k/{key}/fonts/...), så samme CSS virker uanset origin/nøgle. Kurateret
- * og custom peger på samme fonts/-navneskema; publish sørger for at
- * filerne ligger der.
+ * @font-face-blokke + font-family-kæde for ét font-slot (to-slot-revisionen
+ * 2026-08-04). url()'erne er RELATIVE — de resolver mod CSS-filens egen
+ * placering (/k/{key}/tokens.css → /k/{key}/fonts/...), så samme CSS virker
+ * uanset origin/nøgle. Kæden følger forlægget: primær, fallback-stakkene i
+ * valgt rækkefølge, og det generiske nøgleord udledt af SIDSTE fallback.
  */
-function fontFaceBlocks(
-  webFont: NonNullable<NonNullable<Tokens['typography']>['webFont']>,
-): string[] {
+function fontFaceBlocks(slot: FontSlot, slotKey: 'heading' | 'body'): string[] {
   const out: string[] = []
-  for (const weight of [...webFont.weights].sort((a, b) => a - b)) {
+  for (const weight of [...slot.weights].sort((a, b) => a - b)) {
     const file =
-      webFont.source === 'custom'
-        ? webFont.files[String(weight)]
-        : fontFileName(webFont.family, weight)
+      slot.source === 'custom'
+        ? slot.files[String(weight)]
+        : fontFileName(slot.family, weight, slotKey)
     out.push(
       '',
       '@font-face {',
-      `  font-family: '${webFont.family.replace(/'/g, '')}';`,
+      `  font-family: '${slot.family.replace(/'/g, '')}';`,
       '  font-style: normal;',
       `  font-weight: ${weight};`,
       '  font-display: swap;',
@@ -33,6 +31,17 @@ function fontFaceBlocks(
     )
   }
   return out
+}
+
+/** CSS font-family-kæden for et slot — spejles 1:1 af UI'ets kæde-feedback. */
+export function fontFamilyChain(slot: FontSlot): string {
+  const parts = [`'${slot.family.replace(/'/g, '')}'`]
+  for (const key of slot.fallbacks) {
+    parts.push(...FALLBACK_STACKS[key].fonts)
+  }
+  const last = slot.fallbacks[slot.fallbacks.length - 1]
+  parts.push(FALLBACK_STACKS[last].generic)
+  return parts.join(', ')
 }
 
 function colorLines(colors: NonNullable<Tokens['colors']>, indent: string): string[] {
@@ -70,6 +79,14 @@ export function renderTokensCss(tokens: Tokens): string {
     }
   }
 
+  // Font-slots (Font 1/overskrift + Font 2/brødtekst) sætter kæde-vars —
+  // heading-slottet vinder over et manuelt fontFamily.heading (og body over
+  // .base): slots ER den kuraterede måde at styre familierne på; de rå
+  // strenge består kun som avanceret/legacy-håndtag.
+  const slots = tokens.typography?.slots
+  if (slots?.heading) lines.push(`  --font-family-heading: ${fontFamilyChain(slots.heading)};`)
+  if (slots?.body) lines.push(`  --font-family-base: ${fontFamilyChain(slots.body)};`)
+
   if (tokens.radius) {
     for (const [key, value] of Object.entries(tokens.radius)) {
       if (value === undefined) continue
@@ -97,9 +114,8 @@ export function renderTokensCss(tokens: Tokens): string {
     lines.push('}')
   }
 
-  if (tokens.typography?.webFont) {
-    lines.push(...fontFaceBlocks(tokens.typography.webFont))
-  }
+  if (slots?.heading) lines.push(...fontFaceBlocks(slots.heading, 'heading'))
+  if (slots?.body) lines.push(...fontFaceBlocks(slots.body, 'body'))
 
   return lines.join('\n') + '\n'
 }

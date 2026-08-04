@@ -56,16 +56,19 @@ export function referencedAssets(tokens: Tokens): Array<{ name: string; contentT
   if (logo) {
     out.push({ name: logo.file, contentType: logo.type === 'svg' ? 'image/svg+xml' : 'image/png' })
   }
-  const font = tokens.typography?.webFont
-  if (font?.source === 'custom') {
-    for (const name of Object.values(font.files)) {
-      out.push({ name, contentType: 'font/woff2' })
+  const slots = tokens.typography?.slots
+  for (const key of ['heading', 'body'] as const) {
+    const slot = slots?.[key]
+    if (slot?.source === 'custom') {
+      for (const name of Object.values(slot.files)) {
+        out.push({ name, contentType: 'font/woff2' })
+      }
     }
   }
   return out
 }
 
-export function fontFileName(family: string, weight: number): string {
+export function fontFileName(family: string, weight: number, slot?: 'heading' | 'body'): string {
   const slug =
     family
       .toLowerCase()
@@ -74,5 +77,7 @@ export function fontFileName(family: string, weight: number): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 60) || 'font'
-  return `fonts/${slug}-${weight}.woff2`
+  // Slot-præfiks (to-slot-revisionen): samme familie+vægt i begge slots må
+  // aldrig kollidere i storage — uploads er per-slot.
+  return slot ? `fonts/${slot}-${slug}-${weight}.woff2` : `fonts/${slug}-${weight}.woff2`
 }

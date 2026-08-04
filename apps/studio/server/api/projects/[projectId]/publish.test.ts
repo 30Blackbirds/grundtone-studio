@@ -133,8 +133,11 @@ vi.mock('~~/server/lib/tokens', () => ({
 
 // ─── curated fonts — rene buffers, pakke-læsning testes i curated-fonts.test.ts ──
 vi.mock('~~/server/lib/curated-fonts', () => ({
-  curatedFontFiles: (family: string, weights: number[]) =>
-    weights.map((weight) => ({ name: `fonts/${family.toLowerCase()}-${weight}.woff2`, weight })),
+  curatedFontFiles: (family: string, weights: number[], slot: string) =>
+    weights.map((weight) => ({
+      name: `fonts/${slot}-${family.toLowerCase()}-${weight}.woff2`,
+      weight,
+    })),
   readCuratedFont: () => Promise.resolve(Buffer.from('wOF2mock')),
 }))
 
@@ -302,11 +305,17 @@ describe('POST /api/projects/[projectId]/publish', () => {
         colors: { primary: '#0059b3' },
         assets: { logo: { file: 'logo.svg', type: 'svg' } },
         typography: {
-          webFont: {
-            source: 'custom',
-            family: 'Asp Grotesk',
-            weights: [400, 700],
-            files: { '400': 'fonts/asp-grotesk-400.woff2', '700': 'fonts/asp-grotesk-700.woff2' },
+          slots: {
+            body: {
+              source: 'custom',
+              family: 'Asp Grotesk',
+              weights: [400, 700],
+              files: {
+                '400': 'fonts/body-asp-grotesk-400.woff2',
+                '700': 'fonts/body-asp-grotesk-700.woff2',
+              },
+              fallbacks: ['humanist'],
+            },
           },
         },
       },
@@ -320,11 +329,11 @@ describe('POST /api/projects/[projectId]/publish', () => {
     const keys = spies.storage.map((o) => o.key)
     // Fase B: draft → immutabelt arkiv
     expect(keys).toContain(`p/${PROJECT.id}/v1/logo.svg`)
-    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/asp-grotesk-400.woff2`)
-    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/asp-grotesk-700.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/body-asp-grotesk-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/body-asp-grotesk-700.woff2`)
     // Fase C: arkiv → current (det /k serverer)
     expect(keys).toContain(`p/${PROJECT.id}/current/logo.svg`)
-    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/asp-grotesk-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/body-asp-grotesk-400.woff2`)
     // Kilderne er copies, ikke re-uploads gennem app-processen
     const v1Logo = spies.storage.find((o) => o.key === `p/${PROJECT.id}/v1/logo.svg`)
     expect(v1Logo?.bodyPreview).toBe(`copy:p/${PROJECT.id}/draft/logo.svg`)
@@ -342,7 +351,16 @@ describe('POST /api/projects/[projectId]/publish', () => {
       version: 0,
       status: 'draft',
       tokensJson: {
-        typography: { webFont: { source: 'curated', family: 'Inter', weights: [400, 700] } },
+        typography: {
+          slots: {
+            heading: {
+              source: 'curated',
+              family: 'Inter',
+              weights: [400, 700],
+              fallbacks: ['humanist'],
+            },
+          },
+        },
       },
       publishedAt: null,
       publishedBy: null,
@@ -352,18 +370,20 @@ describe('POST /api/projects/[projectId]/publish', () => {
     await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
 
     const keys = spies.storage.map((o) => o.key)
-    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
-    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/inter-700.woff2`)
-    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/inter-400.woff2`)
-    const v1 = spies.storage.find((o) => o.key === `p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/heading-inter-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/heading-inter-700.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/heading-inter-400.woff2`)
+    const v1 = spies.storage.find(
+      (o) => o.key === `p/${PROJECT.id}/v1/fonts/heading-inter-400.woff2`,
+    )
     expect(v1?.contentType).toBe('font/woff2')
     // arkivet er en PUT fra disk-bufferen (spy'en slicer Buffer → Buffer);
     // current er en copy af arkivet
     expect(String(v1?.bodyPreview)).toBe('wOF2mock')
     const current = spies.storage.find(
-      (o) => o.key === `p/${PROJECT.id}/current/fonts/inter-400.woff2`,
+      (o) => o.key === `p/${PROJECT.id}/current/fonts/heading-inter-400.woff2`,
     )
-    expect(current?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/fonts/inter-400.woff2`)
+    expect(current?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/fonts/heading-inter-400.woff2`)
     // 4 token-writes + 2 arkiv-puts + 2 current-copies
     expect(spies.storage).toHaveLength(8)
   })

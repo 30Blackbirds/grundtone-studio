@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   fontFileName,
   MAX_ASSET_BYTES,
+  referencedAssets,
   validateFontUpload,
   validateLogoUpload,
 } from './asset-upload'
@@ -65,6 +66,8 @@ describe('validateFontUpload', () => {
 describe('fontFileName', () => {
   it('slugs family names into schema-valid references', () => {
     expect(fontFileName('Asp Grotesk', 400)).toBe('fonts/asp-grotesk-400.woff2')
+    expect(fontFileName('Asp Grotesk', 400, 'body')).toBe('fonts/body-asp-grotesk-400.woff2')
+    expect(fontFileName('Asp Grotesk', 400, 'heading')).toBe('fonts/heading-asp-grotesk-400.woff2')
     // æ/ø har ingen NFKD-dekomposition og droppes; å → a + ring → 'a'
     expect(fontFileName('Æøå Sans! 2.0', 700)).toBe('fonts/a-sans-2-0-700.woff2')
   })
@@ -74,5 +77,55 @@ describe('fontFileName', () => {
     for (const name of ['---', '!!!', '日本語フォント', 'x'.repeat(200)]) {
       expect(fontFileName(name, 400)).toMatch(pattern)
     }
+  })
+})
+
+describe('referencedAssets (publish-promoveringen, to-slot)', () => {
+  it('collects logo + custom font files across BOTH slots with content types', () => {
+    const refs = referencedAssets({
+      assets: { logo: { file: 'logo.svg', type: 'svg' } },
+      typography: {
+        slots: {
+          heading: {
+            source: 'custom',
+            family: 'X',
+            weights: [700],
+            files: { '700': 'fonts/heading-x-700.woff2' },
+            fallbacks: ['humanist'],
+          },
+          body: {
+            source: 'custom',
+            family: 'Y',
+            weights: [400],
+            files: { '400': 'fonts/body-y-400.woff2' },
+            fallbacks: ['humanist'],
+          },
+        },
+      },
+    })
+    expect(refs).toEqual([
+      { name: 'logo.svg', contentType: 'image/svg+xml' },
+      { name: 'fonts/heading-x-700.woff2', contentType: 'font/woff2' },
+      { name: 'fonts/body-y-400.woff2', contentType: 'font/woff2' },
+    ])
+  })
+
+  it('returns nothing for curated slots and asset-less tokens', () => {
+    expect(referencedAssets({})).toEqual([])
+    expect(
+      referencedAssets({
+        typography: {
+          slots: {
+            body: { source: 'curated', family: 'Inter', weights: [400], fallbacks: ['humanist'] },
+          },
+        },
+      }),
+    ).toEqual([])
+  })
+
+  it('maps png logo content type', () => {
+    expect(referencedAssets({ assets: { logo: { file: 'logo.png', type: 'png' } } })).toEqual([
+      { name: 'logo.png', contentType: 'image/png' },
+    ])
   })
 })

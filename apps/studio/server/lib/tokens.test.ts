@@ -76,13 +76,27 @@ describe('dark overrides (override model, 2026-07-29)', () => {
   })
 })
 
-describe('brand-assets (locked schema 2026-08-03)', () => {
+describe('brand-assets (two-slot revision 2026-08-04)', () => {
+  const curatedSlot = {
+    source: 'curated',
+    family: 'Manrope',
+    weights: [400, 700],
+    fallbacks: ['neutral-grotesk', 'system-grotesk'],
+  }
+  const customSlot = {
+    source: 'custom',
+    family: 'Asp Grotesk',
+    weights: [400, 700],
+    files: {
+      '400': 'fonts/body-asp-grotesk-400.woff2',
+      '700': 'fonts/body-asp-grotesk-700.woff2',
+    },
+    fallbacks: ['serif-classic'],
+  }
+
   it('accepts a logo reference with matching type', () => {
     expect(
       tokensSchema.safeParse({ assets: { logo: { file: 'logo.svg', type: 'svg' } } }).success,
-    ).toBe(true)
-    expect(
-      tokensSchema.safeParse({ assets: { logo: { file: 'logo.png', type: 'png' } } }).success,
     ).toBe(true)
   })
 
@@ -94,70 +108,106 @@ describe('brand-assets (locked schema 2026-08-03)', () => {
     }
   })
 
-  it('accepts a curated webFont from the v1 list with weights', () => {
+  it('accepts heading+body slots (curated + custom) with fallback keys', () => {
     const res = tokensSchema.safeParse({
-      typography: { webFont: { source: 'curated', family: 'Manrope', weights: [400, 600, 700] } },
+      typography: { slots: { heading: curatedSlot, body: customSlot } },
     })
     expect(res.success).toBe(true)
   })
 
-  it('rejects curated families outside the v1 list and invalid weights', () => {
+  it('rejects free-text fallbacks and >2 fallbacks', () => {
     expect(
       tokensSchema.safeParse({
-        typography: { webFont: { source: 'curated', family: 'Comic Sans MS', weights: [400] } },
-      }).success,
-    ).toBe(false)
-    expect(
-      tokensSchema.safeParse({
-        typography: { webFont: { source: 'curated', family: 'Inter', weights: [350] } },
-      }).success,
-    ).toBe(false)
-    expect(
-      tokensSchema.safeParse({
-        typography: { webFont: { source: 'curated', family: 'Inter', weights: [400, 400] } },
-      }).success,
-    ).toBe(false)
-  })
-
-  it('accepts a custom webFont with one file per weight', () => {
-    const res = tokensSchema.safeParse({
-      typography: {
-        webFont: {
-          source: 'custom',
-          family: 'Asp Grotesk',
-          weights: [400, 700],
-          files: { '400': 'fonts/asp-grotesk-400.woff2', '700': 'fonts/asp-grotesk-700.woff2' },
-        },
-      },
-    })
-    expect(res.success).toBe(true)
-  })
-
-  it('rejects custom webFont when files and weights diverge', () => {
-    const base = { source: 'custom', family: 'Asp Grotesk', weights: [400, 700] }
-    expect(
-      tokensSchema.safeParse({
-        typography: { webFont: { ...base, files: { '400': 'fonts/a-400.woff2' } } },
+        typography: { slots: { heading: { ...curatedSlot, fallbacks: ['Comic Sans MS'] } } },
       }).success,
     ).toBe(false)
     expect(
       tokensSchema.safeParse({
         typography: {
-          webFont: {
-            ...base,
-            files: { '400': 'fonts/a-400.woff2', '500': 'fonts/a-500.woff2' },
+          slots: {
+            heading: {
+              ...curatedSlot,
+              fallbacks: ['neutral-grotesk', 'system-grotesk', 'humanist'],
+            },
           },
         },
       }).success,
     ).toBe(false)
   })
 
-  it('rejects custom font files with traversal or wrong format', () => {
+  it('enforces the per-family curated weight catalog (IBM Plex Sans has no 800)', () => {
+    expect(
+      tokensSchema.safeParse({
+        typography: {
+          slots: {
+            heading: {
+              source: 'curated',
+              family: 'IBM Plex Sans',
+              weights: [800],
+              fallbacks: ['humanist'],
+            },
+          },
+        },
+      }).success,
+    ).toBe(false)
+    expect(
+      tokensSchema.safeParse({
+        typography: {
+          slots: {
+            heading: {
+              source: 'curated',
+              family: 'Manrope',
+              weights: [800],
+              fallbacks: ['humanist'],
+            },
+          },
+        },
+      }).success,
+    ).toBe(true)
+  })
+
+  it("enforces Allan's total cap: at most 4 font FILES across both slots", () => {
+    const twoAndTwo = tokensSchema.safeParse({
+      typography: { slots: { heading: curatedSlot, body: customSlot } },
+    })
+    expect(twoAndTwo.success).toBe(true)
+    const threeAndTwo = tokensSchema.safeParse({
+      typography: {
+        slots: {
+          heading: { ...curatedSlot, weights: [400, 600, 700] },
+          body: customSlot,
+        },
+      },
+    })
+    expect(threeAndTwo.success).toBe(false)
+  })
+
+  it('rejects custom slots where files and weights diverge', () => {
+    expect(
+      tokensSchema.safeParse({
+        typography: {
+          slots: {
+            body: { ...customSlot, files: { '400': 'fonts/body-asp-grotesk-400.woff2' } },
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects font files with traversal or wrong format', () => {
     for (const file of ['../x.woff2', 'fonts/../x.woff2', 'fonts/x.ttf', 'https://e.x/f.woff2']) {
       expect(
         tokensSchema.safeParse({
           typography: {
-            webFont: { source: 'custom', family: 'X', weights: [400], files: { '400': file } },
+            slots: {
+              body: {
+                source: 'custom',
+                family: 'X',
+                weights: [400],
+                files: { '400': file },
+                fallbacks: ['humanist'],
+              },
+            },
           },
         }).success,
       ).toBe(false)

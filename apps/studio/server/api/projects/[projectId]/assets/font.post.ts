@@ -11,6 +11,7 @@ import { FONT_WEIGHTS } from '~~/server/lib/tokens'
 // family+weight kommer som query (binær body er reserveret til selve filen).
 
 const querySchema = z.object({
+  slot: z.enum(['heading', 'body']),
   family: z.string().min(1).max(100),
   weight: z.coerce
     .number()
@@ -37,7 +38,7 @@ export default defineEventHandler(async (event) => {
   if (!query.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'family and weight (400|500|600|700) required',
+      statusMessage: 'slot (heading|body), family and weight (400-800) required',
     })
   }
 
@@ -56,7 +57,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const file = fontFileName(query.data.family, query.data.weight)
+  const file = fontFileName(query.data.family, query.data.weight, query.data.slot)
   await putObject(paths(projectId).draftAsset(file), validated.body, {
     contentType: validated.contentType,
     cacheControl: 'no-store',
