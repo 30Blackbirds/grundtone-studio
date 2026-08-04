@@ -23,17 +23,38 @@ interface DraftRow {
 
 const draft: DraftRow[] = []
 const published: DraftRow[] = []
+const attestationUpdates: Array<{
+  table: string
+  servingEndedAt: Date | null
+  predicate: unknown
+}> = []
 
 // ─── h3 ───────────────────────────────────────────────────────────────────
 vi.mock('h3', () => mockH3())
 
 // ─── drizzle-orm ──────────────────────────────────────────────────────────
+// Prædikat-byggerne returnerer STRUKTUR, ikke null. Uden det kastede mocken
+// where-klausulen væk, og idempotens-testene nedenfor kunne ikke skelne
+// "update ramte 0 rækker fordi isNull-guarden ekskluderede dem" fra "update
+// nulstillede et løbende ur ved en fejl" — altså præcis den stille regression
+// guarden er sat til at forhindre ([review]-fund på #196).
 vi.mock('drizzle-orm', () => ({
-  and: () => null,
-  desc: () => null,
-  eq: () => null,
-  max: () => null,
+  and: (...parts: unknown[]) => ({ op: 'and', parts: parts.filter(Boolean) }),
+  desc: () => ({ op: 'desc' }),
+  eq: (col: unknown, val: unknown) => ({ op: 'eq', col, val }),
+  max: () => ({ op: 'max' }),
+  inArray: (col: unknown, vals: unknown) => ({ op: 'inArray', col, vals }),
+  isNull: (col: unknown) => ({ op: 'isNull', col }),
+  notInArray: (col: unknown, vals: unknown) => ({ op: 'notInArray', col, vals }),
 }))
+
+/** Fladt opslag i prædikat-træet — bruges til at bevise at en guard ER der. */
+function predicateHasOp(node: unknown, op: string): boolean {
+  if (!node || typeof node !== 'object') return false
+  const n = node as { op?: string; parts?: unknown[] }
+  if (n.op === op) return true
+  return Array.isArray(n.parts) ? n.parts.some((p) => predicateHasOp(p, op)) : false
+}
 
 // ─── db ───────────────────────────────────────────────────────────────────
 // Lightweight query builder that returns drafts, published rows, or max
@@ -71,6 +92,20 @@ const dbMock = {
       }
     },
   }),
+  // Retention-uret skriver via db.update(fontLicenceAttestation) — vi fanger
+  // sat/ryddet uden at simulere where-klausulen (den er drizzle's ansvar).
+  update: (table: { _?: { name?: string } }) => ({
+    set: (values: Record<string, unknown>) => ({
+      where: (predicate: unknown) => {
+        attestationUpdates.push({
+          table: table?._?.name ?? 'unknown',
+          servingEndedAt: values.servingEndedAt as Date | null,
+          predicate,
+        })
+        return Promise.resolve()
+      },
+    }),
+  }),
   transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       update: () => ({
@@ -96,6 +131,12 @@ vi.mock('~~/server/db', () => ({ db: dbMock }))
 vi.mock('~~/server/db/schema', () => ({
   configVersion: { _: { name: 'config_version' } },
   activeVersion: { _: { name: 'active_version' } },
+  fontLicenceAttestation: {
+    _: { name: 'font_licence_attestation' },
+    projectId: 'projectId',
+    file: 'file',
+    servingEndedAt: 'servingEndedAt',
+  },
 }))
 
 // ─── helpers + storage ───────────────────────────────────────────────────
@@ -173,6 +214,7 @@ beforeEach(() => {
   spies.audit.length = 0
   spies.storage.length = 0
   spies.bunnyPurges.length = 0
+  attestationUpdates.length = 0
   draft.length = 0
   published.length = 0
   requireProjectAccess.mockReset()
@@ -386,5 +428,70 @@ describe('POST /api/projects/[projectId]/publish', () => {
     expect(current?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/fonts/heading-inter-400.woff2`)
     // 4 token-writes + 2 arkiv-puts + 2 current-copies
     expect(spies.storage).toHaveLength(8)
+  })
+
+  // Retention-uret (jura §16a): "slettes 10 år efter at filen SIDST blev
+  // serveret". Publish er dér leverancen skifter, så det er dér uret sættes
+  // og ryddes. Testene pinner begge retninger + idempotensen.
+  it('starts the retention clock for fonts a publish stops serving', async () => {
+    draft.push({
+      id: 'draft-r1',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: { colors: { primary: '#000' } },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-08-04T12:00:00Z'),
+    })
+    await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
+    const set = attestationUpdates.filter((u) => u.servingEndedAt instanceof Date)
+    expect(set.length).toBeGreaterThan(0)
+    expect(set[0].table).toBe('font_licence_attestation')
+    // DEN AFGØRENDE ASSERTION: uret må kun sættes på rækker hvor det ikke
+    // allerede løber. Uden isNull-guarden ville hver publish uden font-
+    // ændringer skubbe slettedatoen frem — en GDPR-fejl der ser ud som om
+    // reglen virker og først bliver synlig om ti år. Fjernes guarden, fejler
+    // dette, hvor mock'ens tidligere where-kassering lod det passere.
+    expect(predicateHasOp(set[0].predicate, 'isNull')).toBe(true)
+  })
+
+  it('clears the clock for fonts that are being served again (rollback)', async () => {
+    draft.push({
+      id: 'draft-r2',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: {
+        typography: {
+          slots: {
+            body: {
+              source: 'custom',
+              family: 'Asp Grotesk',
+              weights: [400],
+              files: { '400': 'fonts/body-asp-grotesk-400.woff2' },
+              fallbacks: ['humanist'],
+            },
+          },
+        },
+      },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-08-04T12:00:00Z'),
+    })
+    await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
+    // Den serverede fil får uret NULSTILLET — scopet til netop de filer der
+    // serveres igen (inArray), ikke bredt over projektet.
+    const cleared = attestationUpdates.filter((u) => u.servingEndedAt === null)
+    expect(cleared).toHaveLength(1)
+    expect(predicateHasOp(cleared[0].predicate, 'inArray')).toBe(true)
+
+    // ...og alt ANDET i projektet får det STARTET — med begge guards: kun
+    // rækker uden løbende ur (isNull) og kun filer der ikke serveres
+    // (notInArray). Mangler én af dem, rammer opdateringen for bredt.
+    const started = attestationUpdates.filter((u) => u.servingEndedAt instanceof Date)
+    expect(started).toHaveLength(1)
+    expect(predicateHasOp(started[0].predicate, 'isNull')).toBe(true)
+    expect(predicateHasOp(started[0].predicate, 'notInArray')).toBe(true)
   })
 })

@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
-import { and, desc, eq, max } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, max, notInArray } from 'drizzle-orm'
 import { db } from '~~/server/db'
-import { activeVersion, configVersion } from '~~/server/db/schema'
+import { activeVersion, configVersion, fontLicenceAttestation } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
@@ -152,6 +152,54 @@ export default defineEventHandler(async (event) => {
       }),
     ),
   ])
+
+  // ─── Retention-uret (jura §16a) ─────────────────────────────────────────
+  // Fase C har netop skiftet hvad /k serverer, så DETTE er øjeblikket hvor
+  // leverancen af de gamle filer ophører og de nye begynder. Ét felt bærer
+  // begge retninger: filer der ikke længere er refereret får uret startet,
+  // og filer der er tilbage (rollback til en tidligere font) får det ryddet.
+  // Vi rører kun rækker hvis tilstand faktisk ændrer sig — isNull/notNull i
+  // where-klausulerne gør begge opdateringer idempotente, så en gentaget
+  // publish uden font-ændringer ikke forskyder uret.
+  const servedFiles = [...assets.map((a) => a.name), ...curated.map((f) => f.name)].filter((n) =>
+    n.startsWith('fonts/'),
+  )
+  const now = new Date()
+  if (servedFiles.length > 0) {
+    // Genoptaget levering → nulstil uret.
+    await db
+      .update(fontLicenceAttestation)
+      .set({ servingEndedAt: null })
+      .where(
+        and(
+          eq(fontLicenceAttestation.projectId, projectId),
+          inArray(fontLicenceAttestation.file, servedFiles),
+        ),
+      )
+    // Alt andet i projektet serveres ikke længere → start uret (kun hvis det
+    // ikke allerede løber, ellers ville hver publish udskyde sletningen).
+    await db
+      .update(fontLicenceAttestation)
+      .set({ servingEndedAt: now })
+      .where(
+        and(
+          eq(fontLicenceAttestation.projectId, projectId),
+          isNull(fontLicenceAttestation.servingEndedAt),
+          notInArray(fontLicenceAttestation.file, servedFiles),
+        ),
+      )
+  } else {
+    // Ingen custom/kuraterede fontfiler i den nye version → alt ophører.
+    await db
+      .update(fontLicenceAttestation)
+      .set({ servingEndedAt: now })
+      .where(
+        and(
+          eq(fontLicenceAttestation.projectId, projectId),
+          isNull(fontLicenceAttestation.servingEndedAt),
+        ),
+      )
+  }
 
   // ─── Phase D — flip active_version pointer (atomic in DB) ───────────────
   await db
