@@ -1,0 +1,2 @@
+ALTER TABLE "font_licence_attestation" ADD COLUMN "serving_ended_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "font_licence_attestation_serving_ended_idx" ON "font_licence_attestation" USING btree ("serving_ended_at");

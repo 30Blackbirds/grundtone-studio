@@ -19,6 +19,18 @@ export const ATTESTATION_VERSION = 'studio-b2b-erklaering-2026-08-02'
 // ændres ordlyden, skal denne bumpes i samme diff, og tests/legal-copy.test.ts
 // pinner ordlydens substans så en ændring ikke kan ske ubemærket.
 export const FONT_LICENCE_VERSION = 'studio-font-licence-1.0'
+// Retention for bevis-rækken (jura §16a): slettes N år efter at filen SIDST
+// blev serveret — uanset hvorfor leveringen ophørte. 10 år er det konservative
+// valg: 3-årsfristen løber ved ukendskab først fra det tidspunkt rettighedshaveren
+// BURDE være blevet bekendt, og en skriftproducent opdager sjældent med det samme
+// — regnet fra vores egen sidste leverance ville vi slette beviset i præcis den
+// periode hvor kravet realistisk dukker op.
+//
+// ⚠️ Konfigurerbar med vilje: juras anvendelse af forældelsesreglerne på en
+// VEDVARENDE immaterialretskrænkelse er sendt til advokat-verifikation, og Allan
+// får 10-vs-5-år forelagt som risikoappetit-valg. Tallet kan ændre sig én gang;
+// logikken (servingEndedAt + frist) er uændret uanset udfald.
+export const ATTESTATION_RETENTION_YEARS = 10
 export const TERMS_URL = 'https://grundtone.com/vilkaar'
 export const PRIVACY_URL = 'https://grundtone.com/privatliv'
 export const WITHDRAWAL_URL = 'https://grundtone.com/fortrydelse'

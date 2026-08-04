@@ -77,8 +77,23 @@ export const fontLicenceAttestation = pgTable(
     userId: text().notNull(),
     userEmail: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    // Retention-uret (jura §16a): sættes når filen HOLDER OP med at blive
+    // serveret, ryddes hvis leveringen genoptages (rollback), sættes igen ved
+    // fornyet ophør. NULL = filen serveres stadig, og uret er ikke begyndt.
+    // Rækken slettes ATTESTATION_RETENTION_YEARS efter værdien.
+    //
+    // Juras pointe om hvorfor ét felt er nok: ny publish, slot-skift,
+    // projektsletning og org-ophør adskiller sig i ÅRSAG, ikke i VIRKNING —
+    // juridisk tæller kun hvornår vi holdt op med at sprede filen. Og en font
+    // serveret i 20 minutter får samme frist som en serveret i tre år, fordi
+    // kravet opstår af den krænkende handling, ikke af dens varighed.
+    servingEndedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index('font_licence_attestation_project_idx').on(t.projectId, t.createdAt)],
+  (t) => [
+    index('font_licence_attestation_project_idx').on(t.projectId, t.createdAt),
+    // Sletningen scanner på uret — ikke på projektet.
+    index('font_licence_attestation_serving_ended_idx').on(t.servingEndedAt),
+  ],
 )
 
 export const apiKey = pgTable(
