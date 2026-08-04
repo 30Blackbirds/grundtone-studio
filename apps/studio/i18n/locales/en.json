@@ -476,9 +476,10 @@
       "serif-typewriter": "Serif — typewriter (Times New Roman…)",
       "monospace": "Monospace (SF Mono, Consolas…)"
     },
-    "budgetFull": "Max 4 font files in total across Font 1 and Font 2 — remove one to add another.",
+    "budgetFull": "Max 4 font files in total across the two font slots — remove one to add another.",
     "previewTitle": "Live preview — combined brand context",
-    "previewSub": "How Font 1 (heading) and Font 2 (body) play together."
+    "previewSub": "How Font 1 (heading) and Font 2 (body) play together.",
+    "budgetCounter": "{used} of {max} font files used"
   },
   "contrast": {
     "unparseable": "Can't read this color — use #RRGGBB",
@@ -882,7 +883,8 @@
       "tosLabel": "I accept the subscription terms, including the data processing agreement (DPA)",
       "checkboxHint": "The button activates once both boxes are ticked and the CVR/VAT number is filled in",
       "vatHelp": "CVR (Danish companies), VAT number (EU) or business ID (other). Verified automatically with VIES after purchase — the purchase completes regardless."
-    }
+    },
+    "fontFilesNote": "Brand typefaces: up to 4 font files in total across the two font slots per project."
   },
   "help": {
     "publishHelp": {

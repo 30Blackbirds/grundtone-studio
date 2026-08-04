@@ -139,3 +139,10 @@ export const SHOW_PRICE_LOCK_LINE = true
 export function getPlan(key: PlanKey): PlanDef {
   return PLAN_CATALOG.find((p) => p.key === key)!
 }
+
+// Jura/Allan-låst loft 2026-08-04: "4 fontfiler i alt" på tværs af de to
+// font-slots (fil-formulering så kursiv-filer utvetydigt tæller med). Bor
+// HER som config-konstant (ikke spredt i valideringer) så en senere
+// justering — fx Enterprise-forhøjelse — er ét sted. Skal fremgå af /plans
+// (aftale-kilden) og må bevidst IKKE stå i ToS.
+export const MAX_FONT_FILES_TOTAL = 4

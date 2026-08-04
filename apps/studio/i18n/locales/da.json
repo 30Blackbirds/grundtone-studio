@@ -476,9 +476,10 @@
       "serif-typewriter": "Serif — skrivemaskine (Times New Roman…)",
       "monospace": "Monospace (SF Mono, Consolas…)"
     },
-    "budgetFull": "Maks. 4 fontfiler i alt på tværs af Font 1 og Font 2 — fjern en for at tilføje en anden.",
+    "budgetFull": "Maks. 4 fontfiler i alt på tværs af de to font-slots — fjern en for at tilføje en anden.",
     "previewTitle": "Live preview — kombineret brand-kontekst",
-    "previewSub": "Sådan spiller Font 1 (overskrift) og Font 2 (brødtekst) sammen."
+    "previewSub": "Sådan spiller Font 1 (overskrift) og Font 2 (brødtekst) sammen.",
+    "budgetCounter": "{used} af {max} fontfiler brugt"
   },
   "contrast": {
     "unparseable": "Kan ikke læse denne farve — brug #RRGGBB",
@@ -882,7 +883,8 @@
       "tosLabel": "Jeg accepterer abonnementsvilkårene, inkl. databehandleraftalen (DPA)",
       "checkboxHint": "Knappen aktiveres når begge felter er markeret og CVR-/momsnummer er udfyldt",
       "vatHelp": "CVR (danske virksomheder), momsnummer (EU) eller virksomheds-id (øvrige). Bekræftes automatisk hos VIES efter køb — købet gennemføres uanset."
-    }
+    },
+    "fontFilesNote": "Brand-skrifttyper: op til 4 fontfiler i alt på tværs af de to font-slots pr. projekt."
   },
   "help": {
     "publishHelp": {

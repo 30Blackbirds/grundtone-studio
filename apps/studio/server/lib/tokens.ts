@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_FONT_FILES_TOTAL } from '~~/lib/plan-catalog'
 import { CSS_COLOR_PATTERN, CSS_LENGTH_PATTERN } from '~~/utils/css-values'
 
 const cssColor = z.string().min(1).max(100).regex(CSS_COLOR_PATTERN, 'must be a valid CSS color')
@@ -140,8 +141,9 @@ export function slotFileCount(slot: FontSlot): number {
   return slot.source === 'custom' ? Object.keys(slot.files).length : slot.weights.length
 }
 
-/** Allan-låst loft 2026-08-04: "4 fontfiler i alt" på tværs af BEGGE slots. */
-export const MAX_FONT_FILES_TOTAL = 4
+// Loftet bor i lib/plan-catalog.ts (config-hjemmet, jura-krav) — re-eksporteret
+// her så schema-forbrugere har ét import-sted.
+export { MAX_FONT_FILES_TOTAL }
 
 export const tokensSchema = z
   .object({

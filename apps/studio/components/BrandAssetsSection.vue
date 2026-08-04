@@ -4,6 +4,7 @@
   // assets publiceres MED farve-tokens i samme kladde/publicér-cyklus (sidens
   // header er den fælles linje). Font-delen er TO slots (Font 1/overskrift +
   // Font 2/brødtekst) med Allan-loftet "4 fontfiler i alt" på tværs af begge.
+  import { MAX_FONT_FILES_TOTAL } from '~~/lib/plan-catalog'
   import type { FontSlot, Tokens } from '~~/server/lib/tokens'
 
   const props = defineProps<{ projectId: string; canEdit: boolean }>()
@@ -74,9 +75,8 @@
     if (!slot) return 0
     return slot.source === 'custom' ? Object.keys(slot.files).length : slot.weights.length
   }
-  const remainingBudget = computed(
-    () => 4 - slotFiles(headingSlot.value) - slotFiles(bodySlot.value),
-  )
+  const usedFiles = computed(() => slotFiles(headingSlot.value) + slotFiles(bodySlot.value))
+  const remainingBudget = computed(() => MAX_FONT_FILES_TOTAL - usedFiles.value)
 
   const previewHeadingFamily = computed(() => headingSlot.value?.family ?? null)
   const previewBodyFamily = computed(() => bodySlot.value?.family ?? null)
@@ -127,6 +127,20 @@
       </div>
     </GTCard>
 
+    <!-- Fælles fil-tæller (designer-forlæg: strip over begge font-kort) -->
+    <div class="brand-file-budget">
+      <span>{{
+        t('brandAssets.budgetCounter', { used: usedFiles, max: MAX_FONT_FILES_TOTAL })
+      }}</span>
+      <div class="brand-file-budget__bar" aria-hidden="true">
+        <span
+          v-for="i in MAX_FONT_FILES_TOTAL"
+          :key="i"
+          class="brand-file-budget__seg"
+          :class="{ on: i <= usedFiles }"
+        />
+      </div>
+    </div>
     <FontSlotEditor
       v-model="headingSlot"
       slot-key="heading"
