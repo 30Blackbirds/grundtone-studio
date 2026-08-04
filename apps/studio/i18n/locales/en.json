@@ -443,11 +443,13 @@
     "weightsLabel": "Weights to include",
     "weightsHint": "— only the selected ones load from the CDN",
     "weightForFile": "Which weight is this file?",
-    "license": "I confirm that I am licensed to use this font commercially and to upload it to this service.",
+    "license": "I warrant that I have the right to use this typeface and to let Grundtone distribute it to the users who visit my brands.",
+    "licenseHelp": "Web distribution usually requires a different licence from the one that comes with a typeface bought for your own computer. Check your licence for webfont, web embedding or web use.",
     "licenseMore": "Read more about font licences",
     "errTooLarge": "The file is too large — reduce it to under 512 KB and try again.",
     "errLogoFormat": "Wrong file format — only SVG and PNG are accepted.",
     "errFontFormat": "Wrong file format — only .woff2 is accepted. Convert your font and try again.",
+    "errLicenceRequired": "Tick the licence declaration before uploading — we need to be able to document it.",
     "errFamilyFirst": "Enter the font name before uploading.",
     "previewLabel": "Live preview — brand context",
     "previewHeading": "Why we built our own CMS",
@@ -976,7 +978,9 @@
       "subProcessors": "Sub-processors",
       "cookies": "Cookies and local storage"
     },
-    "fontLicensesHeading": "Font licences",
-    "fontLicensesBody": "Library typefaces are open source (SIL Open Font License) and delivered by us. If you upload your own font files, you confirm that you are licensed for commercial use and to upload them to the service — detailed terms appear in the subscription terms."
+    "fontLicensesHeading": "Typefaces and licences",
+    "fontLicensesLibrary": "The typefaces in our library are freely licensed (SIL Open Font License) and can be used as they are.",
+    "fontLicensesUpload": "If you upload your own typeface, we deliver it onward to the users who visit your brands. That is web distribution — and it usually requires a different licence from the one that comes with a typeface bought for use on your own computer. Check your licence for terms such as webfont, web embedding or web use before uploading.",
+    "fontLicensesWarranty": "You warrant that you have the right to use the typeface and to let us distribute it as part of delivering your brands."
   }
 }
