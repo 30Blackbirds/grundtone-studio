@@ -21,8 +21,17 @@ const REDACTED_EMAIL = 'deleted@redacted'
 // filen: "en attestation for en font, vi stadig serverer, skal ikke udløbe,
 // fordi den medarbejder der uploadede den, har forladt virksomheden."
 //
-// Dataminimering håndteres i stedet ved at pseudonymisere e-mailen ved
-// SKRIVNING (salt_v1:<hash>, jura §16) — ikke ved at redigere rækken senere.
+// Dataminimering håndteres i stedet ved TIDSBEGRÆNSNING, ikke ved redaktion:
+// rækken bærer klartekst-e-mail som bevis og slettes HELT når
+// servingEndedAt + ATTESTATION_RETENTION_YEARS er passeret (jura §16a).
+//
+// E-mailen står bevidst i klartekst — jura omgjorde et tidligere hash-krav
+// (§16 rev.): en hash kan bekræfte en formodning, men ikke FREMVISE en
+// identitet, og efter en art. 17-sletning er userId heller ikke opløseligt.
+// Hash + uopløseligt id ville give en række der peger på en identitet ingen
+// kan slå op — vi ville have bevaret rækken for bevisværdiens skyld og
+// samtidig fjernet netop den. Genopfind ikke den diskussion her.
+//
 // deleted.post.test.ts pinner at denne webhook lader tabellen være.
 
 const bodySchema = z.object({
