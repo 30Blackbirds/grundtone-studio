@@ -91,4 +91,25 @@ describe('account deleted webhook', () => {
     const redacted = updates.map((u) => u.values)
     expect(redacted.every((v) => Object.values(v).includes('deleted@redacted'))).toBe(true)
   })
+
+  // Bevisregistret må IKKE røres af kontosletning (jura §16): levetiden hører
+  // til filens leverance + forældelsesfristen, ikke til brugerens konto.
+  // Adfærden er allerede rigtig — men den var det ved et TILFÆLDE (tabellen
+  // kom til efter webhooken), og holder kun indtil nogen udvider redaktionen
+  // "for konsistens". Derfor pinnes den her frem for at bero på hukommelse.
+  it('leaves the font licence attestation registry untouched', async () => {
+    await handler({
+      headers: { authorization: `Bearer ${SECRET}` },
+      body: { userId: 'user-42' },
+    })
+    const touched = [...updates.map((u) => u.table), ...deletes]
+    expect(touched).not.toContain('font_licence_attestation')
+    // ...mens de fire denormaliserede email-felter fortsat ER redigeret:
+    expect(updates.map((u) => u.table).sort()).toEqual([
+      'active_version',
+      'api_key',
+      'config_version',
+      'project_invitation',
+    ])
+  })
 })

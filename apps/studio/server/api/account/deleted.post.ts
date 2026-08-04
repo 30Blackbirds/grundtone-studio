@@ -12,6 +12,19 @@ import {
 
 const REDACTED_EMAIL = 'deleted@redacted'
 
+// ⚠️ TILFØJ IKKE font_licence_attestation HER — heller ikke "for konsistens".
+//
+// [jura] 2026-08-04 (§16): bevisregistret for font-licens-erklæringer er
+// undtaget efter art. 17(3), og dets levetid hører til FILENS leverance +
+// forældelsesfristen — ikke til brugerens konto. Modparten er en tredjepart
+// (skriftproducenten), og krænkelsen er vedvarende så længe vi serverer
+// filen: "en attestation for en font, vi stadig serverer, skal ikke udløbe,
+// fordi den medarbejder der uploadede den, har forladt virksomheden."
+//
+// Dataminimering håndteres i stedet ved at pseudonymisere e-mailen ved
+// SKRIVNING (salt_v1:<hash>, jura §16) — ikke ved at redigere rækken senere.
+// deleted.post.test.ts pinner at denne webhook lader tabellen være.
+
 const bodySchema = z.object({
   userId: z.string().min(1),
 })
