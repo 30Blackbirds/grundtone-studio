@@ -52,11 +52,16 @@ vi.mock('~~/server/lib/storage', () => ({
   paths: (projectId: string) => ({
     currentJson: `p/${projectId}/current.json`,
     currentCss: `p/${projectId}/current.css`,
+    currentAsset: (name: string) => `p/${projectId}/current/${name}`,
   }),
   getObjectAsString: (key: string) => Promise.resolve(storage.get(key) ?? null),
+  getObjectAsBuffer: (key: string) => {
+    const v = storage.get(key)
+    return Promise.resolve(v === undefined ? null : Buffer.from(v))
+  },
 }))
 
-const handler = (await import('./[file].get')).default as unknown as (
+const handler = (await import('./[...file].get')).default as unknown as (
   event: FakeEvent,
 ) => Promise<unknown>
 
@@ -221,5 +226,54 @@ describe('GET /k/[key]/[file]', () => {
     const overLimit = fakeEvent({ params: { key, file: 'tokens.json' } })
     await expect(handler(overLimit)).rejects.toMatchObject({ statusCode: 429 })
     expect(overLimit.responseHeaders['retry-after']).toMatch(/^\d+$/)
+  })
+
+  it('serves logo.svg from current/ with CSP sandbox + nosniff (brand-assets)', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/logo.svg`, '<svg viewBox="0 0 24 24"/>')
+    const event = fakeEvent({ params: { key, file: 'logo.svg' } })
+    const body = (await handler(event)) as Buffer
+    expect(Buffer.isBuffer(body)).toBe(true)
+    expect(body.toString()).toContain('<svg')
+    expect(event.responseHeaders['content-type']).toBe('image/svg+xml')
+    expect(event.responseHeaders['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(event.responseHeaders['x-content-type-options']).toBe('nosniff')
+    expect(event.responseHeaders.etag).toMatch(/^"[a-f0-9]{16}"$/)
+  })
+
+  it('serves custom font files under fonts/ with the woff2 content type', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    const event = fakeEvent({ params: { key, file: 'fonts/asp-grotesk-400.woff2' } })
+    await handler(event)
+    expect(event.responseHeaders['content-type']).toBe('font/woff2')
+    expect(event.responseHeaders['x-content-type-options']).toBe('nosniff')
+  })
+
+  it('404s traversal-shaped and off-pattern asset paths', async () => {
+    const { key, row } = fresh()
+    nextDbRows = [row]
+    for (const file of [
+      'fonts/../../secrets.txt',
+      'fonts/Æblegrød.woff2',
+      'logo.gif',
+      'current.json',
+      'fonts/x.ttf',
+    ]) {
+      await expect(handler(fakeEvent({ params: { key, file } }))).rejects.toMatchObject({
+        statusCode: 404,
+      })
+    }
+  })
+
+  it('does NOT add CSP/nosniff headers on token files (uændret kontrakt)', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{"colors":{}}')
+    const event = fakeEvent({ params: { key, file: 'tokens.json' } })
+    await handler(event)
+    expect(event.responseHeaders['content-security-policy']).toBeUndefined()
   })
 })

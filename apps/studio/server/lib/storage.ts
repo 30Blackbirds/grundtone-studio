@@ -70,6 +70,17 @@ export async function copyObject(
   )
 }
 
+export async function getObjectAsBuffer(key: string): Promise<Buffer | null> {
+  try {
+    const res = await client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }))
+    if (!res.Body) return null
+    return Buffer.from(await res.Body.transformToByteArray())
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'NoSuchKey') return null
+    throw err
+  }
+}
+
 export async function getObjectAsString(key: string): Promise<string | null> {
   try {
     const res = await client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }))

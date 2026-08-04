@@ -12,11 +12,25 @@ import { db } from '~~/server/db'
 import { apiKey, orgSuspension, project } from '~~/server/db/schema'
 import { hashApiKey } from '~~/server/lib/api-keys'
 import { recordCdnGraceCut } from '~~/server/lib/metrics'
-import { paths, getObjectAsString } from '~~/server/lib/storage'
+import { paths, getObjectAsBuffer, getObjectAsString } from '~~/server/lib/storage'
 import { TTLCache } from '~~/server/lib/ttl-cache'
 import { SlidingWindowRateLimiter } from '~~/server/lib/rate-limit'
 
-const VALID_FILES = new Set(['tokens.json', 'tokens.css'])
+// Filfladen er en LUKKET liste + ét stramt mønster — [...file] er catch-all
+// (fonts/<slug>.woff2 har to segmenter), så mønstrene ER traversal-værnet.
+// Asset-navnene spejler tokens-schemaets logoFile/fontFile-mønstre.
+const TOKEN_FILES = new Set(['tokens.json', 'tokens.css'])
+const ASSET_TYPES: Record<string, string> = {
+  'logo.svg': 'image/svg+xml',
+  'logo.png': 'image/png',
+}
+const FONT_FILE = /^fonts\/[a-z0-9-]+\.woff2$/
+
+function assetContentType(file: string): string | null {
+  if (file in ASSET_TYPES) return ASSET_TYPES[file]
+  if (FONT_FILE.test(file)) return 'font/woff2'
+  return null
+}
 
 // Plaintext API key in the URL is intentional — see docs/api/cdn-keys.md
 // for the full rationale (Stripe pk_live model: publishable keys with no
@@ -62,7 +76,7 @@ async function cdnCutAt(organizationId: string): Promise<number | null> {
 // we serve; any new publish overwrites the storage path so a stale cache entry
 // only sticks around for one window.
 interface BlobEntry {
-  body: string
+  body: string | Buffer
   etag: string
 }
 const blobCache = new TTLCache<string, BlobEntry>(5000, 60_000)
@@ -72,7 +86,7 @@ const blobCache = new TTLCache<string, BlobEntry>(5000, 60_000)
 // per minute" mental model.
 const rateLimiter = new SlidingWindowRateLimiter(60_000, 10_000)
 
-function buildEtag(body: string): string {
+function buildEtag(body: string | Buffer): string {
   return `"${createHash('sha256').update(body).digest('hex').slice(0, 16)}"`
 }
 
@@ -102,7 +116,8 @@ export default defineEventHandler(async (event) => {
   const key = getRouterParam(event, 'key')
   const file = getRouterParam(event, 'file')
   if (!key || !file) throw createError({ statusCode: 404 })
-  if (!VALID_FILES.has(file)) throw createError({ statusCode: 404 })
+  const assetType = assetContentType(file)
+  if (!TOKEN_FILES.has(file) && !assetType) throw createError({ statusCode: 404 })
 
   const hash = hashApiKey(key)
 
@@ -146,22 +161,36 @@ export default defineEventHandler(async (event) => {
   }
 
   const p = paths(meta.projectId)
-  const blobKey = file === 'tokens.json' ? p.currentJson : p.currentCss
+  const blobKey = assetType
+    ? p.currentAsset(file)
+    : file === 'tokens.json'
+      ? p.currentJson
+      : p.currentCss
 
   let entry = blobCache.get(blobKey)
   if (!entry) {
-    const body = await getObjectAsString(blobKey)
+    const body = assetType ? await getObjectAsBuffer(blobKey) : await getObjectAsString(blobKey)
     if (!body) throw createError({ statusCode: 404, statusMessage: 'Not published yet' })
     entry = { body, etag: buildEtag(body) }
     blobCache.set(blobKey, entry)
   }
 
-  setHeader(event, 'Content-Type', file === 'tokens.json' ? 'application/json' : 'text/css')
+  const contentType = assetType ?? (file === 'tokens.json' ? 'application/json' : 'text/css')
+  setHeader(event, 'Content-Type', contentType)
   setHeader(event, 'Cache-Control', 'public, max-age=60, must-revalidate')
   setHeader(event, 'Access-Control-Allow-Origin', origin ?? '*')
   setHeader(event, 'Access-Control-Allow-Methods', 'GET')
   setHeader(event, 'Vary', 'Origin')
   setHeader(event, 'ETag', entry.etag)
+  if (assetType) {
+    // Låst design (stored-XSS-forsvar i dybden ovenpå upload-saniteringen):
+    // /k serverer fra app-origin hvor session-cookies bor. sandbox-CSP'en
+    // neutraliserer alt eksekverbart ved DIREKTE navigation til et SVG
+    // (script kører i sandboxet null-origin, aldrig mod appens), og nosniff
+    // stopper content-type-gætterier på alle asset-svar.
+    setHeader(event, 'X-Content-Type-Options', 'nosniff')
+    setHeader(event, 'Content-Security-Policy', "sandbox; default-src 'none'")
+  }
 
   const ifNoneMatch = getRequestHeader(event, 'if-none-match')
   if (ifNoneMatch === entry.etag) {
