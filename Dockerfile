@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable pnpm
 
 FROM base AS deps
@@ -74,7 +74,7 @@ RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*
  && cp -r "$HOOKABLE_SRC" /deploy/.output/server/node_modules/hookable \
  && test -f /deploy/.output/server/node_modules/hookable/package.json
 
-FROM node:24-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NITRO_PORT=3000
