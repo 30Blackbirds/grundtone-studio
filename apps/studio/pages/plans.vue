@@ -101,6 +101,11 @@
       <p v-if="SHOW_PRICE_LOCK_LINE" class="text-tertiary text-sm mt-2 mb-0">
         {{ t('plans.priceLock') }}
       </p>
+      <!-- Jura-krav 2026-08-04: font-fil-loftet skal fremgå af prissiden
+           (aftale-kilden) — bevidst IKKE i ToS. Ordret "4 fontfiler i alt". -->
+      <p class="text-tertiary text-sm mt-1 mb-0">
+        {{ t('plans.fontFilesNote') }}
+      </p>
       <div v-if="orgOptions.length > 1" class="plans-org-select mt-4">
         <GTSelect
           v-model="selectedOrg"
