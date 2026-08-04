@@ -966,5 +966,17 @@
     "localeLifetime": "12 måneder",
     "noConsentNote": "Fordi vi kun sætter nødvendige cookies, beder vi dig ikke om samtykke. Får vi senere behov for statistik-cookies, spørger vi først — og du kan sige nej uden at det påvirker din brug af tjenesten.",
     "altchaNote": "Vores bot-beskyttelse (ALTCHA) kører på vores egne servere og sætter hverken cookies eller tredjeparts-scripts."
+  },
+  "legalIndex": {
+    "title": "Juridisk",
+    "intro": "Vilkår, privatliv og databehandling for Grundtone Studio.",
+    "pages": {
+      "privacy": "Privatlivspolitik",
+      "dpa": "Databehandleraftale (DPA)",
+      "subProcessors": "Underleverandører",
+      "cookies": "Cookies og lokal lagring"
+    },
+    "fontLicensesHeading": "Font-licenser",
+    "fontLicensesBody": "Skrifttyper fra biblioteket er open source (SIL Open Font License) og leveres af os. Uploader du egne fontfiler, bekræfter du at du har licens til kommerciel brug og til at uploade dem til tjenesten — detaljerede vilkår fremgår af abonnementsvilkårene."
   }
 }
