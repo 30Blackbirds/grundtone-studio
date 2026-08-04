@@ -449,6 +449,7 @@
     "errTooLarge": "The file is too large — reduce it to under 512 KB and try again.",
     "errLogoFormat": "Wrong file format — only SVG and PNG are accepted.",
     "errFontFormat": "Wrong file format — only .woff2 is accepted. Convert your font and try again.",
+    "errLicenceRequired": "Tick the licence declaration before uploading — we need to be able to document it.",
     "errFamilyFirst": "Enter the font name before uploading.",
     "previewLabel": "Live preview — brand context",
     "previewHeading": "Why we built our own CMS",

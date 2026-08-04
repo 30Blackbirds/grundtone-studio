@@ -3,6 +3,7 @@
   // revisionen 2026-08-04, forlæg redesign-brand-assets.html). Bibliotek-
   // eller upload-tilstand pr. slot + kuraterede system-fallbacks (nøgler,
   // aldrig fritekst) + kæde-feedback der spejler serverens fontFamilyChain.
+  import { FONT_LICENCE_VERSION } from '~~/lib/legal'
   import type { FontSlot } from '~~/server/lib/tokens'
 
   const props = defineProps<{
@@ -65,6 +66,12 @@
   )
   const customWeight = ref('400')
   const licenseAccepted = ref(model.value?.source === 'custom')
+  // Tidspunktet for selve afkrydsningen er en del af beviset (§8c-mønstret) —
+  // ikke upload-tidspunktet, som kan ligge minutter senere.
+  const licenseAcceptedAt = ref<string | null>(null)
+  watch(licenseAccepted, (accepted) => {
+    licenseAcceptedAt.value = accepted ? new Date().toISOString() : null
+  })
   const fallback1 = ref<string>(model.value?.fallbacks[0] ?? 'system-grotesk')
   const fallback2 = ref<string>(model.value?.fallbacks[1] ?? '')
   const error = ref<string | null>(null)
@@ -150,6 +157,10 @@
       error.value = t('brandAssets.errFamilyFirst')
       return
     }
+    if (!licenseAccepted.value || !licenseAcceptedAt.value) {
+      error.value = t('brandAssets.errLicenceRequired')
+      return
+    }
     error.value = null
     uploading.value = true
     try {
@@ -162,6 +173,8 @@
             slot: props.slotKey,
             family: customFamily.value.trim(),
             weight: Number(customWeight.value),
+            licenceVersion: FONT_LICENCE_VERSION,
+            licenceAcceptedAt: licenseAcceptedAt.value,
           },
         },
       )
@@ -171,7 +184,11 @@
     } catch (err) {
       const code = (err as { data?: { data?: { code?: string } } }).data?.data?.code
       error.value =
-        code === 'too_large' ? t('brandAssets.errTooLarge') : t('brandAssets.errFontFormat')
+        code === 'too_large'
+          ? t('brandAssets.errTooLarge')
+          : code === 'licence_attestation_required' || code === 'licence_version_mismatch'
+            ? t('brandAssets.errLicenceRequired')
+            : t('brandAssets.errFontFormat')
     } finally {
       uploading.value = false
     }

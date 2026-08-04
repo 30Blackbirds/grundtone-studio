@@ -48,6 +48,39 @@ export const orgSuspension = pgTable('org_suspension', {
   actor: text().notNull(),
 })
 
+// Font-licens-erklæringer (jura-ruling 2026-08-04, docs/legal/
+// consent-tekster.md): kunden indestår for at have ret til at lade os
+// VIDEREDISTRIBUERE en uploadet skrifttype til deres slutbrugere. Erklæringen
+// er hele vores forsvar hvis en skriftproducent rejser krav, så den skal
+// kunne fremvises for præcis den bestridte fil.
+//
+// Juras tre krav formet dette bord: (2) endpointet afviser uden erklæring —
+// UI-gaten er bekvemmelighed; (3) rækken har INGEN foreign key til projektet
+// og slettes ALDRIG med filen — det er erklæringen, ikke filen, der er
+// dokumentationen. Derfor også denormaliseret bruger-email og fil-reference
+// som ren tekst: sporet skal kunne læses år efter at alt andet er væk.
+// Erklæringen genafgives pr. fil (jura: den knytter sig til den enkelte
+// skrifttypes licens, ikke til kontoen), så der er bevidst INGEN unique
+// constraint der ville kollapse gentagne uploads af samme vægt.
+export const fontLicenceAttestation = pgTable(
+  'font_licence_attestation',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    projectId: uuid().notNull(),
+    organizationId: text().notNull(),
+    slot: text().notNull(),
+    file: text().notNull(),
+    weight: integer().notNull(),
+    family: text().notNull(),
+    version: text().notNull(),
+    acceptedAt: timestamp({ withTimezone: true }).notNull(),
+    userId: text().notNull(),
+    userEmail: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('font_licence_attestation_project_idx').on(t.projectId, t.createdAt)],
+)
+
 export const apiKey = pgTable(
   'api_key',
   {

@@ -13,6 +13,12 @@ export const TERMS_VERSION = 'studio-tos-1.0'
 // B2B-erklæringen (jura §0, tekst LÅST i commit 340e4f5) har sit EGET
 // bevisspor — to retsvirkninger, to versioner (juras krav 1+3).
 export const ATTESTATION_VERSION = 'studio-b2b-erklaering-2026-08-02'
+// Font-licens-erklæringen (jura-ruling 104d174 + consent-tekster.md): egen
+// retsvirkning → eget bevisspor og egen version. Versionen bor HER ved siden
+// af selve teksten i i18n (brandAssets.license) — juras krav 1 "én kilde":
+// ændres ordlyden, skal denne bumpes i samme diff, og tests/legal-copy.test.ts
+// pinner ordlydens substans så en ændring ikke kan ske ubemærket.
+export const FONT_LICENCE_VERSION = 'studio-font-licence-1.0'
 export const TERMS_URL = 'https://grundtone.com/vilkaar'
 export const PRIVACY_URL = 'https://grundtone.com/privatliv'
 export const WITHDRAWAL_URL = 'https://grundtone.com/fortrydelse'

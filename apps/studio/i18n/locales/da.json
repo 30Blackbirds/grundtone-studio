@@ -449,6 +449,7 @@
     "errTooLarge": "Filen er for stor — reducér til under 512 KB og prøv igen.",
     "errLogoFormat": "Forkert filformat — kun SVG og PNG accepteres.",
     "errFontFormat": "Forkert filformat — kun .woff2 accepteres. Konvertér din font og prøv igen.",
+    "errLicenceRequired": "Sæt flueben i licens-erklæringen før du uploader — vi skal kunne dokumentere den.",
     "errFamilyFirst": "Angiv fontens navn før du uploader.",
     "previewLabel": "Live preview — brand-kontekst",
     "previewHeading": "Hvorfor vi byggede vores eget CMS",

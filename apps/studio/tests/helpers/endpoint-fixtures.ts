@@ -54,6 +54,9 @@ export interface FakeAuthActor {
 
 export interface FakeEvent {
   params: Record<string, string>
+  // Query-string som handlers læser via getQuery — upload-endpoints bruger
+  // den til metadata fordi body'en er reserveret til de binære bytes.
+  query: Record<string, string>
   body: unknown
   headers: Record<string, string>
   // Mirrors H3EventContext; handlers read event.context.auth for the JWT actor.
@@ -65,6 +68,7 @@ export interface FakeEvent {
 export function fakeEvent(opts: Partial<FakeEvent> = {}): FakeEvent {
   return {
     params: { ...(opts.params ?? {}) },
+    query: { ...(opts.query ?? {}) },
     body: opts.body ?? null,
     headers: { ...(opts.headers ?? {}) },
     context: opts.context ?? {
@@ -82,6 +86,9 @@ export function mockH3() {
     defineEventHandler: (fn: unknown) => fn,
     getRouterParam: (event: FakeEvent, name: string) => event.params[name],
     readBody: (event: FakeEvent) => Promise.resolve(event.body),
+    getQuery: (event: FakeEvent) => event.query,
+    // readRawBody(event, false) giver Buffer — binære uploads (logo/font).
+    readRawBody: (event: FakeEvent) => Promise.resolve(event.body),
     getRequestHeader: (event: FakeEvent, name: string) => event.headers[name.toLowerCase()] ?? null,
     getRequestIP: (event: FakeEvent) => event.headers['x-forwarded-for'] ?? null,
     setHeader: (event: FakeEvent, name: string, value: string | number) => {
@@ -90,9 +97,15 @@ export function mockH3() {
     setResponseStatus: (event: FakeEvent, status: number) => {
       event.responseStatus = status
     },
-    createError: (opts: { statusCode: number; statusMessage?: string }) => {
-      const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
+    // `data` bæres med, så tests kan assertere på fejl-koder (fx
+    // quota_exceeded, licence_attestation_required) og ikke kun statuskoder.
+    createError: (opts: { statusCode: number; statusMessage?: string; data?: unknown }) => {
+      const err = new Error(opts.statusMessage ?? '') as Error & {
+        statusCode: number
+        data?: unknown
+      }
       err.statusCode = opts.statusCode
+      if (opts.data !== undefined) err.data = opts.data
       return err
     },
   }
