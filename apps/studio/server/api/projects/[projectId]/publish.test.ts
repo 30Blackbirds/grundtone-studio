@@ -108,9 +108,20 @@ vi.mock('~~/server/lib/storage', () => ({
     versionedCss: (n: number) => `p/${projectId}/v${n}/tokens.css`,
     currentJson: `p/${projectId}/current.json`,
     currentCss: `p/${projectId}/current.css`,
+    draftAsset: (name: string) => `p/${projectId}/draft/${name}`,
+    versionedAsset: (n: number, name: string) => `p/${projectId}/v${n}/${name}`,
+    currentAsset: (name: string) => `p/${projectId}/current/${name}`,
   }),
   putObject: (key: string, body: string, opts: { contentType: string }) => {
     spies.storage.push({ key, contentType: opts.contentType, bodyPreview: body.slice(0, 32) })
+    return Promise.resolve()
+  },
+  copyObject: (sourceKey: string, destKey: string, opts: { contentType: string }) => {
+    spies.storage.push({
+      key: destKey,
+      contentType: opts.contentType,
+      bodyPreview: `copy:${sourceKey}`,
+    })
     return Promise.resolve()
   },
 }))
@@ -272,5 +283,48 @@ describe('POST /api/projects/[projectId]/publish', () => {
     expect(spies.storage).toHaveLength(0)
     expect(spies.audit).toHaveLength(0)
     expect(spies.bunnyPurges).toHaveLength(0)
+  })
+
+  it('promotes brand-assets draft blobs to versioned + current alongside tokens', async () => {
+    draft.push({
+      id: 'draft-2',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: {
+        colors: { primary: '#0059b3' },
+        assets: { logo: { file: 'logo.svg', type: 'svg' } },
+        typography: {
+          webFont: {
+            source: 'custom',
+            family: 'Asp Grotesk',
+            weights: [400, 700],
+            files: { '400': 'fonts/asp-grotesk-400.woff2', '700': 'fonts/asp-grotesk-700.woff2' },
+          },
+        },
+      },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-08-04T10:00:00Z'),
+    })
+
+    await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
+
+    const keys = spies.storage.map((o) => o.key)
+    // Fase B: draft → immutabelt arkiv
+    expect(keys).toContain(`p/${PROJECT.id}/v1/logo.svg`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/asp-grotesk-400.woff2`)
+    expect(keys).toContain(`p/${PROJECT.id}/v1/fonts/asp-grotesk-700.woff2`)
+    // Fase C: arkiv → current (det /k serverer)
+    expect(keys).toContain(`p/${PROJECT.id}/current/logo.svg`)
+    expect(keys).toContain(`p/${PROJECT.id}/current/fonts/asp-grotesk-400.woff2`)
+    // Kilderne er copies, ikke re-uploads gennem app-processen
+    const v1Logo = spies.storage.find((o) => o.key === `p/${PROJECT.id}/v1/logo.svg`)
+    expect(v1Logo?.bodyPreview).toBe(`copy:p/${PROJECT.id}/draft/logo.svg`)
+    expect(v1Logo?.contentType).toBe('image/svg+xml')
+    const currentLogo = spies.storage.find((o) => o.key === `p/${PROJECT.id}/current/logo.svg`)
+    expect(currentLogo?.bodyPreview).toBe(`copy:p/${PROJECT.id}/v1/logo.svg`)
+    // 4 token-writes + 3 arkiv-copies + 3 current-copies
+    expect(spies.storage).toHaveLength(10)
   })
 })
