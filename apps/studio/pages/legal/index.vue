@@ -29,7 +29,15 @@
       </li>
     </ul>
 
+    <!-- Ordret fra [jura]s §5b (docs/legal/checkout-forbrugerkrav.md, 72e02e2).
+         Substansen er låst: webdistributionen SKAL nævnes eksplicit — en desktop-
+         licens tillader netop det interimet bad kunden bekræfte, og udeladelsen
+         betød at et sandfærdigt ja stadig kunne være licensbrud. Ret ikke her;
+         ret i juras dokument. OFL-påstanden er verificeret mod alle seks
+         @fontsource-pakkers license-felt (alle OFL-1.1, 2026-08-04). -->
     <h2 class="font-heading text-2xl mt-6 mb-3">{{ t('legalIndex.fontLicensesHeading') }}</h2>
-    <p>{{ t('legalIndex.fontLicensesBody') }}</p>
+    <p>{{ t('legalIndex.fontLicensesLibrary') }}</p>
+    <p>{{ t('legalIndex.fontLicensesUpload') }}</p>
+    <p>{{ t('legalIndex.fontLicensesWarranty') }}</p>
   </article>
 </template>

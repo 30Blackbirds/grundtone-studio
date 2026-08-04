@@ -443,7 +443,7 @@
     "weightsLabel": "Vægte at inkludere",
     "weightsHint": "— kun de valgte lastes fra CDN",
     "weightForFile": "Hvilken vægt er denne fil?",
-    "license": "Jeg bekræfter at jeg har licens til at bruge denne font kommercielt og til at uploade den til denne tjeneste.",
+    "license": "Jeg indestår for, at jeg har ret til at bruge skrifttypen og til at lade jer distribuere den som led i leverancen af mine brands.",
     "licenseMore": "Læs mere om font-licenser",
     "errTooLarge": "Filen er for stor — reducér til under 512 KB og prøv igen.",
     "errLogoFormat": "Forkert filformat — kun SVG og PNG accepteres.",
@@ -976,7 +976,9 @@
       "subProcessors": "Underleverandører",
       "cookies": "Cookies og lokal lagring"
     },
-    "fontLicensesHeading": "Font-licenser",
-    "fontLicensesBody": "Skrifttyper fra biblioteket er open source (SIL Open Font License) og leveres af os. Uploader du egne fontfiler, bekræfter du at du har licens til kommerciel brug og til at uploade dem til tjenesten — detaljerede vilkår fremgår af abonnementsvilkårene."
+    "fontLicensesHeading": "Skrifttyper og licenser",
+    "fontLicensesLibrary": "Skrifttyperne i vores bibliotek er frit licenserede (SIL Open Font License) og kan bruges uden videre.",
+    "fontLicensesUpload": "Uploader du din egen skrifttype, leverer vi den videre til de brugere, der besøger dine brands. Det er en webdistribution — og den kræver som regel en anden licens end den, der følger med en skrifttype købt til brug på din egen computer. Tjek din licens for ord som webfont, web embedding eller web use, før du uploader.",
+    "fontLicensesWarranty": "Du indestår for, at du har ret til at bruge skrifttypen og til at lade os distribuere den som led i leverancen af dine brands."
   }
 }
