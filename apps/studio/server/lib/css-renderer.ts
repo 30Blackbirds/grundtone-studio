@@ -1,7 +1,38 @@
+import { fontFileName } from './asset-upload'
 import type { Tokens } from './tokens'
 
 function camelToKebab(s: string): string {
   return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)
+}
+
+/**
+ * @font-face-blokke for webFont (brand-assets). url()'erne er RELATIVE —
+ * de resolver mod CSS-filens egen placering (/k/{key}/tokens.css →
+ * /k/{key}/fonts/...), så samme CSS virker uanset origin/nøgle. Kurateret
+ * og custom peger på samme fonts/-navneskema; publish sørger for at
+ * filerne ligger der.
+ */
+function fontFaceBlocks(
+  webFont: NonNullable<NonNullable<Tokens['typography']>['webFont']>,
+): string[] {
+  const out: string[] = []
+  for (const weight of [...webFont.weights].sort((a, b) => a - b)) {
+    const file =
+      webFont.source === 'custom'
+        ? webFont.files[String(weight)]
+        : fontFileName(webFont.family, weight)
+    out.push(
+      '',
+      '@font-face {',
+      `  font-family: '${webFont.family.replace(/'/g, '')}';`,
+      '  font-style: normal;',
+      `  font-weight: ${weight};`,
+      '  font-display: swap;',
+      `  src: url('${file}') format('woff2');`,
+      '}',
+    )
+  }
+  return out
 }
 
 function colorLines(colors: NonNullable<Tokens['colors']>, indent: string): string[] {
@@ -64,6 +95,10 @@ export function renderTokensCss(tokens: Tokens): string {
     lines.push(`:root[data-gt-mode='dark'] {`)
     lines.push(...colorLines(darkColors, '  '))
     lines.push('}')
+  }
+
+  if (tokens.typography?.webFont) {
+    lines.push(...fontFaceBlocks(tokens.typography.webFont))
   }
 
   return lines.join('\n') + '\n'
