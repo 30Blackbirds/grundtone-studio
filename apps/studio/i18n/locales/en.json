@@ -966,5 +966,17 @@
     "localeLifetime": "12 months",
     "noConsentNote": "Because we only set necessary cookies, we do not ask for consent. Should we later need analytics cookies, we will ask first — and you can say no without it affecting your use of the service.",
     "altchaNote": "Our bot protection (ALTCHA) runs on our own servers and sets neither cookies nor third-party scripts."
+  },
+  "legalIndex": {
+    "title": "Legal",
+    "intro": "Terms, privacy and data processing for Grundtone Studio.",
+    "pages": {
+      "privacy": "Privacy policy",
+      "dpa": "Data processing agreement (DPA)",
+      "subProcessors": "Sub-processors",
+      "cookies": "Cookies and local storage"
+    },
+    "fontLicensesHeading": "Font licences",
+    "fontLicensesBody": "Library typefaces are open source (SIL Open Font License) and delivered by us. If you upload your own font files, you confirm that you are licensed for commercial use and to upload them to the service — detailed terms appear in the subscription terms."
   }
 }
