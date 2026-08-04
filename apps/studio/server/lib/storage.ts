@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3'
 
 let _client: S3Client | null = null
 
@@ -31,7 +31,11 @@ export interface PutOptions {
   cacheControl?: string
 }
 
-export async function putObject(key: string, body: string, options: PutOptions): Promise<void> {
+export async function putObject(
+  key: string,
+  body: string | Buffer,
+  options: PutOptions,
+): Promise<void> {
   await client().send(
     new PutObjectCommand({
       Bucket: bucket(),
@@ -39,6 +43,29 @@ export async function putObject(key: string, body: string, options: PutOptions):
       Body: body,
       ContentType: options.contentType,
       CacheControl: options.cacheControl,
+    }),
+  )
+}
+
+/**
+ * Server-side copy (draft-asset → versioned/current ved publish) — binære
+ * assets skal aldrig rundtures gennem app-processen bare for at skifte key.
+ * MetadataDirective REPLACE så cache-control kan strammes på destinationen
+ * (draft = ingen cache, versioned = immutable).
+ */
+export async function copyObject(
+  sourceKey: string,
+  destKey: string,
+  options: PutOptions,
+): Promise<void> {
+  await client().send(
+    new CopyObjectCommand({
+      Bucket: bucket(),
+      CopySource: `${bucket()}/${sourceKey}`,
+      Key: destKey,
+      ContentType: options.contentType,
+      CacheControl: options.cacheControl,
+      MetadataDirective: 'REPLACE',
     }),
   )
 }
@@ -61,6 +88,12 @@ export function paths(projectId: string, version?: number) {
     versionedCss: (v: number) => `${root}/v${v}/tokens.css`,
     currentJson: `${root}/current.json`,
     currentCss: `${root}/current.css`,
+    // Brand-assets: uploads lander i draft/-præfikset og promoveres af
+    // publish til v{n}/ (immutabelt arkiv) + current/ (det /k serverer).
+    // `name` er allerede schema-valideret relativt (logo.svg / fonts/x.woff2).
+    draftAsset: (name: string) => `${root}/draft/${name}`,
+    versionedAsset: (v: number, name: string) => `${root}/v${v}/${name}`,
+    currentAsset: (name: string) => `${root}/current/${name}`,
     ...(version !== undefined
       ? { json: `${root}/v${version}/tokens.json`, css: `${root}/v${version}/tokens.css` }
       : {}),

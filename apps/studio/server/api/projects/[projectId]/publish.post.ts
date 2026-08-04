@@ -5,8 +5,9 @@ import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
-import { paths, putObject } from '~~/server/lib/storage'
+import { copyObject, paths, putObject } from '~~/server/lib/storage'
 import { renderTokensCss } from '~~/server/lib/css-renderer'
+import { referencedAssets } from '~~/server/lib/asset-upload'
 import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
 
 // Publish ordering — four phases, each recoverable if the next one fails.
@@ -79,6 +80,7 @@ export default defineEventHandler(async (event) => {
   })
 
   // ─── Phase B — upload immutable archive blobs ───────────────────────────
+  const assets = referencedAssets(tokens)
   await Promise.all([
     putObject(p.versionedJson(nextVersion), json, {
       contentType: 'application/json',
@@ -88,6 +90,16 @@ export default defineEventHandler(async (event) => {
       contentType: 'text/css',
       cacheControl: 'public, max-age=31536000, immutable',
     }),
+    // Brand-assets promoveres fra draft-laget i samme fase — server-side copy,
+    // binærerne rundtures aldrig gennem app-processen. Mangler en refereret
+    // draft-blob (uploadet slettet/aldrig lagt), fejler copy → publish fejler
+    // FØR current/-pointerne røres, så kunder aldrig ser en halv version.
+    ...assets.map((a) =>
+      copyObject(p.draftAsset(a.name), p.versionedAsset(nextVersion, a.name), {
+        contentType: a.contentType,
+        cacheControl: 'public, max-age=31536000, immutable',
+      }),
+    ),
   ])
 
   // ─── Phase C — overwrite "current" pointer blobs (what the CDN reads) ───
@@ -102,6 +114,12 @@ export default defineEventHandler(async (event) => {
       contentType: 'text/css',
       cacheControl: 'public, max-age=60, must-revalidate',
     }),
+    ...assets.map((a) =>
+      copyObject(p.versionedAsset(nextVersion, a.name), p.currentAsset(a.name), {
+        contentType: a.contentType,
+        cacheControl: 'public, max-age=60, must-revalidate',
+      }),
+    ),
   ])
 
   // ─── Phase D — flip active_version pointer (atomic in DB) ───────────────
