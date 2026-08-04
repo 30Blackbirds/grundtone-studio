@@ -20,7 +20,7 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "versionLine": "Version 1.0 · Last updated: 3 August 2026 · The Danish version is authoritative",
+    "versionLine": "Version 1.0 · Last updated: 4 August 2026 · The Danish version is authoritative",
     "s1h": "Controller",
     "s1controller": "Asp Productions ApS, Danish company reg. no. (CVR) 36708077, Raffinaderivej 20, DK-2300 Copenhagen S, Denmark. KlangHaus is a trading name of Asp Productions ApS.",
     "s1contactLabel": "Data protection contact:",
@@ -92,7 +92,7 @@
   },
   "dpa": {
     "title": "Data Processing Agreement (DPA)",
-    "updated": "Last updated: 3 August 2026",
+    "updated": "Last updated: 4 August 2026",
     "intakeHeading": "Business customer?",
     "intakeBody": "The data processing agreement is concluded as an annex to the Grundtone Studio subscription agreement. The agreement text is undergoing external legal review and is available on request via",
     "intro": "When your organisation places content containing personal data in Grundtone Studio, your organisation is the controller and Asp Productions ApS (Danish CVR 36708077, trading as KlangHaus) is the processor under GDPR art. 28. This page describes the framework — it is not the agreement itself.",
@@ -121,7 +121,7 @@
   },
   "subProcessors": {
     "title": "Sub-processors",
-    "updated": "Last updated: 3 August 2026",
+    "updated": "Last updated: 4 August 2026",
     "intro": "These are the sub-processors that process personal data on our behalf. The list is verified against our actual systems and is identical to section 6 of the privacy policy.",
     "sentrySubNote": "Sentry's own sub-processors appear in Sentry's subprocessor list, which we reference rather than copy.",
     "notification": "Business customers are notified in writing at least 30 days before planned additions or replacements of sub-processors, cf. the data processing agreement.",
