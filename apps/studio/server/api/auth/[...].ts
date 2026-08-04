@@ -38,5 +38,26 @@ export default defineEventHandler((event) => {
     })
   }
   // event.path indeholder både /api/auth/... og query-strengen.
-  return proxyRequest(event, `${target}${event.path}`)
+  //
+  // redirect:'manual' er BÆRENDE, ikke en optimering. Uden den bruger
+  // proxy-fetchen sin default ('follow') og følger auths 302 SERVER-SIDE —
+  // og fordi Location er relativ, resolver den mod AUTH-origin i stedet for
+  // studio-origin. Resultatet var at verify-flowet endte på auth-hostens
+  // fallback-side ("KlangHaus identity", HTTP 200) frem for på /verify/done
+  // (diagnosticeret af [auth] 2026-08-04 med A/B mod prod).
+  //
+  // To grunde til at 3xx SKAL videregives rått til browseren:
+  //   1. Location er relativ → browseren resolver den mod studio-origin,
+  //      hvilket er præcis den rute vi vil have (/verify/done?error=…).
+  //   2. Session-cookien fra autoSignInAfterVerification sidder PÅ selve
+  //      302-svaret. Følger vi redirecten server-side, forsvinder den, og
+  //      brugeren ville blive verificeret men ikke logget ind.
+  //
+  // Open-redirect-risikoen er auths: den validerer callbackURL som relativ
+  // (låst i verify-kontrakten), så vi videregiver kun destinationer den har
+  // godkendt. h3's sendProxy kopierer status, Location og Set-Cookie som de
+  // er — det eneste manglende var at fetchen ikke måtte spise redirecten.
+  return proxyRequest(event, `${target}${event.path}`, {
+    fetchOptions: { redirect: 'manual' },
+  })
 })
