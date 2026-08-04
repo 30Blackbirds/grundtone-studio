@@ -31,6 +31,23 @@ export const FONT_LICENCE_VERSION = 'studio-font-licence-1.0'
 // får 10-vs-5-år forelagt som risikoappetit-valg. Tallet kan ændre sig én gang;
 // logikken (servingEndedAt + frist) er uændret uanset udfald.
 export const ATTESTATION_RETENTION_YEARS = 10
+
+// Den dag bevisregistret først kunne indeholde en række: migration 0010 gik
+// live med v0.2.15. Ingen `servingEndedAt` kan derfor være ældre end dette,
+// og den ALLERTIDLIGSTE dato hvor en række overhovedet kan blive sletbar er
+// denne + ATTESTATION_RETENTION_YEARS.
+export const ATTESTATION_REGISTRY_LIVE_SINCE = '2026-08-04'
+
+// Sweepet der udfører sletningen er bevidst ikke bygget endnu: intet bliver
+// sletbart i et årti, og det der hastede var at URET blev rigtigt fra dag ét
+// (et forkert ur kan ikke repareres bagudrettet; et manglende sweep kan
+// bygges når som helst).
+//
+// Men [jura] §16b har ret i at den reelle risiko ikke er juridisk — den er
+// INSTITUTIONEL GLEMSEL: om ti år er der ingen der husker denne beslutning.
+// Derfor er fraværet gjort DETEKTERBART frem for husket. Sæt dette flag til
+// true i samme PR som sweepet lander, og se legal-retention.test.ts.
+export const ATTESTATION_SWEEP_IMPLEMENTED = false
 export const TERMS_URL = 'https://grundtone.com/vilkaar'
 export const PRIVACY_URL = 'https://grundtone.com/privatliv'
 export const WITHDRAWAL_URL = 'https://grundtone.com/fortrydelse'
