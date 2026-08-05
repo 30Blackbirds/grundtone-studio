@@ -39,5 +39,16 @@
     <p>{{ t('legalIndex.fontLicensesLibrary') }}</p>
     <p>{{ t('legalIndex.fontLicensesUpload') }}</p>
     <p>{{ t('legalIndex.fontLicensesWarranty') }}</p>
+    <!-- Henvisningen blev fjernet, da /legal/terms ikke fandtes: en henvisning
+         til en side der 404'er er vaerre end ingen. Den kommer tilbage i SAMME
+         leverance som selve siden ([jura] 2026-08-05, punkt 3), saa vinduet
+         aldrig opstaar igen. -->
+    <p>
+      {{ t('legalIndex.fontLicensesTermsRef') }}
+      <NuxtLink to="/legal/terms" class="text-primary">{{
+        t('legalIndex.fontLicensesTermsLink')
+      }}</NuxtLink
+      >.
+    </p>
   </article>
 </template>
