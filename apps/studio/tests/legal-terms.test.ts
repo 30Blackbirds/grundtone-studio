@@ -122,3 +122,67 @@ describe('accept-checkboxen fortaeller, at vilkaarene er danske', () => {
     expect(da.plans.confirm.tosLabel).not.toContain('dansk')
   })
 })
+
+// 🔴 DEN FULDE NOEGLE-INVENTAR — bygget efter [review] demonstrerede hullet.
+//
+// De oevrige tests her spoerger, om det RIGTIGE staar der. Denne spoerger, om
+// noget MANGLER, og det er en anden slags fejl. [review] fjernede punktummet
+// i "9.2." i kilden — en triviel, plausibel fremtidig tastefejl uden nogen
+// forbudt term — og udtraekkeren droppede en ansvarsklausul STILLE med exit 0,
+// mens alle 12 tests forblev groenne. Teksten blev klistret ind i s9p1, saa
+// selv en laesning af outputtet ville se en sammenhaengende paragraf.
+//
+// Inventaret er udledt af det jura-godkendte snapshot. Aendrer jura kilden med
+// vilje, skal denne liste opdateres bevidst — og DET er pointen: en aendring i
+// antallet af bestemmelser skal kraeve en menneskelig beslutning, ikke bare
+// glide igennem som en tavs diff.
+const EXPECTED = [
+  { n: 1, paras: [1, 2, 3], bullets: [], subs: {} },
+  { n: 2, paras: [], bullets: [1, 2, 3, 4], subs: {} },
+  { n: 3, paras: [1, 2, 3], bullets: [], subs: {} },
+  { n: 4, paras: [1, 2, 3, 4], bullets: [], subs: {} },
+  { n: 5, paras: [1, 2, 3, 4, 5], bullets: [], subs: {} },
+  { n: 6, paras: [1, 2, 3, 4], bullets: [], subs: { '3': ['a', 'b', 'c', 'd'] } },
+  { n: 7, paras: [1, 2, 3, 4], bullets: [], subs: {} },
+  { n: 8, paras: [1, 2], bullets: [], subs: {} },
+  { n: 9, paras: [1, 2], bullets: [], subs: {} },
+  { n: 10, paras: [1, 2, 3, 4], bullets: [], subs: {} },
+  { n: 11, paras: [1, 2, 3], bullets: [], subs: {} },
+  { n: 12, paras: [1, 2, 3, 4], bullets: [], subs: {} },
+  { n: 13, paras: [1, 2, 3, 4, 5], bullets: [], subs: {} },
+  { n: 14, paras: [1, 2, 3], bullets: [], subs: {} },
+  { n: 15, paras: [1, 2, 3], bullets: [], subs: {} },
+  { n: 16, paras: [1], bullets: [], subs: {} },
+] as const
+
+describe('ingen bestemmelse er faldet ud af udtraekket', () => {
+  const terms = da.terms as Record<string, string>
+
+  it.each(EXPECTED.map((s) => [s.n, s] as const))('§%i har alle sine noegler', (_n, s) => {
+    const missing: string[] = []
+    for (const p of s.paras) {
+      if (!terms[`s${s.n}p${p}`]) missing.push(`s${s.n}p${p}`)
+      for (const sub of (s.subs as Record<string, readonly string[]>)[String(p)] ?? []) {
+        if (!terms[`s${s.n}p${p}${sub}`]) missing.push(`s${s.n}p${p}${sub}`)
+      }
+    }
+    for (const b of s.bullets) {
+      if (!terms[`s${s.n}b${b}`]) missing.push(`s${s.n}b${b}`)
+    }
+    expect(missing, `manglende bestemmelser i §${s.n}`).toEqual([])
+  })
+
+  it('har praecis det forventede antal noegler i alt', () => {
+    const contentKeys = Object.keys(terms).filter((k) => /^s\d+(h|p\d+[a-d]?|b\d+)$/.test(k))
+    const expected = EXPECTED.reduce(
+      (n, s) =>
+        n +
+        1 +
+        s.paras.length +
+        s.bullets.length +
+        Object.values(s.subs as Record<string, readonly string[]>).flat().length,
+      0,
+    )
+    expect(contentKeys).toHaveLength(expected)
+  })
+})
