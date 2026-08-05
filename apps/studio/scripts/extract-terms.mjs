@@ -57,6 +57,15 @@ for (let i = 0; i < parts.length; i += 3) {
   }
 }
 
+// 🔴 vue-i18n: en RAA @ i en locale-streng er linked-message-syntaks og
+// knaekker builden med "error code: 10". Den har ramt os tre gange — og
+// hverken tests eller typecheck ser den, kun builden. Mailadresser i juras
+// tekst escapes derfor her, saa fejlen ikke kan opstaa igen: {'@'} renderer
+// som et almindeligt @.
+for (const k of Object.keys(out)) {
+  out[k] = out[k].replace(/(?<!\{')@(?!'\})/g, "{'@'}");
+}
+
 const blob = JSON.stringify(out);
 const hits = BANNED.filter((b) => blob.includes(b));
 if (hits.length) {

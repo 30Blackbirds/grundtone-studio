@@ -79,3 +79,29 @@ describe('font-licens-fladen henviser til vilkårene', () => {
     expect(da.legalIndex.fontLicensesTermsLink).toContain('13')
   })
 })
+
+// 🔴 vue-i18n fejlkode 10: en RAA @ i en locale-streng er linked-message-
+// syntaks og knaekker BUILDEN. Den har ramt os tre gange, og hverken tests
+// eller typecheck ser den — kun `nuxt build`, altsaa senest muligt.
+//
+// Denne test flytter opdagelsen fra CI's build-step til suiten, og den
+// daekker HELE locale-filen frem for kun vilkaarene: naeste forekomst
+// kommer ikke noedvendigvis fra det samme sted.
+describe('locale-strenge maa ikke indeholde raa @ (vue-i18n error 10)', () => {
+  const walk = (obj: unknown, path: string[] = []): [string, string][] =>
+    typeof obj === 'string'
+      ? [[path.join('.'), obj]]
+      : typeof obj === 'object' && obj !== null
+        ? Object.entries(obj).flatMap(([k, v]) => walk(v, [...path, k]))
+        : []
+
+  it.each([
+    ['da', da],
+    ['en', en],
+  ])('%s.json er fri for uescapede @', (_name, locale) => {
+    const offenders = walk(locale)
+      .filter(([, v]) => /(?<!\{')@(?!'\})/.test(v))
+      .map(([k]) => k)
+    expect(offenders, `brug {'@'} i stedet for @ i: ${offenders.join(', ')}`).toEqual([])
+  })
+})

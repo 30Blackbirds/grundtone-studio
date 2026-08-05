@@ -987,7 +987,7 @@
   },
   "terms": {
     "s1h": "Hvem vi er, og hvad vilkårene dækker",
-    "s1p1": "Disse vilkår gælder for abonnement på **Grundtone Studio** (\"Tjenesten\"), der udbydes af **Asp Productions ApS**, CVR-nr. 36708077, Raffinaderivej 20, 2300 København S, Danmark (\"vi\", \"os\"). **KlangHaus er et handelsnavn for Asp Productions ApS.** Kontakt: privacy@klanghaus.dk.",
+    "s1p1": "Disse vilkår gælder for abonnement på **Grundtone Studio** (\"Tjenesten\"), der udbydes af **Asp Productions ApS**, CVR-nr. 36708077, Raffinaderivej 20, 2300 København S, Danmark (\"vi\", \"os\"). **KlangHaus er et handelsnavn for Asp Productions ApS.** Kontakt: privacy{'@'}klanghaus.dk.",
     "s1p2": "Tjenesten er en hosted platform til styring, versionering og publicering af design-tokens og brand-konfigurationer, med tilhørende leverance via CDN.",
     "s1p3": "**Tjenesten udbydes udelukkende til erhvervsdrivende (B2B) og ikke til forbrugere.** Ved bestilling af betalte planer erklærer du, at købet sker som led i dit erhverv, og du oplyser virksomhedens CVR-/momsnummer. Forbrugerlovgivningens regler, herunder fortrydelsesretten efter forbrugeraftaleloven, finder derfor ikke anvendelse på aftalen.",
     "s2h": "Definitioner",
