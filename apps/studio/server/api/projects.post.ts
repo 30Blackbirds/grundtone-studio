@@ -45,7 +45,13 @@ export default defineEventHandler(async (event) => {
   // — a member without create rights gets the lookup but the grant below would
   // still leave them as project admin, so we additionally require that the
   // caller actually appears in the resolved org membership.
-  const isMember = org.members?.some((m) => m.userId === actor.sub) ?? true
+  //
+  // 🔴 `?? false`, ikke `?? true` (SIK-003). Faldet rammer, når `org.members`
+  // er undefined — altså når vi IKKE fik en medlemsliste at tjekke imod. Den
+  // gamle default lod tvivlen komme kalderen til gode og gav dermed adgang
+  // præcis i det tilfælde, hvor vi vidste mindst. Mangler listen, ved vi ikke,
+  // om de er medlem, og så er svaret nej.
+  const isMember = org.members?.some((m) => m.userId === actor.sub) ?? false
   if (!isMember) {
     throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
   }
