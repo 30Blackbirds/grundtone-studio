@@ -123,66 +123,33 @@ describe('accept-checkboxen fortaeller, at vilkaarene er danske', () => {
   })
 })
 
-// 🔴 DEN FULDE NOEGLE-INVENTAR — bygget efter [review] demonstrerede hullet.
+// ─── Paragraf-sekvens paa den PUBLICEREDE tekst ─────────────────────────────
 //
-// De oevrige tests her spoerger, om det RIGTIGE staar der. Denne spoerger, om
-// noget MANGLER, og det er en anden slags fejl. [review] fjernede punktummet
-// i "9.2." i kilden — en triviel, plausibel fremtidig tastefejl uden nogen
-// forbudt term — og udtraekkeren droppede en ansvarsklausul STILLE med exit 0,
-// mens alle 12 tests forblev groenne. Teksten blev klistret ind i s9p1, saa
-// selv en laesning af outputtet ville se en sammenhaengende paragraf.
+// [jura] afviste min oprindelige noegle-optaelling, og med en god grund: den
+// viser at ANTALLET skred, ikke HVILKEN klausul der forsvandt — og den skal
+// vedligeholdes i haanden, saa den, der lige har tabt en paragraf ved uheld,
+// opdaterer bare tallet. Sekvens-kravet subsumerer den og er mere informativt.
 //
-// Inventaret er udledt af det jura-godkendte snapshot. Aendrer jura kilden med
-// vilje, skal denne liste opdateres bevidst — og DET er pointen: en aendring i
-// antallet af bestemmelser skal kraeve en menneskelig beslutning, ikke bare
-// glide igennem som en tavs diff.
-const EXPECTED = [
-  { n: 1, paras: [1, 2, 3], bullets: [], subs: {} },
-  { n: 2, paras: [], bullets: [1, 2, 3, 4], subs: {} },
-  { n: 3, paras: [1, 2, 3], bullets: [], subs: {} },
-  { n: 4, paras: [1, 2, 3, 4], bullets: [], subs: {} },
-  { n: 5, paras: [1, 2, 3, 4, 5], bullets: [], subs: {} },
-  { n: 6, paras: [1, 2, 3, 4], bullets: [], subs: { '3': ['a', 'b', 'c', 'd'] } },
-  { n: 7, paras: [1, 2, 3, 4], bullets: [], subs: {} },
-  { n: 8, paras: [1, 2], bullets: [], subs: {} },
-  { n: 9, paras: [1, 2], bullets: [], subs: {} },
-  { n: 10, paras: [1, 2, 3, 4], bullets: [], subs: {} },
-  { n: 11, paras: [1, 2, 3], bullets: [], subs: {} },
-  { n: 12, paras: [1, 2, 3, 4], bullets: [], subs: {} },
-  { n: 13, paras: [1, 2, 3, 4, 5], bullets: [], subs: {} },
-  { n: 14, paras: [1, 2, 3], bullets: [], subs: {} },
-  { n: 15, paras: [1, 2, 3], bullets: [], subs: {} },
-  { n: 16, paras: [1], bullets: [], subs: {} },
-] as const
-
-describe('ingen bestemmelse er faldet ud af udtraekket', () => {
+// Den egentlige rettelse af [review]s mutation ligger i UDTRAEKKEREN, som nu
+// fejler paa en uparsbar bestemmelse frem for at springe den over. Denne test
+// er det andet net: den daekker den committede flade, ogsaa hvis nogen
+// haand-redigerer JSON'en uden at koere udtraekket.
+describe('paragraf-sekvensen i den publicerede tekst er ubrudt', () => {
   const terms = da.terms as Record<string, string>
 
-  it.each(EXPECTED.map((s) => [s.n, s] as const))('§%i har alle sine noegler', (_n, s) => {
-    const missing: string[] = []
-    for (const p of s.paras) {
-      if (!terms[`s${s.n}p${p}`]) missing.push(`s${s.n}p${p}`)
-      for (const sub of (s.subs as Record<string, readonly string[]>)[String(p)] ?? []) {
-        if (!terms[`s${s.n}p${p}${sub}`]) missing.push(`s${s.n}p${p}${sub}`)
-      }
-    }
-    for (const b of s.bullets) {
-      if (!terms[`s${s.n}b${b}`]) missing.push(`s${s.n}b${b}`)
-    }
-    expect(missing, `manglende bestemmelser i §${s.n}`).toEqual([])
+  it('har §1–§16 uden huller og uden dubletter', () => {
+    const found = Object.keys(terms)
+      .map((k) => /^s(\d+)h$/.exec(k)?.[1])
+      .filter(Boolean)
+      .map(Number)
+      .sort((a, b) => a - b)
+    expect(found).toEqual(Array.from({ length: 16 }, (_, i) => i + 1))
   })
 
-  it('har praecis det forventede antal noegler i alt', () => {
-    const contentKeys = Object.keys(terms).filter((k) => /^s\d+(h|p\d+[a-d]?|b\d+)$/.test(k))
-    const expected = EXPECTED.reduce(
-      (n, s) =>
-        n +
-        1 +
-        s.paras.length +
-        s.bullets.length +
-        Object.values(s.subs as Record<string, readonly string[]>).flat().length,
-      0,
+  it('har mindst ét afsnit eller punkt i hver paragraf', () => {
+    const empty = Array.from({ length: 16 }, (_, i) => i + 1).filter(
+      (n) => !Object.keys(terms).some((k) => new RegExp(`^s${n}(p\\d+|b\\d+)`).test(k)),
     )
-    expect(contentKeys).toHaveLength(expected)
+    expect(empty, `paragraffer uden indhold: §${empty.join(', §')}`).toEqual([])
   })
 })

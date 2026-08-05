@@ -37,6 +37,43 @@ if (!src.includes(MARKER)) {
 let body = src.slice(src.indexOf('## 1.'), src.indexOf(MARKER));
 body = body.replace(/---\s*$/, '').replace(/<!--[\s\S]*?-->/g, '');
 
+// ─── Krav 1: STRIKSHED FREM FOR OVERBAERENHED ([jura], consent-tekster.md) ──
+//
+// Kan en nummereret paragrafoverskrift ikke parses, skal vi FEJLE — ikke
+// springe over. [review] demonstrerede hvorfor: fjern punktummet i "9.2." og
+// den tidligere version droppede en ansvarsklausul med exit 0, mens teksten
+// blev klistret ind i den foregaaende paragraf. Ingen forbudt term, intet
+// roedt, og selv en gennemlaesning saa en sammenhaengende paragraf.
+//
+// Baggrunden for at barren er hoejere her end de fleste steder er juras:
+// vores bevis-spor goer defekten SELV-BEKRAEFTENDE. Falder en klausul ud,
+// viser vi kunden en aftale uden den — og registrerer samtidig, at de
+// accepterede praecis dét, med korrekt versionslabel og tidsstempel. Beviset
+// ville bekraefte den forkerte tekst.
+//
+// Vi leder derfor efter linjer, der LIGNER en nummereret bestemmelse, men
+// ikke matcher det stramme moenster. Én saadan linje stopper udtraekket.
+const CLAUSE_STRICT = /^\d+\.\d+\.\s+\S/;
+// Praecis nok til at undgaa falske positiver: et paragraf-nummer har 1-2
+// cifre paa hver side. Et dansk tusindtalsseparator har PRAECIS 3 cifre efter
+// punktummet ("1.000 kr." i §14.2), saa det falder udenfor. En vagt med
+// falske positiver bliver ignoreret — samme grund som [jura] afviste et
+// parentes-forbud i den forbudte-term-liste.
+const CLAUSE_LOOSE = /^\d{1,2}[.,]\d{1,2}[.,]?\s/;
+const malformed = body
+  .split('\n')
+  .map((line, i) => [i + 1, line])
+  .filter(([, line]) => CLAUSE_LOOSE.test(line) && !CLAUSE_STRICT.test(line));
+if (malformed.length) {
+  console.error(
+    'FEJL: linjer ligner en nummereret bestemmelse, men kan ikke parses:\n' +
+      malformed.map(([n, l]) => `  linje ${n}: ${l.slice(0, 70)}`).join('\n') +
+      '\n\nEn tavs udeladelse i tekst med retsvirkning er vaerre end et brud.\n' +
+      'Ret KILDEN — formatet er "N.M. tekst" med punktum efter begge tal.',
+  );
+  process.exit(1);
+}
+
 const out = {};
 const parts = body.split(/^## (\d+)\. (.+)$/m).slice(1);
 for (let i = 0; i < parts.length; i += 3) {
@@ -64,6 +101,27 @@ for (let i = 0; i < parts.length; i += 3) {
 // som et almindeligt @.
 for (const k of Object.keys(out)) {
   out[k] = out[k].replace(/(?<!\{')@(?!'\})/g, "{'@'}");
+}
+
+// ─── Krav 2: UBRUDT PARAGRAF-SEKVENS ────────────────────────────────────────
+// Viser HVILKEN paragraf der mangler, ikke blot at antallet er skredet — og
+// kraever ingen manuelt vedligeholdt optaelling, som den, der lige har tabt en
+// paragraf, ellers bare ville opdatere.
+const seen = Object.keys(out)
+  .map((k) => /^s(\d+)h$/.exec(k)?.[1])
+  .filter(Boolean)
+  .map(Number)
+  .sort((a, b) => a - b);
+const gaps = [];
+for (let i = 1; i <= (seen.at(-1) ?? 0); i++) if (!seen.includes(i)) gaps.push(i);
+const dupes = seen.filter((n, i) => seen.indexOf(n) !== i);
+if (gaps.length || dupes.length || seen[0] !== 1) {
+  console.error(
+    `FEJL: paragraf-sekvensen er brudt. Fundet: ${seen.join(', ')}` +
+      (gaps.length ? `\n  MANGLER: §${gaps.join(', §')}` : '') +
+      (dupes.length ? `\n  DUBLETTER: §${dupes.join(', §')}` : ''),
+  );
+  process.exit(1);
 }
 
 const blob = JSON.stringify(out);
