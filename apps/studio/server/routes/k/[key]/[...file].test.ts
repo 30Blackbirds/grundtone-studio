@@ -228,6 +228,11 @@ describe('GET /k/[key]/[file]', () => {
     expect(overLimit.responseHeaders['retry-after']).toMatch(/^\d+$/)
   })
 
+  // 🔴 SIK-010: denne assertion er ikke kosmetik. Fire kendte SVG-vektorer
+  // (svg/onload, svg:script, SMIL animate/set) er inerte ALENE fordi dette
+  // header sættes — saniteringen fanger dem ikke alle. Fjernes headeret,
+  // bliver de til stored XSS på app-originet hvor session-cookies bor.
+  // Se svg-sanitize.ts' filhoved. Testen skal fejle FØR en kunde opdager det.
   it('serves logo.svg from current/ with CSP sandbox + nosniff (brand-assets)', async () => {
     const { key, projectId, row } = fresh()
     nextDbRows = [row]
