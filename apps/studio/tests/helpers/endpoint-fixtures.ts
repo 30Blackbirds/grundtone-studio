@@ -102,9 +102,18 @@ export function mockH3() {
     createError: (opts: { statusCode: number; statusMessage?: string; data?: unknown }) => {
       const err = new Error(opts.statusMessage ?? '') as Error & {
         statusCode: number
+        statusMessage?: string
         data?: unknown
       }
       err.statusCode = opts.statusCode
+      // statusMessage SKAL sættes som egen property, ikke kun som Error.message.
+      // Den rigtige h3-createError sætter begge, og mocken satte kun message —
+      // så en test der assertede på `err.statusMessage` læste `undefined`. Med
+      // toMatchObject bestod den endda tavst, fordi H3Errors statusMessage ikke
+      // er enumerable og derfor slet ikke blev sammenlignet. Resultatet var, at
+      // INGEN test i repoet kunne verificere en fejlbesked — kun dens statuskode.
+      // Fundet da 403-beskeden på font-leveringen (SIK-011) skulle pinnes.
+      if (opts.statusMessage !== undefined) err.statusMessage = opts.statusMessage
       if (opts.data !== undefined) err.data = opts.data
       return err
     },

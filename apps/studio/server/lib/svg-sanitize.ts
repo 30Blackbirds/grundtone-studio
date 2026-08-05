@@ -1,15 +1,42 @@
-// SVG-sanitering for logo-uploads (brand-assets, låst design 2026-08-03).
+// SVG-sanitering for logo-uploads (brand-assets).
+//
+// 🔴 LÆS DETTE FØR DU LØSNER CSP'EN PÅ /k ([sikkerhed] SIK-010):
+//
+// **CSP'en ER forsvaret. Denne sanitering er det ekstra lag — ikke omvendt.**
+// En tidligere version af denne kommentar sagde at saniteringen fjerner de
+// aktive vektorer og at CSP'en kom "derudover". Det var forkert vej rundt og
+// farligt: den, der senere løsner CSP'en for et legitimt behov (fx et logo
+// der skal kunne animere), ville læse det og konkludere at saniteringen
+// dækker. Det gør den ikke.
+//
+// Regex mod HTML har strukturelle grænser. Verificeret mod vores egen kode
+// 2026-08-04 — disse fire OVERLEVER saniteringen og er kun inerte fordi
+// /k svarer med `CSP: sandbox; default-src 'none'` (sandbox uden
+// allow-scripts slår scriptudførelse helt fra):
+//   · <svg/onload=…>          — `/` er gyldig attribut-separator; vores
+//                                mønster kræver whitespace før `on…`
+//   · <svg:script>            — namespace-præfikset matcher ikke `<script`
+//   · <animate attributeName="href" values="javascript:…">
+//   · <set attributeName="onload" …>
+//     ^ SMIL sætter attributter på RENDERTIDSPUNKTET; ingen af mønstrene
+//       her ser på elementer, kun på attributter og blokke.
+//
+// svg-sanitize.test.ts har dem som eksplicitte "forventes at overleve"-
+// cases, så begrænsningen er eksekverbar frem for kun beskrevet — og
+// [file].test.ts asserterer på CSP-headeren, så et fjernet header giver
+// rødt her frem for at blive opdaget af en kunde.
+//
+// Vil vi have saniteringen til at BÆRE forsvaret, skal den skiftes til en
+// parser-baseret allowlist (fx DOMPurify i jsdom). Regexen nedenfor er
+// bevidst en billig første barriere mod det almindelige, ikke en garanti.
+//
 // Trusselsmodellen: /k/{key}/logo.svg serveres fra app-origin hvor session-
-// cookies bor — et SVG med script/handlers er stored XSS. Forsvaret er
-// LAGDELT: denne sanitering fjerner de aktive vektorer, og /k-routen sætter
-// derudover CSP sandbox + nosniff (delivery-laget). Whitelist-parsere er
-// overkill her: SVG'et renderes kun i <img>-kontekst af vores egne flader,
-// så opgaven er at neutralisere dokumentet, ikke at bevare alt eksotisk.
+// cookies bor — et SVG med script/handlers ville være stored XSS uden CSP'en.
 
-const SCRIPT_BLOCKS = /<script[\s\S]*?(?:<\/script\s*>|$)/gi
+const SCRIPT_BLOCKS = /<[a-z0-9]*:?script[\s\S]*?(?:<\/[a-z0-9]*:?script\s*>|$)/gi
 const FOREIGN_OBJECT_BLOCKS = /<foreignObject[\s\S]*?(?:<\/foreignObject\s*>|$)/gi
 // on*-attributter (onclick, onload, …) — begge quote-varianter + uquoted
-const EVENT_HANDLER_ATTRS = /\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi
+const EVENT_HANDLER_ATTRS = /[\s/]on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi
 // javascript:-URL'er i href/xlink:href
 const SCRIPT_URLS = /\s(?:xlink:)?href\s*=\s*(?:"\s*javascript:[^"]*"|'\s*javascript:[^']*')/gi
 // Eksterne referencer: href/src mod andre origins (data:-URI'er i fx fills

@@ -67,3 +67,38 @@ describe('looksLikeSvg', () => {
     expect(looksLikeSvg('')).toBe(false)
   })
 })
+
+describe('what the regex CANNOT catch (SIK-010) — CSP carries these', () => {
+  // ⚠️ Disse cases asserterer at vektorerne OVERLEVER saniteringen. Det er
+  // ikke en fejl der skal "rettes" ved at slække assertionen — det er
+  // begrænsningen gjort eksekverbar, så den ikke kun står i en kommentar.
+  //
+  // De er inerte i produktion ALENE fordi /k svarer med
+  // `CSP: sandbox; default-src 'none'`. Løsnes den CSP, bliver de til
+  // stored XSS på app-originet. Skal saniteringen selv kunne bære dem,
+  // kræver det en parser-baseret allowlist — og så vender disse tests om.
+  const uncaught = {
+    'SMIL animate sets href at render time':
+      '<svg><a><animate attributeName="href" values="javascript:alert(1)"/></a></svg>',
+    'SMIL set injects an event handler attribute':
+      '<svg><set attributeName="onload" to="alert(1)"/></svg>',
+  }
+
+  for (const [name, vector] of Object.entries(uncaught)) {
+    it(`survives sanitisation — by design, not by oversight: ${name}`, () => {
+      expect(sanitizeSvg(vector)).toMatch(/alert|javascript:/i)
+    })
+  }
+})
+
+describe('vectors the tightened patterns DO catch (SIK-010 follow-up)', () => {
+  it('strips handlers separated by a slash, not just whitespace', () => {
+    // `/` er en gyldig attribut-separator i HTML — det oprindelige mønster
+    // krævede whitespace og lod <svg/onload=…> passere.
+    expect(sanitizeSvg('<svg/onload=alert(1)></svg>')).not.toMatch(/alert/i)
+  })
+
+  it('strips namespace-prefixed script elements', () => {
+    expect(sanitizeSvg('<svg><svg:script>alert(1)</svg:script></svg>')).not.toMatch(/alert/i)
+  })
+})

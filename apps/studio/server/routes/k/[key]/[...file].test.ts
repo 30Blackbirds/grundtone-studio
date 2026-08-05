@@ -228,6 +228,11 @@ describe('GET /k/[key]/[file]', () => {
     expect(overLimit.responseHeaders['retry-after']).toMatch(/^\d+$/)
   })
 
+  // 🔴 SIK-010: denne assertion er ikke kosmetik. Fire kendte SVG-vektorer
+  // (svg/onload, svg:script, SMIL animate/set) er inerte ALENE fordi dette
+  // header sættes — saniteringen fanger dem ikke alle. Fjernes headeret,
+  // bliver de til stored XSS på app-originet hvor session-cookies bor.
+  // Se svg-sanitize.ts' filhoved. Testen skal fejle FØR en kunde opdager det.
   it('serves logo.svg from current/ with CSP sandbox + nosniff (brand-assets)', async () => {
     const { key, projectId, row } = fresh()
     nextDbRows = [row]
@@ -246,7 +251,10 @@ describe('GET /k/[key]/[file]', () => {
     const { key, projectId, row } = fresh()
     nextDbRows = [row]
     storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
-    const event = fakeEvent({ params: { key, file: 'fonts/asp-grotesk-400.woff2' } })
+    const event = fakeEvent({
+      params: { key, file: 'fonts/asp-grotesk-400.woff2' },
+      headers: { origin: 'https://acme.example' },
+    })
     await handler(event)
     expect(event.responseHeaders['content-type']).toBe('font/woff2')
     expect(event.responseHeaders['x-content-type-options']).toBe('nosniff')
@@ -275,5 +283,105 @@ describe('GET /k/[key]/[file]', () => {
     const event = fakeEvent({ params: { key, file: 'tokens.json' } })
     await handler(event)
     expect(event.responseHeaders['content-security-policy']).toBeUndefined()
+  })
+
+  // [infra] kunne ikke ramme et FAKTISK asset-svar gennem CDN'en (ingen
+  // gyldig tenant-sti med et uploadet logo — featuren er ny og ubrugt), og
+  // noterede ærligt at "header-sætning kan i princippet variere pr.
+  // respons-vej". Denne test lukker netop det hul stærkere end ét curl ville:
+  // den går ALLE asset-veje igennem, ikke bare den ene nogen tilfældigvis
+  // rammer. Falder én af dem ud af CSP-stien, bliver det rødt her.
+  it.each([
+    ['logo.svg', 'image/svg+xml'],
+    ['logo.png', 'image/png'],
+    ['fonts/heading-inter-400.woff2', 'font/woff2'],
+    ['fonts/body-asp-grotesk-700.woff2', 'font/woff2'],
+  ])('every asset response path carries CSP + nosniff: %s', async (file, contentType) => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/${file}`, 'x')
+    // Origin med på alle veje: sådan ser et rigtigt browser-kald ud, og fonte
+    // KRÆVER headeren (SIK-011). At logo/tokens også virker UDEN den er
+    // dækket separat nedenfor — undtagelsen er bevidst, ikke et hul.
+    const event = fakeEvent({ params: { key, file }, headers: { origin: 'https://acme.example' } })
+    await handler(event)
+    expect(event.responseHeaders['content-type']).toBe(contentType)
+    expect(event.responseHeaders['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(event.responseHeaders['x-content-type-options']).toBe('nosniff')
+  })
+
+  // ─── SIK-011: fonte kræver Origin ([jura] 2026-08-05) ────────────────────
+  //
+  // Grænsen er LICENS-OMFANG, ikke fortrolighed: kunden erklærer ved upload
+  // at vi må distribuere fonten til "de brugere, der besøger mine brands",
+  // og et header-løst kald er ikke det. Testene under her holder BEGGE sider
+  // af snittet fast — både at fonte afvises, og at tokens/logo bevidst IKKE
+  // gør det. Uden den anden halvdel kunne en fremtidig "konsistens-oprydning"
+  // udvide kravet til hele endpointet og brække build-time-hentning af
+  // tokens.json, uden at noget blev rødt.
+  it('403s a font request with no Origin header (uden for kundens erklæring)', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    await expect(
+      handler(fakeEvent({ params: { key, file: 'fonts/asp-grotesk-400.woff2' } })),
+    ).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  // Beskeden er ikke kosmetik, og den er derfor pinnet. MÅLT: en
+  // `<link rel=preload as=font>` UDEN crossorigin hentes i no-cors-mode og
+  // sender intet Origin — så netop de kunder rammer denne 403. Uden
+  // `crossorigin` i teksten kan de ikke se hvad de skal gøre, og en 403 uden
+  // handlingsanvisning på en offentlig flade bliver en supportsag.
+  it('tells the caller HOW to fix it — the 403 names crossorigin', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    // Læser property'en direkte: `statusMessage` er ikke enumerable på H3Error,
+    // så toMatchObject ser den ikke og ville bestå uanset indhold.
+    const err = (await handler(
+      fakeEvent({ params: { key, file: 'fonts/asp-grotesk-400.woff2' } }),
+    ).catch((e: unknown) => e)) as { statusCode: number; statusMessage: string }
+    expect(err.statusCode).toBe(403)
+    expect(err.statusMessage).toContain('crossorigin')
+  })
+
+  it('serves the same font once an Origin is present', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    const event = fakeEvent({
+      params: { key, file: 'fonts/asp-grotesk-400.woff2' },
+      headers: { origin: 'https://acme.example' },
+    })
+    await expect(handler(event)).resolves.toBeTruthy()
+    expect(event.responseHeaders['content-type']).toBe('font/woff2')
+  })
+
+  it.each(['tokens.json', 'tokens.css', 'logo.svg', 'logo.png'])(
+    'keeps serving %s WITHOUT an Origin — server-til-server er tilladt her',
+    async (file) => {
+      const { key, projectId, row } = fresh()
+      nextDbRows = [row]
+      const blob = file.startsWith('tokens.')
+        ? `p/${projectId}/current.${file.split('.')[1]}`
+        : `p/${projectId}/current/${file}`
+      storage.set(blob, '{}')
+      await expect(handler(fakeEvent({ params: { key, file } }))).resolves.toBeTruthy()
+    },
+  )
+
+  it('still applies the origin allowlist to fonts when one is configured', async () => {
+    const { key, projectId, row } = fresh({ allowedOrigins: ['acme.com'] })
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    await expect(
+      handler(
+        fakeEvent({
+          params: { key, file: 'fonts/asp-grotesk-400.woff2' },
+          headers: { origin: 'https://evil.example' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 })
   })
 })

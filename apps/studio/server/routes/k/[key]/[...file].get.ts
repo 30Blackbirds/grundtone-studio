@@ -105,9 +105,9 @@ function buildEtag(body: string | Buffer): string {
 defineRouteMeta({
   openAPI: {
     summary:
-      'Offentligt CDN-endpoint: API-nøgle → projekt, rate-limit + origin-allowlist + ETag, serverer tokens.json/tokens.css.',
+      'Offentligt CDN-endpoint: API-nøgle → projekt, rate-limit + origin-allowlist + ETag, serverer tokens, logo og fonte.',
     description:
-      'Offentligt CDN-endpoint. Oversætter plaintext-API-nøgle til projekt, håndhæver rate-limit, origin-allowlist og ETag, og serverer tokens.json/tokens.css.',
+      'Offentligt CDN-endpoint. Oversætter plaintext-API-nøgle til projekt, håndhæver rate-limit, origin-allowlist og ETag, og serverer tokens.json/tokens.css, logo.svg/logo.png og fonts/*.woff2. Fontfiler kræver en Origin-header (licens-omfang, SIK-011); tokens og logo serveres også til server-til-server-kald.',
     tags: ['CDN'],
   },
 })
@@ -145,6 +145,55 @@ export default defineEventHandler(async (event) => {
   }
 
   const origin = getRequestHeader(event, 'origin')
+
+  // ─── SIK-011: fontfiler leveres kun til browser-kald ([jura] 2026-08-05) ──
+  //
+  // **Dette er IKKE en sikkerhedskontrol.** `Origin` sættes af klienten og kan
+  // forfalskes af enhver, der skriver headeren selv. Det er en god-tros-
+  // foranstaltning, der gør, at vi leverer inden for det omfang, kunden har
+  // erklæret — ikke en spærring, der gør omgåelse umulig. Skriv den ikke om
+  // til noget stærkere, end den er.
+  //
+  // Grænsen her er ikke FORTROLIGHED, men LICENS-OMFANG. En skriftfil er ikke
+  // hemmelig — den kan hentes fra ethvert website, der bruger den — men dens
+  // distribution er retligt begrænset på en måde, en hex-farvekode ikke er:
+  // kommercielle webfont-licenser afgrænses typisk efter domæne og/eller
+  // sidevisninger, og et endpoint uden origin-begrænsning gør begge dele
+  // meningsløse. Kunden erklærer ved upload, at vi må distribuere filen "til
+  // de brugere, der besøger mine brands"; et curl fra en vilkårlig tredjepart
+  // er ikke det. Uden denne linje leverede vi mere, end kunden har indestået
+  // for — så vi tilpasser leveringen til erklæringen, ikke omvendt.
+  //
+  // Bryder ikke rigtige browsere: CSS Fonts-specen kræver, at `src: url()`
+  // hentes i CORS-anonymous mode, så Origin ledsager ALTID et cross-origin
+  // font-kald — og /k er pr. konstruktion cross-origin fra kundens side. Et
+  // SAME-origin kald ville mangle headeren, men den vej findes ikke hos os:
+  // Studios egen preview bygger fonten med FontFace-API'et fra upload-bytes
+  // og rører aldrig /k (verificeret i FontSlotEditor.vue).
+  //
+  // Tokens og logo er bevidst undtaget: de har legitim server-til-server-brug
+  // (fx build-time-hentning af tokens.json), og de bærer ingen licensgrænse.
+  //
+  // Beskeden nævner `crossorigin` med vilje. MÅLT 2026-08-05 (browser-rig,
+  // [sikkerhed]s SIK-011-hypotese): `<link rel=preload as=font>` UDEN
+  // crossorigin-attributten hentes i no-cors-mode og sender INTET Origin —
+  // både same- og cross-origin. Selve @font-face-hentningen er altid cors og
+  // rammes ikke, så kundens font virker stadig; men preloaden bliver en synlig
+  // 403 i deres netværkspanel. Uden forklaring bliver det en supportsag om at
+  // "Grundtone er nede"; med forklaring bliver det en to-tegns rettelse hos
+  // kunden — som samtidig fjerner den dobbelt-hentning, de allerede havde.
+  if (FONT_FILE.test(file) && !origin) {
+    // Ren tekst med vilje: en HTTP reason-phrase er ikke et sted til markup.
+    // h3 sanitizer ikke ved createError, men beskeden passerer header-lag der
+    // gør — så vinkelparenteser og anførselstegn kan forsvinde undervejs og
+    // efterlade en halv sætning. Klartekst overlever hele vejen.
+    throw createError({
+      statusCode: 403,
+      statusMessage:
+        'Origin required for font delivery — add the crossorigin attribute to your font preload link',
+    })
+  }
+
   if (meta.allowedOrigins.length > 0 && origin) {
     const allowed = meta.allowedOrigins.some((pattern) => matchOrigin(pattern, origin))
     if (!allowed) throw createError({ statusCode: 403, statusMessage: 'Origin not allowed' })
