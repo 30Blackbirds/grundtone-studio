@@ -34,17 +34,35 @@ overrides:
   # function" (samme brud som grundtone#113; 3.x er ikke i advisory-spannene).
   'js-yaml@>=5.0.0 <5.2.2': '>=5.2.2'
   'js-yaml@>=4.0.0 <4.3.0': '>=4.3.0'
-  # GHSA-mh99-v99m-4gvg — high: brace-expansion OOM-crash DoS via unbounded
-  # expansion. The advisory marks EVERY version <=5.0.7 vulnerable across all
-  # major lines and patches only in 5.0.8, so the earlier "keep 2.x on 2.1.2"
-  # scoping is no longer sufficient. Force the whole 2.x–5.0.7 span (reached via
-  # multiple minimatch parents: eslint, and archiver>glob) up to 5.0.8. The 1.x
-  # line (<2.0.0, used by minimatch@3) is left untouched — a flat 5.x bump there
-  # risks the CJS/ESM break the original scoping guarded against; no 1.x
-  # brace-expansion is in the prod tree (audit confirms green).
-  # (+ opfølger patched 5.0.9 — 5.0.8-mitigeringen af CVE-2026-14257 kunne
-  # omgås; span + gulv hævet tilsvarende.)
-  'brace-expansion@>=2.0.0 <5.0.9': '>=5.0.9'
+  # brace-expansion — TO advisories, og begge har PER-LINJE-intervaller:
+  #   GHSA-mh99-v99m-4gvg (CVE-2026-14257): <1.1.17 / 2.x<2.1.3 / 3.x<3.0.3 / 4.x-5.x<5.0.8
+  #   GHSA-rgw5-rvv9-x895 (omgår ovenstående): <1.1.18 / 2.x<2.1.4 / 3.x<3.0.6 / 4.x-5.x<5.0.9
+  #
+  # RETTET 2026-08-05: den tidligere form var ÉT fladt span, >=2.0.0 <5.0.9,
+  # skrevet ud fra en kommentar der påstod at advisoriet ramte "every version
+  # <=5.0.7 across all major lines and patches only in 5.0.8". Det er forkert —
+  # verificeret mod GitHubs advisory-API, ikke mod vores egen note. Hver
+  # major-linje har sin egen patch.
+  #
+  # Konsekvensen af det flade span var ikke teoretisk: det ville have tvunget
+  # fx en 2.1.4 — som ER patch-versionen for sin linje — op på 5.0.9, altså
+  # over to major-grænser uden grund. Præcis det brud, 1.x-undtagelsen nedenfor
+  # blev skrevet for at undgå. Per-linje-formen dækker alt uden at flytte nogen
+  # pakke til en anden major.
+  # 🔴 CARET, ikke >=. Selektoren (venstre side) vaelger HVEM der rammes, men
+  # erstatnings-range'en er FRI: '>=1.1.18' tillader 5.x, og pnpm tager den
+  # hoejeste. Maalt i isoleret probe — minimatch@3 med '>=1.1.18' fik
+  # brace-expansion 5.0.9, altsaa tre majors op og praecis det brud, per-linje-
+  # formen skal forhindre. Med '^1.1.18' bliver den paa 1.1.18. ([taktart] fandt
+  # den; jeg havde >=-formen i to repos, hvor den bare aldrig fyrede.)
+  #
+  # Bemaerk at dette er MODSAT vores anden >=-erfaring: '>=5.0.8' resolverede
+  # til 5.0.8 frem for 5.0.9. Samme operator, modsat udfald — dér fandtes ingen
+  # hoejere version at hoppe til, her findes tre majors. Begge er sande.
+  'brace-expansion@<1.1.18': '^1.1.18'
+  'brace-expansion@>=2.0.0 <2.1.4': '^2.1.4'
+  'brace-expansion@>=3.0.0 <3.0.6': '^3.0.6'
+  'brace-expansion@>=4.0.0 <5.0.9': '^5.0.9'
   # GHSA — high (x2): Immutable.js List 32-bit trie overflow + Map/Set hash-
   # collision algorithmic-complexity DoS; both patched in 5.1.8. Pulled in via
   # @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite > sass. Remove when sass
