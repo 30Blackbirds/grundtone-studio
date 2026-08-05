@@ -281,4 +281,26 @@ describe('GET /k/[key]/[file]', () => {
     await handler(event)
     expect(event.responseHeaders['content-security-policy']).toBeUndefined()
   })
+
+  // [infra] kunne ikke ramme et FAKTISK asset-svar gennem CDN'en (ingen
+  // gyldig tenant-sti med et uploadet logo — featuren er ny og ubrugt), og
+  // noterede ærligt at "header-sætning kan i princippet variere pr.
+  // respons-vej". Denne test lukker netop det hul stærkere end ét curl ville:
+  // den går ALLE asset-veje igennem, ikke bare den ene nogen tilfældigvis
+  // rammer. Falder én af dem ud af CSP-stien, bliver det rødt her.
+  it.each([
+    ['logo.svg', 'image/svg+xml'],
+    ['logo.png', 'image/png'],
+    ['fonts/heading-inter-400.woff2', 'font/woff2'],
+    ['fonts/body-asp-grotesk-700.woff2', 'font/woff2'],
+  ])('every asset response path carries CSP + nosniff: %s', async (file, contentType) => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/${file}`, 'x')
+    const event = fakeEvent({ params: { key, file } })
+    await handler(event)
+    expect(event.responseHeaders['content-type']).toBe(contentType)
+    expect(event.responseHeaders['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(event.responseHeaders['x-content-type-options']).toBe('nosniff')
+  })
 })
