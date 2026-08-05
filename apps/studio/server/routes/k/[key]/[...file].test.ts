@@ -328,6 +328,24 @@ describe('GET /k/[key]/[file]', () => {
     ).rejects.toMatchObject({ statusCode: 403 })
   })
 
+  // Beskeden er ikke kosmetik, og den er derfor pinnet. MÅLT: en
+  // `<link rel=preload as=font>` UDEN crossorigin hentes i no-cors-mode og
+  // sender intet Origin — så netop de kunder rammer denne 403. Uden
+  // `crossorigin` i teksten kan de ikke se hvad de skal gøre, og en 403 uden
+  // handlingsanvisning på en offentlig flade bliver en supportsag.
+  it('tells the caller HOW to fix it — the 403 names crossorigin', async () => {
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current/fonts/asp-grotesk-400.woff2`, 'wOF2....')
+    // Læser property'en direkte: `statusMessage` er ikke enumerable på H3Error,
+    // så toMatchObject ser den ikke og ville bestå uanset indhold.
+    const err = (await handler(
+      fakeEvent({ params: { key, file: 'fonts/asp-grotesk-400.woff2' } }),
+    ).catch((e: unknown) => e)) as { statusCode: number; statusMessage: string }
+    expect(err.statusCode).toBe(403)
+    expect(err.statusMessage).toContain('crossorigin')
+  })
+
   it('serves the same font once an Origin is present', async () => {
     const { key, projectId, row } = fresh()
     nextDbRows = [row]

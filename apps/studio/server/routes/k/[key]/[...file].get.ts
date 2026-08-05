@@ -173,8 +173,25 @@ export default defineEventHandler(async (event) => {
   //
   // Tokens og logo er bevidst undtaget: de har legitim server-til-server-brug
   // (fx build-time-hentning af tokens.json), og de bærer ingen licensgrænse.
+  //
+  // Beskeden nævner `crossorigin` med vilje. MÅLT 2026-08-05 (browser-rig,
+  // [sikkerhed]s SIK-011-hypotese): `<link rel=preload as=font>` UDEN
+  // crossorigin-attributten hentes i no-cors-mode og sender INTET Origin —
+  // både same- og cross-origin. Selve @font-face-hentningen er altid cors og
+  // rammes ikke, så kundens font virker stadig; men preloaden bliver en synlig
+  // 403 i deres netværkspanel. Uden forklaring bliver det en supportsag om at
+  // "Grundtone er nede"; med forklaring bliver det en to-tegns rettelse hos
+  // kunden — som samtidig fjerner den dobbelt-hentning, de allerede havde.
   if (FONT_FILE.test(file) && !origin) {
-    throw createError({ statusCode: 403, statusMessage: 'Origin required for font files' })
+    // Ren tekst med vilje: en HTTP reason-phrase er ikke et sted til markup.
+    // h3 sanitizer ikke ved createError, men beskeden passerer header-lag der
+    // gør — så vinkelparenteser og anførselstegn kan forsvinde undervejs og
+    // efterlade en halv sætning. Klartekst overlever hele vejen.
+    throw createError({
+      statusCode: 403,
+      statusMessage:
+        'Origin required for font delivery — add the crossorigin attribute to your font preload link',
+    })
   }
 
   if (meta.allowedOrigins.length > 0 && origin) {
