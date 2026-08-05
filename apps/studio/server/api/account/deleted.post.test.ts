@@ -5,9 +5,15 @@ const updates: Array<{ table: string; values: Record<string, unknown> }> = []
 
 vi.mock('~~/server/db', () => ({
   db: {
-    delete: () => ({
+    // Optager sit ARGUMENT, ikke en hardkodet streng ([sikkerhed] SIK-006):
+    // med `delete: () => …` kunne handleren slette en hvilken som helst tabel
+    // uden at nogen test blev rød — assertionen så ud til at verificere HVAD
+    // der blev tømt, men verificerede kun AT db.delete() blev kaldt. Bevist
+    // med mutation: sletning af apiKey i stedet for projectMember lod alle
+    // fem tests stå grønne.
+    delete: (table: { _: { name: string } }) => ({
       where: () => {
-        deletes.push('project_member')
+        deletes.push(table._.name)
         return Promise.resolve()
       },
     }),
