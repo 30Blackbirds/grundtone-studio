@@ -103,6 +103,14 @@ async function getToken(event: H3Event): Promise<string | null> {
 //
 // Egen env-var (ikke ACCOUNT_S2S_TOKEN): tokenet har en anden audience, og at
 // dele én vaerdi mellem to modtagere goer en kompromittering bredere end noedigt.
+//
+// 🔴 `aud` = `klanghaus-pdp`. Vi laeser og saetter den IKKE her — tokenet baerer
+// den fra mintningen, og #90 asserterer ikke paa den. Vaerdien staar alligevel
+// skrevet, fordi konsekvensen af at gaette forkert er ubehagelig: mintes med én
+// vaerdi og asserteres senere paa en anden, fejler ALLE skrivninger paa én gang,
+// og fejlen vil ligne en TOKEN-fejl frem for en KONFIGURATIONS-fejl. Praecis som
+// issuer-asymmetrien mod staging: en 401, der saa ud som et daarligt token, men
+// var en forkert `iss`. Skal nogen en dag assertere audience, er det denne.
 function serviceClient() {
   const baseUrl = process.env.PERMISSIONS_URL
   if (!baseUrl) throw new Error('PERMISSIONS_URL must be set')
