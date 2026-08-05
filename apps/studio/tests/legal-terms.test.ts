@@ -17,22 +17,17 @@ describe('abonnementsvilkår — publiceret tekst', () => {
     }
   })
 
-  // 🔴 Kilden indeholder en intern redaktionel note i §7.3, adresseret til
-  // workers og markeret med advarselstegn. Den maa ALDRIG naa en kunde.
-  it('indeholder INGEN interne redaktionelle noter', () => {
+  // 🔴 Juras femte krav (consent-tekster.md): interne noter hoerer i
+  // HTML-kommentarer, aldrig i broedteksten — heller ikke med advarselstegn.
+  // Listen er juras egen. Bemaerk hvad der IKKE staar paa den: parenteser.
+  // Juridisk tekst bruger dem legitimt ("(§4.3)", "(reverse charge)"), og et
+  // parentes-forbud ville give falske positiver, man laerer at ignorere — og
+  // en advarsel man ignorerer, er samme fejlklasse som den vi lige har ryddet.
+  it('indeholder intet, der kun hoerer hjemme internt', () => {
     const all = JSON.stringify(terms)
-    expect(all).not.toContain('\u26a0')
-    expect(all).not.toContain('[account]')
-    expect(all).not.toContain('[grundtone]')
-    expect(all).not.toContain('bekræfter ved implementering')
-  })
-
-  // Kilden henviser til databehandleraftalen med en REPO-STI. En kunde skal
-  // se et link til den publicerede side, ikke en filsti i vores git-tree.
-  it('lækker ingen repo-stier', () => {
-    const all = JSON.stringify(terms)
-    expect(all).not.toContain('docs/legal')
-    expect(all).not.toContain('.md')
+    for (const banned of ['\u26a0', '[account]', '[grundtone]', '[jura]', 'docs/', '.md']) {
+      expect(all, `publiceret tekst indeholder ${banned}`).not.toContain(banned)
+    }
   })
 
   // §13.4 er den bestemmelse, font-licens-fladen henviser til. Begge led
