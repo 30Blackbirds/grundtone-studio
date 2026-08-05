@@ -1,5 +1,18 @@
 # syntax=docker/dockerfile:1.7
-FROM node:26-alpine AS base
+#
+# ⚠️ Node-majoren her SKAL følges ad med .nvmrc (24.13.0) og engines.node
+# (>=24.0.0) — ellers tester CI én runtime og prod kører en anden.
+#
+# Dependabot bumpede denne til 26-alpine alene (#161) og brækkede builden:
+# **Node 26 har FJERNET corepack fra de officielle images** (deprecated i 25),
+# så `corepack enable pnpm` fejler med exit 127. Verificeret direkte:
+# node:24-alpine har corepack, node:26-alpine har ikke.
+#
+# Skal vi til Node 26, er det en koordineret ændring: bump .nvmrc + engines
+# SAMTIDIG, og erstat corepack med en eksplicit pnpm-installation
+# (`RUN npm i -g pnpm@<version>` eller pnpm/action-setup-ækvivalent).
+# Et ensidigt Dockerfile-bump er ikke nok.
+FROM node:24-alpine AS base
 RUN corepack enable pnpm
 
 FROM base AS deps
@@ -74,7 +87,7 @@ RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*
  && cp -r "$HOOKABLE_SRC" /deploy/.output/server/node_modules/hookable \
  && test -f /deploy/.output/server/node_modules/hookable/package.json
 
-FROM node:26-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NITRO_PORT=3000
