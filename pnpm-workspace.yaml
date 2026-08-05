@@ -49,10 +49,20 @@ overrides:
   # over to major-grænser uden grund. Præcis det brud, 1.x-undtagelsen nedenfor
   # blev skrevet for at undgå. Per-linje-formen dækker alt uden at flytte nogen
   # pakke til en anden major.
-  'brace-expansion@<1.1.18': '>=1.1.18'
-  'brace-expansion@>=2.0.0 <2.1.4': '>=2.1.4'
-  'brace-expansion@>=3.0.0 <3.0.6': '>=3.0.6'
-  'brace-expansion@>=4.0.0 <5.0.9': '>=5.0.9'
+  # 🔴 CARET, ikke >=. Selektoren (venstre side) vaelger HVEM der rammes, men
+  # erstatnings-range'en er FRI: '>=1.1.18' tillader 5.x, og pnpm tager den
+  # hoejeste. Maalt i isoleret probe — minimatch@3 med '>=1.1.18' fik
+  # brace-expansion 5.0.9, altsaa tre majors op og praecis det brud, per-linje-
+  # formen skal forhindre. Med '^1.1.18' bliver den paa 1.1.18. ([taktart] fandt
+  # den; jeg havde >=-formen i to repos, hvor den bare aldrig fyrede.)
+  #
+  # Bemaerk at dette er MODSAT vores anden >=-erfaring: '>=5.0.8' resolverede
+  # til 5.0.8 frem for 5.0.9. Samme operator, modsat udfald — dér fandtes ingen
+  # hoejere version at hoppe til, her findes tre majors. Begge er sande.
+  'brace-expansion@<1.1.18': '^1.1.18'
+  'brace-expansion@>=2.0.0 <2.1.4': '^2.1.4'
+  'brace-expansion@>=3.0.0 <3.0.6': '^3.0.6'
+  'brace-expansion@>=4.0.0 <5.0.9': '^5.0.9'
   # GHSA — high (x2): Immutable.js List 32-bit trie overflow + Map/Set hash-
   # collision algorithmic-complexity DoS; both patched in 5.1.8. Pulled in via
   # @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite > sass. Remove when sass
