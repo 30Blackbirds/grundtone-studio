@@ -105,3 +105,20 @@ describe('locale-strenge maa ikke indeholde raa @ (vue-i18n error 10)', () => {
     expect(offenders, `brug {'@'} i stedet for @ i: ${offenders.join(', ')}`).toEqual([])
   })
 })
+
+// 🔴 Accept-checkboxen er det sted, kunden BINDER sig, og det sted en senere
+// indsigelse ville pege paa. Vilkaarene er dansk-kun, saa den ENGELSKE
+// checkbox skal sige det ([jura] 2026-08-05, §1b) — ellers accepterer en
+// engelsktalende kunde en tekst, de ikke er blevet fortalt er paa dansk.
+//
+// Testen findes, fordi punktet IKKE var sporet noget andet sted: da jura
+// spurgte, om det laa i checkout-leverancen, var strengen live og forkert.
+describe('accept-checkboxen fortaeller, at vilkaarene er danske', () => {
+  it('den engelske label naevner sproget', () => {
+    expect(en.plans.confirm.tosLabel).toContain('in Danish')
+  })
+
+  it('den danske label goer det ikke — dansk er aftalesproget', () => {
+    expect(da.plans.confirm.tosLabel).not.toContain('dansk')
+  })
+})
