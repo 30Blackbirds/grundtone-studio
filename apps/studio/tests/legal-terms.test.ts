@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import da from '~~/i18n/locales/da.json'
 import en from '~~/i18n/locales/en.json'
+import { TERMS_VERSION } from '~~/lib/legal'
 
 // Vilkårsteksten har RETSVIRKNING. Den er udledt af juras kilde
 // (docs/legal/studio-abonnementsvilkår.md, studio-tos-1.0) frem for skrevet
@@ -151,5 +152,27 @@ describe('paragraf-sekvensen i den publicerede tekst er ubrudt', () => {
       (n) => !Object.keys(terms).some((k) => new RegExp(`^s${n}(p\\d+|b\\d+)`).test(k)),
     )
     expect(empty, `paragraffer uden indhold: §${empty.join(', §')}`).toEqual([])
+  })
+})
+
+// 🔴 VERSIONS-LABELEN — [jura]s fund: strengen fandtes i tre haandholdte
+// kopier, saa teksten var sikret ved konstruktion mens LABELEN paa teksten var
+// sikret ved disciplin. Vi kunne vise 1.1-teksten, skrive "Version 1.0"
+// nederst og gemme "1.0" i bevis-sporet — alle tre led internt konsistente,
+// hele attesten forkert.
+//
+// Testene her binder de tre sammen, saa de ikke kan skride hver for sig.
+describe('versions-labelen er udledt, ikke haandholdt', () => {
+  it('locale, bevis-spor og vist linje er den SAMME version', () => {
+    const version = (da.terms as Record<string, string>).version
+    expect(version).toMatch(/^studio-tos-\d+\.\d+$/)
+    expect(TERMS_VERSION, 'bevis-sporet gemmer en anden version end fladen viser').toBe(version)
+    expect((da.terms as Record<string, string>).versionLine).toContain(version)
+  })
+
+  it('de to sprog viser samme version', () => {
+    expect((en.terms as Record<string, string>).version).toBe(
+      (da.terms as Record<string, string>).version,
+    )
   })
 })
