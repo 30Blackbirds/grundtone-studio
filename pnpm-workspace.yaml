@@ -95,3 +95,6 @@ overrides:
   # (Node http2, not undici), so this only silences the audit path. Remove once
   # the connect stack moves to 2.x.
   undici: ^6.24.0
+  'nanoid@<3.3.17': '^3.3.17'
+  'undici@<6.28.0': '^6.28.0'
+  'valibot@<=1.4.1': '^1.4.2'
