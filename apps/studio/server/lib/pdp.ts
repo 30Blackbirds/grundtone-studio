@@ -1,5 +1,9 @@
 import type { Interceptor } from '@connectrpc/connect'
 import type { H3Event } from 'h3'
+// Eksplicit frem for Nuxts auto-import: uden den kan modulet ikke unit-testes
+// (auto-imports findes kun i Nuxt-runtime), og SIK-003's fail-closed-sti er
+// netop det, der skal kunne testes.
+import { createError } from 'h3'
 import { createPromiseClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-node'
 import { PermissionsService } from '@klanghaus/permissions-client/connect'
@@ -77,6 +81,53 @@ async function getToken(event: H3Event): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+// ─── SIK-003: skrive-stier bruger en TJENESTE-identitet ─────────────────────
+//
+// Fase 2 i permissions (#90) allowlister hvem der maa skrive tupler, og den
+// matcher paa `sub = service:studio`. Skrivningerne herunder er PLATFORM-
+// handlinger — studio skriver dem paa systemets vegne, ikke paa brugerens —
+// saa de skal baere tjeneste-identiteten.
+//
+// 🔴 LAES-STIERNE SKAL BLIVE PAA BRUGERENS TOKEN. Det er ikke en detalje:
+// `check`/`batchCheck`/`listMyAccess` afgoer, hvad DENNE bruger maa, og PDP'en
+// laeser subject fra tokenet. Skiftes de med, spoerger vi i praksis "maa
+// service:studio det her?" — og svaret ville vaere ja for alt.
+//
+// Manglende token er FAIL-CLOSED, bevidst. En fallback til brugerens token
+// ville stille genindfoere praecis den tilstand, fase 2 fjerner, og den ville
+// SE UD som om alt virker. Det koster os desuden ingenting: i deploy-kaeden
+// mintes tokenet i trin 2, foer dette skifte gaar ud i trin 4, saa der findes
+// ikke et vindue med tomt token.
+//
+// Egen env-var (ikke ACCOUNT_S2S_TOKEN): tokenet har en anden audience, og at
+// dele én vaerdi mellem to modtagere goer en kompromittering bredere end noedigt.
+//
+// 🔴 `aud` = `klanghaus-pdp`. Vi laeser og saetter den IKKE her — tokenet baerer
+// den fra mintningen, og #90 asserterer ikke paa den. Vaerdien staar alligevel
+// skrevet, fordi konsekvensen af at gaette forkert er ubehagelig: mintes med én
+// vaerdi og asserteres senere paa en anden, fejler ALLE skrivninger paa én gang,
+// og fejlen vil ligne en TOKEN-fejl frem for en KONFIGURATIONS-fejl. Praecis som
+// issuer-asymmetrien mod staging: en 401, der saa ud som et daarligt token, men
+// var en forkert `iss`. Skal nogen en dag assertere audience, er det denne.
+function serviceClient() {
+  const baseUrl = process.env.PERMISSIONS_URL
+  if (!baseUrl) throw new Error('PERMISSIONS_URL must be set')
+  const token = process.env.PDP_S2S_TOKEN
+  if (!token) {
+    throw createError({
+      statusCode: 503,
+      statusMessage:
+        'PDP_S2S_TOKEN is not configured — refusing to write permission tuples as the end user',
+    })
+  }
+  const transport = createConnectTransport({
+    baseUrl,
+    httpVersion: '2',
+    interceptors: [bearerInterceptor(token)],
+  })
+  return createPromiseClient(PermissionsService, transport)
 }
 
 async function clientFor(event: H3Event) {
@@ -211,8 +262,7 @@ export async function grantProjectRole(
   subject: string,
   role: 'viewer' | 'editor' | 'admin',
 ): Promise<void> {
-  const client = await clientFor(event)
-  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const client = serviceClient()
   await client.grantRole({
     subject: userSubject(subject),
     role,
@@ -229,8 +279,7 @@ export async function revokeProjectRole(
   subject: string,
   role: 'viewer' | 'editor' | 'admin',
 ): Promise<void> {
-  const client = await clientFor(event)
-  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const client = serviceClient()
   await client.revokeRole({
     subject: userSubject(subject),
     role,
@@ -250,8 +299,7 @@ export async function grantMachineProjectRole(
   keyId: string,
   role: 'viewer' | 'editor' | 'admin',
 ): Promise<void> {
-  const client = await clientFor(event)
-  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const client = serviceClient()
   await client.grantRole({
     subject: machineSubject(keyId),
     role,
@@ -269,8 +317,7 @@ export async function revokeMachineProjectRole(
   keyId: string,
   role: 'viewer' | 'editor' | 'admin',
 ): Promise<void> {
-  const client = await clientFor(event)
-  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const client = serviceClient()
   await client.revokeRole({
     subject: machineSubject(keyId),
     role,
@@ -288,8 +335,7 @@ export async function linkProjectToOrg(
   projectId: string,
   orgId: string,
 ): Promise<void> {
-  const client = await clientFor(event)
-  if (!client) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const client = serviceClient()
   await client.writeTuple({
     user: orgResource(orgId),
     relation: 'parent',
