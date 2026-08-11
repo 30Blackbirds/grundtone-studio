@@ -6,6 +6,25 @@ function camelToKebab(s: string): string {
 }
 
 /**
+ * Font-familienavn saa det kan staa i en CSS-streng.
+ *
+ * 🔴 Det er en BLOKLISTE, ikke en allowliste — kaldt ved sit rigtige navn
+ * efter [copilot] fangede, at kommentaren paastod det modsatte. (Tredje gang
+ * i denne PR-serie at en kommentar lover noget koden ikke er; en allowliste
+ * ville kraeve at oplistes hvilke tegn der MAA staa, og det kan vi ikke uden
+ * at afvise legitime navne paa CJK, kyrillisk og accenttegn.)
+ *
+ * Den gamle form fjernede KUN apostroffer: et navn der ender paa `\` escaper
+ * den afsluttende apostrof, og et raat linjeskift lukker streng-tokenet, saa
+ * resten parses som ny CSS. Skemaet afviser nu de tegn (tokens.ts), men
+ * rendereren skriver CSS'en og maa vaere korrekt af sig selv — ikke fordi et
+ * andet lag opfoerer sig ordentligt.
+ */
+function cssFamilyName(family: string): string {
+  return family.replace(/[\p{C}\p{Zl}\p{Zp}\\'"]/gu, '')
+}
+
+/**
  * @font-face-blokke + font-family-kæde for ét font-slot (to-slot-revisionen
  * 2026-08-04). url()'erne er RELATIVE — de resolver mod CSS-filens egen
  * placering (/k/{key}/tokens.css → /k/{key}/fonts/...), så samme CSS virker
@@ -22,7 +41,7 @@ function fontFaceBlocks(slot: FontSlot, slotKey: 'heading' | 'body'): string[] {
     out.push(
       '',
       '@font-face {',
-      `  font-family: '${slot.family.replace(/'/g, '')}';`,
+      `  font-family: '${cssFamilyName(slot.family)}';`,
       '  font-style: normal;',
       `  font-weight: ${weight};`,
       '  font-display: swap;',
@@ -35,7 +54,7 @@ function fontFaceBlocks(slot: FontSlot, slotKey: 'heading' | 'body'): string[] {
 
 /** CSS font-family-kæden for et slot — spejles 1:1 af UI'ets kæde-feedback. */
 export function fontFamilyChain(slot: FontSlot): string {
-  const parts = [`'${slot.family.replace(/'/g, '')}'`]
+  const parts = [`'${cssFamilyName(slot.family)}'`]
   for (const key of slot.fallbacks) {
     parts.push(...FALLBACK_STACKS[key].fonts)
   }

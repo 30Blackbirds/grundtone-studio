@@ -100,7 +100,42 @@ const fontSlot = z
     z
       .object({
         source: z.literal('custom'),
-        family: z.string().min(1).max(100),
+        // 🔴 Ikke bare en laengde. `family` skrives ind i en CSS-streng i
+        // `css-renderer.ts`, og renderen fjernede kun apostroffer — et navn
+        // der ENDER paa `\` escaper den afsluttende apostrof, og et
+        // linjeskift kan indsaette egne CSS-linjer i @font-face-blokken.
+        // Maalt 2026-08-11: skemaet slap `a\`, `a\nb`, CRLF og `a;}body{…`
+        // igennem uden indsigelse.
+        //
+        // Allowliste frem for blokliste.
+        //
+        // 🔴 HVILKET TEGN BAERER: **LF og CR**. Maalt af [sikkerhed] mod en
+        // rigtig CSSOM (Blink), med godartet kontrol-input som instrument-
+        // bevis: `a<LF>}body{display:none` giver en `CSSStyleRule[body]` i
+        // stylesheetet OG destruerer den efterfoelgende regel. Det er ikke en
+        // parse-fejl — det er en INDSAT regel.
+        //
+        // LF/CR er kategori `Cc`, altsaa allerede daekket af `\p{C}`.
+        //
+        // U+2028/U+2029 er Zl/Zp og IKKE daekket af `\p{C}` — men de er heller
+        // ikke CSS-linjeskift: maalt parser de identisk med et godartet navn.
+        // De staar her som billig ekstra afvisning, IKKE som vektoren. Vil
+        // nogen forenkle: `\p{Zl}\p{Zp}` kan gaa, `\p{C}` kan ikke.
+        //
+        // `a;}body{display:none` bryder i oevrigt IKKE ud — vaerdien staar inde
+        // i en CSS-streng. Den er noget skemaet TILLADER, ikke noget der
+        // escaper. Backslash til sidst oedelaegger strengen ("Unclosed
+        // string") men injicerer ikke.
+        //
+        // Kuraterede fonte gaar gennem `z.enum` og er upaavirkede.
+        family: z
+          .string()
+          .min(1)
+          .max(100)
+          .regex(
+            /^[^\p{C}\p{Zl}\p{Zp}\\'"]+$/u,
+            'family must not contain control or line/paragraph separators, backslash or quotes',
+          ),
         weights: z.array(fontWeight).min(1),
         files: z.record(z.string(), fontFile),
         fallbacks: z.array(fallbackKey).min(1).max(2),
