@@ -123,10 +123,23 @@ describe('looksLikeSvg er ikke ReDoS-baar (SIK-014)', () => {
   /** Kommentar-raekke uden afsluttende `<svg`, saa motoren skal backtracke. */
   const evil = (n: number) => '<!--a-->'.repeat(n) + '<x'
 
+  // Warmup + median af tre ([copilot]-fund). Én wall-clock-maaling tager
+  // OS-preemption og JIT-opvarmning med, og paa en belastet runner kan det
+  // alene overskride loftet — en flaky sikkerhedstest bliver ignoreret eller
+  // slettet, og saa er vagten vaek af den mest banale grund der findes.
+  //
+  // Medianen er ogsaa halvdelen af rettelsen af MIN egen fejl: mit
+  // "~52 sekunder" kom af at gange 2^6 paa et enkelt stoejende punkt
+  // (815 ms hvor medianen er 122 ms). Ét udsving forplanter sig
+  // eksponentielt, naar man ekstrapolerer paa det.
   const timeMs = (fn: () => void) => {
-    const t0 = process.hrtime.bigint()
-    fn()
-    return Number(process.hrtime.bigint() - t0) / 1e6
+    fn() // warmup — foerste kald betaler JIT-opvarmningen
+    const runs = [0, 0, 0].map(() => {
+      const t0 = process.hrtime.bigint()
+      fn()
+      return Number(process.hrtime.bigint() - t0) / 1e6
+    })
+    return runs.sort((a, b) => a - b)[1]
   }
 
   // 🔴 Stoerrelsen er VALGT, ikke tilfaeldig — og grunden er vaerd at kende,
