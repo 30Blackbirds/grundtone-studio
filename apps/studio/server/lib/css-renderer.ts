@@ -8,11 +8,17 @@ function camelToKebab(s: string): string {
 /**
  * Font-familienavn saa det kan staa i en CSS-streng.
  *
- * 🔴 Allowliste, ikke `replace(/'/g,'')`. Den gamle form fjernede KUN
- * apostroffer: et navn der ender paa `\` escaper den afsluttende apostrof, og
- * et linjeskift indsaetter egne CSS-linjer i @font-face-blokken. Skemaet
- * afviser nu de tegn (tokens.ts), men rendereren skriver CSS'en og maa vaere
- * korrekt af sig selv — ikke fordi et andet lag opfoerer sig ordentligt.
+ * 🔴 Det er en BLOKLISTE, ikke en allowliste — kaldt ved sit rigtige navn
+ * efter [copilot] fangede, at kommentaren paastod det modsatte. (Tredje gang
+ * i denne PR-serie at en kommentar lover noget koden ikke er; en allowliste
+ * ville kraeve at oplistes hvilke tegn der MAA staa, og det kan vi ikke uden
+ * at afvise legitime navne paa CJK, kyrillisk og accenttegn.)
+ *
+ * Den gamle form fjernede KUN apostroffer: et navn der ender paa `\` escaper
+ * den afsluttende apostrof, og et raat linjeskift lukker streng-tokenet, saa
+ * resten parses som ny CSS. Skemaet afviser nu de tegn (tokens.ts), men
+ * rendereren skriver CSS'en og maa vaere korrekt af sig selv — ikke fordi et
+ * andet lag opfoerer sig ordentligt.
  */
 function cssFamilyName(family: string): string {
   return family.replace(/[\p{C}\p{Zl}\p{Zp}\\'"]/gu, '')

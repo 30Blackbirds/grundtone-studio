@@ -134,7 +134,7 @@ const fontSlot = z
           .max(100)
           .regex(
             /^[^\p{C}\p{Zl}\p{Zp}\\'"]+$/u,
-            'family must not contain control characters, backslash or quotes',
+            'family must not contain control or line/paragraph separators, backslash or quotes',
           ),
         weights: z.array(fontWeight).min(1),
         files: z.record(z.string(), fontFile),

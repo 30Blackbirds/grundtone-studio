@@ -299,3 +299,63 @@ describe('font-familienavn kan ikke bryde ud af CSS-strengen', () => {
     expect(fontFamilyChain(slot('Helvetica Neue'))).toContain("'Helvetica Neue'")
   })
 })
+
+// 🔴 SKEMA-LAGET, ikke kun rendereren ([copilot]-fund). PR'en aendrer BEGGE
+// lag, men testene ovenfor maalte kun det ene. Loesnes `family`-regexen i
+// tokens.ts ved en oprydning, ville rendereren blive ved at vaere sikker —
+// og INTET ville fange, at den foerste spaerre var forsvundet.
+//
+// Samme fejlform som flaade-checklistens §2.7: en gate maaler at de tests der
+// FINDES bestaar, ikke at de der SKAL findes er der.
+//
+// Kontroltegnene skrives som escapes — raa tegn i kildefilen braekker
+// esbuilds parser (maalt).
+describe('tokensSchema afviser de samme usikre familienavne', () => {
+  // 🔴 Stien er `typography.slots.heading` — IKKE `fonts`. Foerste udgave af
+  // denne fixture brugte `fonts`, og skemaet er `.strict()`: de otte
+  // afvisnings-cases bestod dermed paa `Unrecognized key: "fonts"` og ikke paa
+  // family-regexen. **Otte groenne tests der maalte den forkerte ting.**
+  // Fanget kun fordi ACCEPT-casene ogsaa fejlede — en test der forventer
+  // `false` kan ikke selv opdage, at den faar `false` af en anden grund.
+  const withFamily = (family: string) => ({
+    ...DEFAULT_TOKENS,
+    // `typography` er `.partial()`, saa vi behoever ikke baere resten med —
+    // og en spread af DEFAULT_TOKENS.typography typer ikke (TS2698).
+    typography: {
+      slots: {
+        heading: {
+          source: 'custom' as const,
+          family,
+          weights: [400],
+          files: { 400: 'fonts/probe-regular.woff2' },
+          fallbacks: ['humanist'],
+        },
+      },
+    },
+  })
+
+  it.each([
+    ['backslash til sidst', 'a\\'],
+    ['linjeskift', 'a\nb'],
+    ['CRLF', 'a\r\nb'],
+    ['U+2028', 'a\u2028b'],
+    ['U+2029', 'a\u2029b'],
+    ['apostrof', "a'b"],
+    ['citationstegn', 'a"b'],
+    ['NUL', 'a\u0000b'],
+  ])('afviser %s', (_navn, family) => {
+    expect(tokensSchema.safeParse(withFamily(family)).success).toBe(false)
+  })
+
+  it('accepterer et almindeligt navn — spaerren maa ikke koebes for bredt', () => {
+    expect(tokensSchema.safeParse(withFamily('Helvetica Neue')).success).toBe(true)
+  })
+
+  // Ikke-ASCII skal IGENNEM: en blokliste der ved et uheld blev til en
+  // ASCII-allowliste ville afvise legitime kunde-fonte.
+  it('accepterer ikke-ASCII navne (CJK, kyrillisk, accenttegn)', () => {
+    for (const f of ['ヒラギノ角ゴ', 'Гарамонд', 'Ærø Sans']) {
+      expect(tokensSchema.safeParse(withFamily(f)).success, f).toBe(true)
+    }
+  })
+})
