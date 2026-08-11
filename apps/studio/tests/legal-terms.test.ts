@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import da from '~~/i18n/locales/da.json'
 import en from '~~/i18n/locales/en.json'
@@ -174,5 +179,92 @@ describe('versions-labelen er udledt, ikke haandholdt', () => {
     expect((en.terms as Record<string, string>).version).toBe(
       (da.terms as Record<string, string>).version,
     )
+  })
+})
+
+// ─── Udtraekkeren selv ──────────────────────────────────────────────────────
+//
+// Testene ovenfor maaler RESULTATET af udledningen. De siger intet om, hvad
+// udtraekkeren goer, naar kilden er forkert — og det er dér, den
+// selv-bekraeftende defekt opstaar: et forkert udtraek producerer et
+// konsistent locale, som alle de andre tests godkender.
+//
+// 🔴 [review] 2026-08-11 fandt den konkrete vej: jeg havde testet at en
+// MANGLENDE versionslinje fejler, men ikke hvad to linjer gjorde. Med
+// `.exec()` vandt den foerste — saa et fremtidigt aendringslog-afsnit med
+// den historiske version oeverst ville have udledt studio-tos-1.0 til en
+// 1.1-tekst, med exit 0. Beviset ville attestere den rigtige tekst under den
+// forkerte label.
+//
+// Kilden ligger i et ANDET repo, saa den kan ikke laeses her (juras krav 3
+// om byte-for-byte mod committet output venter paa cross-repo-adgang i CI).
+// Dokumenterne nedenfor er derfor syntetiske og minimale — de maaler
+// udtraekkerens regler, ikke juras tekst.
+describe('udtraekkeren fejler frem for at gaette', () => {
+  const script = fileURLToPath(new URL('../scripts/extract-terms.mjs', import.meta.url))
+  const dir = mkdtempSync(join(tmpdir(), 'tos-'))
+
+  const doc = (versionLines: string[], clauses = '1.1. En bestemmelse.\n') =>
+    [
+      '# Abonnementsvilkaar',
+      '',
+      ...versionLines,
+      '',
+      '## 1. Aftalen',
+      '',
+      clauses,
+      '<!-- INTERN-SEKTION-START -->',
+      'internt',
+    ].join('\n')
+
+  const line = (v: string) => `**Version:** \`${v}\` · **Gælder fra:** [udfyldes]`
+
+  /** Koerer udtraekkeren og returnerer {code, stderr, out}. */
+  const run = (source: string) => {
+    const src = join(dir, `${Math.random().toString(36).slice(2)}.md`)
+    const out = `${src}.json`
+    writeFileSync(src, source)
+    try {
+      execFileSync('node', [script, src, out], { encoding: 'utf8', stdio: 'pipe' })
+      return { code: 0, stderr: '', out }
+    } catch (err) {
+      const e = err as { status: number; stderr: string }
+      return { code: e.status, stderr: e.stderr, out }
+    }
+  }
+
+  it('udleder versionen naar kilden har praecis én linje', () => {
+    const { code } = run(doc([line('studio-tos-1.1')]))
+    expect(code).toBe(0)
+  })
+
+  it('fejler naar versionslinjen mangler helt', () => {
+    const { code, stderr } = run(doc([]))
+    expect(code).toBe(1)
+    expect(stderr).toContain('versionslinjen')
+  })
+
+  // 🔴 Kernen i [review]s fund: den HISTORISKE linje foerst er den plausible
+  // raekkefoelge i et aendringslog-afsnit, og det var praecis den, der slap
+  // igennem med exit 0 og en forkert label.
+  it('fejler ved TO versionslinjer med den historiske oeverst', () => {
+    const { code, stderr } = run(doc([line('studio-tos-1.0'), line('studio-tos-1.1')]))
+    expect(code).toBe(1)
+    expect(stderr).toContain('2 versionslinjer')
+  })
+
+  // Den modsatte raekkefoelge slap ogsaa igennem foer — dér med den RIGTIGE
+  // label, saa fejlen ville vaere usynlig indtil rakkefoelgen skiftede.
+  it('fejler ogsaa naar den gaeldende staar oeverst', () => {
+    const { code } = run(doc([line('studio-tos-1.1'), line('studio-tos-1.0')]))
+    expect(code).toBe(1)
+  })
+
+  // Samme regel, aeldre fund: en tastefejl i et paragrafnummer maa ikke
+  // betyde, at bestemmelsen tavst klistres ind i den foregaaende paragraf.
+  it('fejler paa en bestemmelse, der ikke kan parses', () => {
+    const { code, stderr } = run(doc([line('studio-tos-1.1')], '1.1. Fin.\n\n1,2. Tastefejl.\n'))
+    expect(code).toBe(1)
+    expect(stderr).toContain('nummereret bestemmelse')
   })
 })
