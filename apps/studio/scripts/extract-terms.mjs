@@ -74,6 +74,31 @@ if (malformed.length) {
   process.exit(1);
 }
 
+// ─── Versionen udledes af kilden, ikke skrevet i haanden ────────────────────
+//
+// 🔴 [jura] fandt, at versionsstrengen fandtes i TRE haandholdte kopier:
+// locale-filens `versionLine` (det kunden SER), `lib/legal.ts`'s TERMS_VERSION
+// (det vi GEMMER i bevis-sporet) og kilden. Teksten var sikret ved
+// konstruktion; LABELEN paa teksten var sikret ved disciplin.
+//
+// Konsekvensen er den selv-bekraeftende defekt i renest form: vi kunne vise
+// kunden 1.1-teksten, skrive "Version 1.0" nederst og gemme "1.0" i
+// bevis-sporet — alle tre led internt konsistente, hele attesten forkert.
+//
+// Derfor udledes den her. Mangler linjen, fejler udtraekket — samme regel som
+// for bestemmelserne: en tavs udeladelse i tekst med retsvirkning er vaerre
+// end et brud.
+const versionMatch = /^\*\*Version:\*\*\s*`([a-z0-9.-]+)`/m.exec(src);
+if (!versionMatch) {
+  console.error(
+    'FEJL: kunne ikke finde versionslinjen i kilden.\n' +
+      'Forventet format: **Version:** `studio-tos-N.N` · **Gaelder fra:** …\n' +
+      'Versionen maa ikke skrives i haanden — den er labelen paa et bindende dokument.',
+  );
+  process.exit(1);
+}
+const VERSION = versionMatch[1];
+
 const out = {};
 const parts = body.split(/^## (\d+)\. (.+)$/m).slice(1);
 for (let i = 0; i < parts.length; i += 3) {
@@ -134,6 +159,11 @@ if (hits.length) {
   );
   process.exit(1);
 }
+
+// Baade maskin-vaerdien (bevis-sporet) og den viste linje kommer fra samme
+// udledning, saa de ikke kan skride fra hinanden.
+out.version = VERSION;
+out.versionLine = `Version ${VERSION} \u00b7 Grundtone Studio`;
 
 writeFileSync(process.argv[3] ?? '/dev/stdout', `${JSON.stringify(out, null, 2)}\n`);
 console.error(`${Object.keys(out).length} noegler udledt fra ${SRC}`);

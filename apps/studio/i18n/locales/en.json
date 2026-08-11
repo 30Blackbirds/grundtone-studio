@@ -1000,7 +1000,7 @@
     "s3p2": "Du er ansvarlig for aktivitet der sker via dine medlemmers adgang. Adgangs- legitimation (herunder API-nøgler og maskin-nøgler) skal opbevares forsvarligt; kompromittering skal meddeles os uden ugrundet ophold, hvorefter nøglen tilbagekaldes.",
     "s3p3": "Vi kan afvise oprettelse eller lukke konti der bruges i strid med §9 (acceptabel brug).",
     "s4h": "Planer og kvoter",
-    "s4p1": "Tjenesten udbydes i de planer der fremgår af den til enhver tid gældende prisside på `grundtone.com/priser` (\"Prissiden\"). Prissiden angiver pr. plan: pris, antal inkluderede aktive brands, eventuel pris pr. ekstra brand (overage), og feature-indhold. Prissiden udgør en del af aftalen ved bestilling.",
+    "s4p1": "Tjenesten udbydes i de planer der fremgår af den til enhver tid gældende prisside på `studio.grundtone.com/plans` (\"Prissiden\"). Prissiden angiver pr. plan: pris, antal inkluderede aktive brands, eventuel pris pr. ekstra brand (overage), og feature-indhold. Prissiden udgør en del af aftalen ved bestilling.",
     "s4p2": "**Gratis plan:** giver ret til det antal projekter der fremgår af Prissiden (p.t. 2), begge fuldt publicerbare. Den gratis plan leveres uden driftsgarantier og er underlagt fair use (§8).",
     "s4p3": "Kvoter håndhæves ved oprettelse/publicering af nye projekter og brands. **En kvote-ændring berører aldrig dine eksisterende projekter eller allerede publicerede brands** — du kan aldrig miste adgang til eksisterende indhold alene som følge af en kvote- eller planændring fra vores side.",
     "s4p4": "Planer med overage: brands ud over det inkluderede antal faktureres pr. påbegyndt faktureringsperiode til den sats der fremgik af Prissiden ved bestilling, jf. dog §6. Planer uden overage (p.t. Solo) har en hård grænse; yderligere brands kræver planskifte.",
@@ -1061,8 +1061,9 @@
     "s16h": "Lovvalg og tvister",
     "s16p1": "Aftalen er underlagt dansk ret. Tvister afgøres ved Københavns Byret som aftalt værneting, medmindre præceptive regler fører til andet.",
     "title": "Abonnementsvilkår",
-    "versionLine": "Version studio-tos-1.0 · Grundtone Studio",
+    "versionLine": "Version studio-tos-1.1 · Grundtone Studio",
     "langNotice": "These terms are available in Danish only. Danish is the agreed contract language for Grundtone Studio. If you need clarification of any provision before accepting, contact us at",
-    "dpaLinkText": "databehandleraftale"
+    "dpaLinkText": "databehandleraftale",
+    "version": "studio-tos-1.1"
   }
 }

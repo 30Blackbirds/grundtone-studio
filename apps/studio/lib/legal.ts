@@ -1,15 +1,22 @@
 // Legal config for the checkout flow (§1a-ruling, jura 2026-08-02).
 //
-// TERMS_VERSION is the accept-proof version stamped into the checkout-session
-// mint (accounts §8-krav: termsAccepted {version, acceptedAt}) — bump it when
-// docs/legal/studio-abonnementsvilkaar.md gets a new ratified version. The
-// value is deliberately a plain string owned here so [jura]'s versioning
-// scheme can change without touching flow code.
+// 🔴 TERMS_VERSION er den version, bevis-sporet gemmer (accounts §8-krav:
+// termsAccepted {version, acceptedAt}). Den UDLEDES nu af kilden i stedet for
+// at blive skrevet i haanden.
 //
-// URLs are config: the public vilkår/privatliv pages ship with the
-// grundtone.com web pipeline — until then these point at the canonical
-// upcoming paths ([docs] owns publishing).
-export const TERMS_VERSION = 'studio-tos-1.0'
+// [jura] fandt, at strengen fandtes i TRE haandholdte kopier: her, i locale-
+// filens `versionLine` (det kunden SER) og i kilden. Teksten var sikret ved
+// konstruktion — labelen paa teksten var sikret ved disciplin. Det er den
+// selv-bekraeftende defekt i renest form: vi kunne vise 1.1-teksten, skrive
+// "Version 1.0" nederst og gemme "1.0" i beviset. Alle tre led internt
+// konsistente, hele attesten forkert.
+//
+// Nu kommer begge fra scripts/extract-terms.mjs, som laeser versionslinjen i
+// docs/legal/studio-abonnementsvilkaar.md. Vil du bumpe versionen: ret KILDEN
+// og koer udtraekket. Retter du den her, skrider den fra det, kunden ser.
+import da from '~~/i18n/locales/da.json'
+
+export const TERMS_VERSION = (da.terms as { version: string }).version
 // B2B-erklæringen (jura §0, tekst LÅST i commit 340e4f5) har sit EGET
 // bevisspor — to retsvirkninger, to versioner (juras krav 1+3).
 export const ATTESTATION_VERSION = 'studio-b2b-erklaering-2026-08-02'
