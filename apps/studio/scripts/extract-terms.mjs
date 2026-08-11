@@ -88,16 +88,36 @@ if (malformed.length) {
 // Derfor udledes den her. Mangler linjen, fejler udtraekket — samme regel som
 // for bestemmelserne: en tavs udeladelse i tekst med retsvirkning er vaerre
 // end et brud.
-const versionMatch = /^\*\*Version:\*\*\s*`([a-z0-9.-]+)`/m.exec(src);
-if (!versionMatch) {
+// 🔴 [review] 2026-08-11: NOEJAGTIG ÉN versionslinje, ikke "den foerste".
+//
+// Jeg flagede selv, at jeg havde testet den manglende linje men ikke to
+// linjer. [review] reproducerede mod den rigtige kilde: staar en historisk
+// linje FOERST — den plausible rangordning i et fremtidigt aendringslog-
+// afsnit — gav `.exec()` exit 0 og udledte studio-tos-1.0, mens teksten
+// forblev 1.1. Det er den selv-bekraeftende defekt igen, ad en ny vej:
+// beviset ville attestere den rigtige tekst under den forkerte label.
+//
+// "Den foerste af flere" er et VALG, scriptet ikke har grundlag for at
+// traeffe. Er der mere end én, ved vi ikke hvilken der gaelder — og saa er
+// svaret at fejle, ikke at gaette. Samme regel som for bestemmelserne.
+const versionMatches = [...src.matchAll(/^\*\*Version:\*\*\s*`([a-z0-9.-]+)`/gm)];
+if (versionMatches.length !== 1) {
   console.error(
-    'FEJL: kunne ikke finde versionslinjen i kilden.\n' +
-      'Forventet format: **Version:** `studio-tos-N.N` · **Gaelder fra:** …\n' +
-      'Versionen maa ikke skrives i haanden — den er labelen paa et bindende dokument.',
+    versionMatches.length === 0
+      ? 'FEJL: kunne ikke finde versionslinjen i kilden.\n' +
+          'Forventet format: **Version:** `studio-tos-N.N` · **Gaelder fra:** …\n' +
+          'Versionen maa ikke skrives i haanden — den er labelen paa et bindende dokument.'
+      : `FEJL: fandt ${versionMatches.length} versionslinjer i kilden:\n` +
+          versionMatches.map((m) => `  ${m[1]}`).join('\n') +
+          '\n\nUdtraekkeren maa ikke vaelge mellem dem. Er der flere, ved vi ikke\n' +
+          'hvilken der gaelder — og en forkert label paa den rigtige tekst er\n' +
+          'praecis den fejl, denne udledning findes for at forhindre.\n' +
+          'Et aendringslog-afsnit skal skrive tidligere versioner i et andet\n' +
+          'format end den gaeldende linje.',
   );
   process.exit(1);
 }
-const VERSION = versionMatch[1];
+const VERSION = versionMatches[0][1];
 
 const out = {};
 const parts = body.split(/^## (\d+)\. (.+)$/m).slice(1);
