@@ -22,6 +22,18 @@ jobs:
   # semver-on-tags so deploys can pin to a specific image.
   # ─────────────────────────────────────────────────────────────────────────
   build:
+    # 🔴 Navnet er ikke kosmetik. Checket hed indtil nu `build`, og CI-workflowets
+    # helt andet job hed `Build` (= `pnpm build`). De to adskilte sig ved ét
+    # bogstav og maalte forskellige ting: `pnpm build` gik igennem, mens
+    # image-buildet doede paa deref-trinnet.
+    #
+    # Den 10.-11./8 var `main` uroerlig i fire runs uden at nogen saa det —
+    # required-listen viste `Build` groen, og det blev laest som "buildet er
+    # daekket". Navnet gjorde hullet usynligt.
+    #
+    # `name:` aendrer KUN det viste check-kontekst; `needs: build` nedenfor
+    # peger paa job-ID'et og er uroert.
+    name: image build + boot-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
