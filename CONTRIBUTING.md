@@ -92,8 +92,19 @@ git tag v0.3.0
 git push --tags
 ```
 
-The tag-pushed workflow (`deploy-prod.yml`, Phase D in the CI/CD plan) requires a manual approval in
-the `production` GitHub Environment before running.
+Tag pushes are handled by the `deploy-production` job in **`build.yml`** (there is no
+`deploy-prod.yml`). It runs only after `image build + boot-smoke` has pushed an image that actually
+boots — `needs: build`.
+
+> 🔴 **There is NO approval gate on the production Environment.** An earlier version of this document
+> said the tag push "requires a manual approval in the `production` GitHub Environment". That is not
+> true and has never been true here: required reviewers on an Environment need GitHub Enterprise, and
+> our Team plan returns 422 on the attempt (verified by [infra] 2026-07-29, and re-verified against
+> `GET /repos/.../environments` on 2026-08-11 — **no environment carries any protection rule**).
+>
+> **Pushing the tag IS the deploy authorisation.** There is nothing between it and production, which
+> is exactly why only Allan cuts `v*` tags. A document that promises a barrier is worse than one that
+> says there is none — it makes people act as if someone else will catch the mistake.
 
 The SDK (`@grundtone/saas-client`) versions independently — see the Changesets-based flow in
 `klanghaus/docs/grundtone-studio/roadmap.md`.
@@ -102,11 +113,16 @@ The SDK (`@grundtone/saas-client`) versions independently — see the Changesets
 
 Three GitHub Environments map to deploy targets:
 
-| Environment  | Used by              | Reviewers required     |
-| ------------ | -------------------- | ---------------------- |
-| `staging`    | `deploy-staging.yml` | None — auto on develop |
-| `production` | `deploy-prod.yml`    | Yes                    |
-| `release`    | `sdk-release.yml`    | Yes                    |
+| Environment  | Used by                          | Protection rules                     |
+| ------------ | -------------------------------- | ------------------------------------ |
+| `staging`    | `build.yml` / `deploy-staging`    | **None** — auto on every green develop |
+| `production` | `build.yml` / `deploy-production` | **None** — the tag push is the gate    |
+| `release`    | `sdk-release.yml`                 | **None**                               |
+
+Measured against `GET /repos/KlangHaus/grundtone-studio/environments` on 2026-08-11: every
+environment reports an empty `protection_rules`. The environments are a **secret-scoping and audit
+boundary**, not an approval gate. Do not read "deploys go through an Environment" as "someone
+approves the deploy".
 
 Each environment owns its own secrets (`STAGING_SSH_KEY`, `PROD_SSH_KEY`, `BUNNY_API_KEY`, etc.).
 Never put deploy-target secrets in repository-wide secrets — environments are the audit boundary.
