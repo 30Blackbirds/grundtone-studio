@@ -102,3 +102,101 @@ describe('vectors the tightened patterns DO catch (SIK-010 follow-up)', () => {
     expect(sanitizeSvg('<svg><svg:script>alert(1)</svg:script></svg>')).not.toMatch(/alert/i)
   })
 })
+
+// 🔴 SIK-014 — ReDoS i `looksLikeSvg`. Denne blok maaler TID, ikke korrekthed.
+//
+// [sikkerhed]s pointe, og den er hele grunden til at testen ser anderledes ud
+// end resten af filen:
+//
+//   "De eksisterende `looksLikeSvg`-tests er alle groenne i dag og ville blive
+//    ved med at vaere det."
+//
+// En korrekthedstest kan ikke fange defekten. Funktionen returnerede det
+// RIGTIGE svar — den brugte bare otte sekunder paa det. Fraveaeret af et
+// tidsloft er praecis dét, der lod hullet ligge i to gennemgange.
+//
+// Maalt paa den gamle regex: 20 kommentarer (162 bytes) = 7,9 ms, og hver
+// ekstra kommentar FORDOBLER. 30 kommentarer (241 bytes) = ~8 sekunder.
+// Funktionen klipper til 1000 tegn, hvilket tillader ~124 — loftet er ikke en
+// beskyttelse.
+describe('looksLikeSvg er ikke ReDoS-baar (SIK-014)', () => {
+  /** Kommentar-raekke uden afsluttende `<svg`, saa motoren skal backtracke. */
+  const evil = (n: number) => '<!--a-->'.repeat(n) + '<x'
+
+  // Warmup + median af tre ([copilot]-fund). Én wall-clock-maaling tager
+  // OS-preemption og JIT-opvarmning med, og paa en belastet runner kan det
+  // alene overskride loftet — en flaky sikkerhedstest bliver ignoreret eller
+  // slettet, og saa er vagten vaek af den mest banale grund der findes.
+  //
+  // Medianen er ogsaa halvdelen af rettelsen af MIN egen fejl: mit
+  // "~52 sekunder" kom af at gange 2^6 paa et enkelt stoejende punkt
+  // (815 ms hvor medianen er 122 ms). Ét udsving forplanter sig
+  // eksponentielt, naar man ekstrapolerer paa det.
+  const timeMs = (fn: () => void) => {
+    fn() // warmup — foerste kald betaler JIT-opvarmningen
+    const runs = [0, 0, 0].map(() => {
+      const t0 = process.hrtime.bigint()
+      fn()
+      return Number(process.hrtime.bigint() - t0) / 1e6
+    })
+    return runs.sort((a, b) => a - b)[1]
+  }
+
+  // 🔴 Stoerrelsen er VALGT, ikke tilfaeldig — og grunden er vaerd at kende,
+  // fordi den aendrede testens design.
+  //
+  // Maalt paa den GAMLE regex (median af tre, ren x4 pr. to kommentarer):
+  //   n=20  (162 B)    9 ms
+  //   n=24  (194 B)  122 ms
+  //   n=26  (210 B)  488 ms
+  //   n=28  (226 B)  1,9 s
+  //   n=30  (242 B)  7,8 s     <- [sikkerhed] maalte 7,5 s · [review] 9,3 s
+  //   n=124 (fuldt 1000-tegns loft)  vender ALDRIG tilbage
+  //
+  // 🔴 En tidligere udgave af denne kommentar skrev "30 = ~52 SEKUNDER".
+  // Det tal var EKSTRAPOLERET, ikke maalt — og ekstrapoleret fra et stoejende
+  // punkt (815 ms ved n=24, hvor medianen er 122 ms). Det stod i en liste
+  // ved siden af maalte tal uden at vaere maerket. Tre uafhaengige maalinger
+  // ligger nu paa 7,5-9,3 s. Konklusionen var uaendret; tallet var det ikke.
+  // Absolutte tider varierer med maskine og belastning — det er VAEKSTEN
+  // (x4) der er egenskaben, ikke tallet.
+  //
+  // En assertion paa 124 ville derfor ikke FEJLE under en regression — den
+  // ville HAENGE, og en synkron regex kan ikke afbrydes af vitest. CI ville
+  // braende sin 20-minutters timeout og ligne et infrastruktur-problem frem
+  // for en rod test. **En vagt, der straffer sit eget brud med en haengning
+  // i stedet for et roedt svar, er en daarlig vagt.**
+  //
+  // 26 er valgt fordi den gamle regex dér er LANGSOM MEN ENDELIG (491 ms):
+  // langt over loftet, saa regressionen fanges — og hurtigt nok til at
+  // fejlen ankommer paa under et sekund.
+  it('afviser 210 bytes ondt input paa under 100 ms', () => {
+    expect(timeMs(() => looksLikeSvg(evil(26)))).toBeLessThan(100)
+  })
+
+  // 🔴 Og her fulgte jeg IKKE min egen begrundelse foerst: den oprindelige
+  // udgave assertede paa det fulde 1000-tegns loft (124 kommentarer). Koert
+  // som mutation HANG suiten i to minutter uden at melde noget — nooejagtig
+  // den daarlige vagt, kommentaren ovenfor advarer imod. At skrive grunden
+  // ned er ikke det samme som at foelge den.
+  //
+  // I stedet maales EGENSKABEN — at tiden ikke vokser eksponentielt med
+  // inputtet — mellem to stoerrelser der begge er ENDELIGE paa den gamle
+  // regex (39 ms og 491 ms). Under en regression er forholdet ~12x og
+  // testen fejler paa under et sekund; med den utvetydige regex er det ~1x.
+  it('vokser ikke eksponentielt med antallet af kommentarer', () => {
+    const small = timeMs(() => looksLikeSvg(evil(20)))
+    const large = timeMs(() => looksLikeSvg(evil(26)))
+    // Rigeligt slack til en langsom runner og til maalestoej paa
+    // sub-millisekund-tider; et eksponentielt blowup er 12x og derover.
+    expect(large).toBeLessThan(Math.max(small * 5, 20))
+  })
+
+  // Tidsloftet maa ikke koebes for korrekthed: de samme inputs skal stadig
+  // give de rigtige svar.
+  it('svarer stadig rigtigt paa de onde inputs', () => {
+    expect(looksLikeSvg(evil(26))).toBe(false)
+    expect(looksLikeSvg('<!-- a --><!-- b --><svg />')).toBe(true)
+    expect(looksLikeSvg('<!-- a -- b --><svg />')).toBe(true)
+  })
+})

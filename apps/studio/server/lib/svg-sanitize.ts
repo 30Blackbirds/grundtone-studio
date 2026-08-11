@@ -61,10 +61,31 @@ export function sanitizeSvg(svg: string): string {
   return out
 }
 
+// 🔴 SIK-014 (ReDoS, 2026-08-11). Den tidligere udgave brugte
+// `(<!--[\s\S]*?-->\s*)*` — en stjernemarkeret gruppe hvis krop kan matche
+// HEN OVER sin egen afslutning. Motoren kan derfor dele en raekke kommentarer
+// op paa eksponentielt mange maader, og hver ekstra kommentar FORDOBLER
+// arbejdet. Maalt: 20 kommentarer (162 bytes) = 7,9 ms · 30 (241 bytes) = ~8
+// sekunder. 1000-tegns-loftet tillader ~124 kommentarer — loftet er ikke en
+// beskyttelse, det er rigeligt til at goere kaldet praktisk uendeligt.
+//
+// Ruten er `POST /api/projects/[projectId]/assets/logo` bag `editor`-adgang,
+// men Free-tier giver egne projekter, saa barren er "enhver med en konto".
+// Og Nitro er single-threaded: et blokeret regex-kald rammer ALLE tenants paa
+// den worker, ikke kun angriberens egen session.
+//
+// Fixet er ikke "hurtigere regex" — det fjerner TVETYDIGHEDEN. Hver del kan
+// nu kun matche paa én maade:
+//   `(?:[^-]|-(?!->))*`  en kommentarkrop kan ikke aede sin egen `-->`
+//   `(?:[^?]|\?(?!>))*`  samme for XML-deklarationens `?>`
+//   `[^>]*`              doctype stopper ved foerste `>`
+// En hurtigere regex med samme tvetydighed flytter graensen; den fjerner den
+// ikke. Se den tidsbundne test i svg-sanitize.test.ts — en korrekthedstest
+// kan IKKE fange det her, fordi funktionen returnerer det rigtige svar.
+const SVG_PROLOGUE =
+  /^(?:<\?xml(?:[^?]|\?(?!>))*\?>\s*)?(?:<!DOCTYPE[^>]*>\s*)?(?:<!--(?:[^-]|-(?!->))*-->\s*)*<svg[\s>/]/i
+
 /** Grov struktur-validering før sanitering: skal ligne ét SVG-dokument. */
 export function looksLikeSvg(content: string): boolean {
-  const head = content.slice(0, 1000).trimStart()
-  return /^(<\?xml[\s\S]{0,200}?\?>\s*)?(<!DOCTYPE[\s\S]{0,300}?>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>/]/i.test(
-    head,
-  )
+  return SVG_PROLOGUE.test(content.slice(0, 1000).trimStart())
 }
