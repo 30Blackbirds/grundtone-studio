@@ -4,6 +4,20 @@ on:
   push:
     branches: [develop, main]
     tags: ['v*.*.*']
+  # 🔴 PR-triggeren findes, fordi image-buildet ellers KUN kan fejle EFTER
+  # merge. 10.-11./8 var `main` uroerlig i fire runs, mens hver eneste PR var
+  # groen: CI-workflowets `Build` (= `pnpm build`) gik igennem, mens image-
+  # buildet doede paa deref-trinnet. Et bevis der foerst opstaar efter merge,
+  # er ikke en barriere.
+  #
+  # Jobbet koerer paa ALLE PR'er og konkluderer altid under samme navn — det
+  # er forudsaetningen for at kunne goeres required. Sti-filtreringen sidder
+  # paa TRINNENE (se `gate` nedenfor), ALDRIG paa jobbet: et job med et falsk
+  # `jobs.<id>.if:` bliver `skipped`, og en sprunget required check BLOKERER
+  # TAVST i stedet for at melde groent ([infra], maalt 2026-08-11: 26 groenne
+  # checks og en PR i BLOCKED uden forklaring).
+  pull_request:
+    branches: [develop, main]
   workflow_dispatch:
 
 # Cancel earlier runs of the same ref so the latest commit wins; never cancel
@@ -47,10 +61,85 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 🔴 Ikke valgfri. Default-dybden er 1, og saa findes PR'ens base-sha
+          # ikke i klonen — `git diff` i gate-trinnet ville fejle eller give et
+          # misvisende svar. En gate der ikke kan se, maa ikke gaette.
+          fetch-depth: 0
 
+      # ── Sti-gate ────────────────────────────────────────────────────────
+      # ÉT gate-trin med ét output, frem for `if:` paa hvert dyrt trin. Med
+      # betingelsen gentaget koerer det fjerde trin nogen tilfoejer uden den
+      # altid — og DEN fejl ytrer sig kun som ekstra minutter, aldrig som en
+      # fejl. Derfor ét sted at rette ([infra]).
+      #
+      # `git diff` frem for en paths-filter-action: fem linjer shell vi kan
+      # laese vejer tungere end en tredjeparts-action mere i supply-chain'en.
+      - id: gate
+        name: rører ændringen build-input?
+        run: |
+          if [ "${{ github.event_name }}" != 'pull_request' ]; then
+            echo 'push/tag — bygger altid'
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base='${{ github.event.pull_request.base.sha }}'
+          # Fejler mod at BYGGE, ikke mod at springe over. En gate der falder
+          # til "spring over", forsvinder tavst den dag konteksten aendrer sig.
+          if [ -z "$base" ]; then
+            echo '::notice::kunne ikke afgøre base-sha — bygger for en sikkerheds skyld'
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Hvad gaten daekker: input der kan braekke IMAGE-buildet eller
+          # BOOTEN. Ikke "hvad aendrer imaget" — Dockerfilens `COPY . .` goer
+          # teknisk set hele repoet til build-input, og en gate paa alt gater
+          # ingenting. En .vue-aendring kan braekke `pnpm build`, og DEN er
+          # daekket af CI-workflowets egne checks.
+          #
+          # package.json i ENHVER dybde: #207, som braekkede main, aendrede
+          # apps/studio/package.json (fanget af lockfilen — men et moenster der
+          # kun kender rod-package.json daekker ikke en workspace-pakke).
+          #
+          # docker/, turbo.json og .npmrc er med, fordi Dockerfilen COPY'er dem
+          # (linje 21 og 105) — [cursor] fandt hullet: entrypointet koerer
+          # migrationer FOER serveren starter, saa boot-smoken afhaenger direkte
+          # af det, og en aendring dér ville ellers slippe forbi ubygget.
+          #
+          # build.yml og boot-smoke.sh selv er med, saa aendringer i selve
+          # byggedefinitionen og i kontrollen ogsaa proeves.
+          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json)$'
+          # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:
+          # en fejlende `git diff` i en kommando-substitution afbryder trinnet
+          # (exit 129) og goer jobbet ROEDT. Det er fail-CLOSED, ikke fail-open
+          # mod at bygge — en forbigaaende git-fejl ville blokere en PR paa
+          # noget uvedkommende. Kan vi ikke se, BYGGER vi. ([cursor]s mekanisme
+          # var en anden — den paastod tavs `relevant=false` — men bekymringen
+          # er rigtig.)
+          if ! CHANGED=$(git diff --name-only "$base"...HEAD); then
+            echo '::notice::git diff fejlede — bygger for en sikkerheds skyld'
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ændrede filer: $(echo "$CHANGED" | wc -l | tr -d ' ')"
+          if echo "$CHANGED" | grep -qE "$PATTERN"; then
+            echo 'build-input rørt → bygger:'
+            echo "$CHANGED" | grep -E "$PATTERN" | sed 's/^/  /'
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ingen build-input rørt → springer build + smoke over'
+            echo 'relevant=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      # Samme gate-output som de dyre trin: paa en PR uden build-input er der
+      # intet at bygge og intet at logge ind for. Uden `if:` her ville
+      # "spring over"-grenen stadig koste buildx-opsaetning + registry-login,
+      # og saa er besparelsen kun halv.
       - uses: docker/setup-buildx-action@v4
+        if: steps.gate.outputs.relevant == 'true'
 
       - name: Log in to ghcr.io
+        if: steps.gate.outputs.relevant == 'true'
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -81,11 +170,59 @@ jobs:
             REF="${{ github.ref_name }}"
             echo "value=${REF#v}" >> "$GITHUB_OUTPUT"
           else
-            echo "value=sha-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+            # 🔴 `github.sha` er MERGE-commit'en paa et pull_request-event, ikke
+            # PR'ens head. Linjen var korrekt saa laenge workflowet kun blev
+            # trigget af push; PR-triggeren aendrer konteksten under den.
+            # En aendring der goer en hidtil korrekt linje forkert, staar ikke
+            # i diffen — der er intet nyt paa linjen at reviewe.
+            SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+            echo "value=sha-$(echo "$SHA" | cut -c1-7)" >> "$GITHUB_OUTPUT"
           fi
+
+      # ── PR-sti: byg lokalt, push ALDRIG ─────────────────────────────────
+      #
+      # Hvad denne sti beviser, og hvad den ikke gør:
+      #
+      #   **PR-stien beviser at det kan bygge og boote — ikke hvad der udleveres.**
+      #
+      # Publiceringen, digest-pinnet og attestationerne hoerer til push-stien
+      # nedenfor. Laeses en groen PR-check som en deploy-garanti, er den laest
+      # som svar paa et andet spoergsmaal end det, den stillede.
+      #
+      # 🔴 `provenance: false` + `sbom: false` er BÆRENDE her, ikke hygiejne.
+      # Attestationer producerer et INDEX, og `--load` kan ikke laegge et index
+      # i runnerens image-store. (En udviklermaskine med containerd image store
+      # KAN — maalt 2026-08-11: et lokalt build med attestation loadede fint paa
+      # OrbStack. Lokale `--load`-builds ligner altsaa ikke noedvendigvis
+      # runnerens.) Slaar nogen provenance til her, fejler checket paa et build
+      # der plejede at virke, med beskeden `docker exporter does not currently
+      # support exporting manifest lists` — som hverken naevner attestationer
+      # eller provenance.
+      #
+      # Unikt tag pr. run + head-sha: et efterladt tag fra et tidligere run kan
+      # ikke tavst genbruges, og tagget peger paa den commit der faktisk blev
+      # reviewet (github.sha ville vaere merge-commit'en).
+      #
+      # sentry_auth_token udelades bevidst: PR-builds skal ikke uploade
+      # sourcemaps. Dockerfilen springer uploadet over uden token.
+      - name: Build image for the PR (--load, ingen push)
+        id: prbuild
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: studio-pr:${{ github.run_id }}-${{ github.event.pull_request.head.sha }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=studio-v2
+          secrets: |
+            node_auth_token=${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         id: push
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -124,44 +261,40 @@ jobs:
       # fejler smoken, fejler jobbet, og ingen deploy sker (prod pinner
       # semver/sha-tags, aldrig :main, så et upåvist :main-tag er harmløst).
       - name: Boot-smoke the pushed image
-        # Entrypointet kører migrationer FØR serveren starter (afdækket af den
-        # første boot-smoke-kørsel: dummy-DB → migrate-crash før noget andet).
-        # En rigtig Postgres-sidecar gør smoken trofast — og validerer samtidig
-        # at migrationskæden kører rent mod en tom database.
+        if: github.event_name != 'pull_request'
         run: |
           # github.repository har store bogstaver (KlangHaus/…) — docker kræver
           # lowercase repo-navne (metadata-action lowercaser selv, rå env gør ikke)
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
-          echo "smoker $IMAGE"
-          docker network create smokenet
-          docker run -d --name smokedb --network smokenet \
-            -e POSTGRES_PASSWORD=smoke postgres:16-alpine
-          for i in $(seq 1 15); do
-            docker exec smokedb pg_isready -U postgres > /dev/null 2>&1 && break
-            [ "$i" = 15 ] && { echo "✗ postgres-sidecar kom aldrig op"; exit 1; }
-            sleep 2
-          done
-          docker run -d --name bootsmoke --network smokenet -p 3000:3000 \
-            -e DATABASE_URL="postgres://postgres:smoke@smokedb:5432/postgres" \
-            -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
-            -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
-            "$IMAGE"
-          for i in $(seq 1 18); do
-            if curl -sf http://127.0.0.1:3000/api/healthz > /dev/null; then
-              echo "✓ image boots (healthz)"
-              break
-            fi
-            if [ "$(docker inspect -f '{{.State.Running}}' bootsmoke)" != "true" ]; then
-              echo "✗ container died during boot"; docker logs bootsmoke | tail -50; exit 1
-            fi
-            [ "$i" = 18 ] && { echo "✗ boot-smoke timed out"; docker logs bootsmoke | tail -50; exit 1; }
-            sleep 5
-          done
-          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/login)
-          [ "$code" = "200" ] || { echo "✗ /login returned $code in boot-smoke"; docker logs bootsmoke | tail -50; exit 1; }
-          echo "✓ /login 200 in boot-smoke"
-          docker rm -f bootsmoke smokedb
-          docker network rm smokenet
+          scripts/boot-smoke.sh "$IMAGE" > /dev/null
+
+      # ── PR-sti: smoken skal binde sig til DET image vi lige byggede ──────
+      #
+      # 🔴 Assertionen er ikke pedanteri. `docker/setup-buildx-action` saetter
+      # `docker-container`-driveren, hvor et build IKKE havner i daemonen uden
+      # `--load` — adfaerden afhaenger altsaa af en linje et helt andet sted i
+      # filen. Runde 6 af v0.2.11-incidenten var praecis den fejl: tre runder
+      # "fejlede" paa forrige runs artefakt.
+      #
+      # `docker image inspect` ALENE beviser kun at *et* image med det navn
+      # findes — den ville ogsaa vaere groen paa et efterladt tag. Det unikke
+      # tag pr. run fjerner den tvetydighed. De to er et PAR; hver for sig er
+      # de svagere end de ser ud ([infra]).
+      #
+      # Og ID-sammenligningen er forskellen paa "et image blev bygget og en
+      # smoke bestod" og "smoken bestod paa DET image".
+      - name: Boot-smoke the PR image
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        run: |
+          TAG='studio-pr:${{ github.run_id }}-${{ github.event.pull_request.head.sha }}'
+          built=$(docker image inspect -f '{{.Id}}' "$TAG") || {
+            echo "::error::$TAG ligger ikke i daemonen — kom --load ikke igennem?"; exit 1; }
+          ran=$(scripts/boot-smoke.sh "$TAG")
+          if [ "$built" != "$ran" ]; then
+            echo "::error::smoken kørte et andet image end det byggede (byggede $built, kørte $ran)"
+            exit 1
+          fi
+          echo "✓ smoken kørte det image der blev bygget ($built)"
 
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
