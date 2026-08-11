@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderTokensCss } from './css-renderer'
+import { fontFamilyChain, renderTokensCss } from './css-renderer'
 import { DEFAULT_TOKENS, tokensSchema, type Tokens } from './tokens'
 
 describe('renderTokensCss', () => {
@@ -235,5 +235,58 @@ describe('@font-face + font-family chains (two-slot revision)', () => {
 
   it('emits no @font-face without slots', () => {
     expect(renderTokensCss({ colors: { primary: '#000' } })).not.toContain('@font-face')
+  })
+})
+
+// 🔴 CSS-injektion via font-familienavn ([sikkerhed], Opengrep-runden
+// 2026-08-11). Den gamle form var `slot.family.replace(/'/g, '')` — den
+// fjernede KUN apostroffer.
+//
+// To veje udenom, begge målt før fixet:
+//   · et navn der ENDER på `\` escaper den afsluttende apostrof
+//   · et linjeskift indsætter egne CSS-linjer i @font-face-blokken
+//
+// Og den kontrol ingen havde kørt: afviser tokens-skemaet dem? NEJ.
+// `z.string().min(1).max(100)` slap `a\`, `a\nb`, CRLF og `a;}body{…`
+// igennem uden indsigelse. Kuraterede fonte går gennem `z.enum` og var
+// aldrig i fare — kun `source: 'custom'`.
+//
+// Alvorlighed er LAV, fordi CSS'en serveres pr. projekt ind på kundens EGET
+// site: en injektion rammer kunden selv, ikke andre tenants. Det ændrer
+// ikke, at rendereren skal være korrekt af sig selv.
+describe('font-familienavn kan ikke bryde ud af CSS-strengen', () => {
+  const slot = (family: string) => ({
+    source: 'custom' as const,
+    family,
+    weights: [400 as const],
+    files: {},
+    fallbacks: ['humanist' as const],
+  })
+
+  it('fjerner backslash, saa navnet ikke kan escape sin egen apostrof', () => {
+    const css = fontFamilyChain(slot('a\\'))
+    expect(css).not.toContain('\\')
+    expect(css.startsWith("'a'")).toBe(true)
+  })
+
+  // U+2028/U+2029 skrives som escapes med VILJE: de raa tegn i kildefilen
+  // braekker esbuilds parser (maalt), hvilket i sig selv siger noget om hvor
+  // daarligt de opfoerer sig et sted de ikke hoerer hjemme.
+  it('fjerner linjeskift, saa der ikke kan indsaettes CSS-linjer', () => {
+    for (const nl of ['\n', '\r\n', '\u2028', '\u2029']) {
+      const css = fontFamilyChain(slot(`a${nl}b`))
+      expect(css, `linjeskift ${JSON.stringify(nl)} slap igennem`).toBe(
+        "'ab', Verdana, Geneva, sans-serif",
+      )
+    }
+  })
+
+  it('fjerner begge citationstegn', () => {
+    expect(fontFamilyChain(slot('a"b'))).not.toContain('"')
+    expect(fontFamilyChain(slot("a'b"))).toBe("'ab', Verdana, Geneva, sans-serif")
+  })
+
+  it('lader almindelige familienavne vaere i fred', () => {
+    expect(fontFamilyChain(slot('Helvetica Neue'))).toContain("'Helvetica Neue'")
   })
 })

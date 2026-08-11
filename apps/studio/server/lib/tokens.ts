@@ -100,7 +100,27 @@ const fontSlot = z
     z
       .object({
         source: z.literal('custom'),
-        family: z.string().min(1).max(100),
+        // 🔴 Ikke bare en laengde. `family` skrives ind i en CSS-streng i
+        // `css-renderer.ts`, og renderen fjernede kun apostroffer — et navn
+        // der ENDER paa `\` escaper den afsluttende apostrof, og et
+        // linjeskift kan indsaette egne CSS-linjer i @font-face-blokken.
+        // Maalt 2026-08-11: skemaet slap `a\`, `a\nb`, CRLF og `a;}body{…`
+        // igennem uden indsigelse.
+        //
+        // Allowliste frem for blokliste. 🔴 `\p{C}` er IKKE nok: U+2028 er
+        // kategori Zl og U+2029 er Zp — ikke C. Maalt, efter at testen fangede
+        // dem i mit foerste forsoeg paa dette fix. Begge behandles som
+        // linjeskift af JS og CSS, saa de skal med eksplicit. Backslash og
+        // begge citationstegn afvises ogsaa. Kuraterede fonte gaar gennem
+        // `z.enum` og er upaavirkede.
+        family: z
+          .string()
+          .min(1)
+          .max(100)
+          .regex(
+            /^[^\p{C}\p{Zl}\p{Zp}\\'"]+$/u,
+            'family must not contain control characters, backslash or quotes',
+          ),
         weights: z.array(fontWeight).min(1),
         files: z.record(z.string(), fontFile),
         fallbacks: z.array(fallbackKey).min(1).max(2),
