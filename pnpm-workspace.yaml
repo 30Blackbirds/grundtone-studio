@@ -10,6 +10,21 @@ packages:
 # Note: migrated here from package.json's pnpm.overrides because pnpm 10
 # ignores that field (warns: "no longer read by pnpm").
 overrides:
+  # 🔴 Dedupliker vue til ÉN version. Ikke kosmetik: Nitro skriver
+  # multi-versions-pakker som symlinks ind i .output/server/node_modules/.nitro/,
+  # og med to vue'er opstaar der en RING (vue <-> @vue/server-renderer). Docker-
+  # buildets `cp -RL` foelger symlinks og fejler paa den ("Symbolic link loop"),
+  # saa image-buildet doer EFTER at `pnpm build` er gaaet igennem.
+  #
+  # Splittet kom med #207's nuxt-bump (3.21.7 -> 3.21.10): nuxt kraever
+  # vue ^3.5.40, mens lockfilen holdt 3.5.38 i @grundtone-undertraeet.
+  # Ingen af siderne kraever 3.5.38 — @grundtone/vue accepterer ^3.5.13 — saa
+  # der er intet at give koeb paa her; det var en efterladt oploesning.
+  #
+  # `-L` er IKKE en kopieringsdetalje, den er garantien: verifikationstrinnet
+  # under kraever et 100% symlink-frit .output, fordi runtime-imaget ikke har
+  # det filsystem, linkene peger ind i. Derfor fjernes RINGEN, ikke `-L`.
+  vue: ^3.5.41
   # GHSA-77vg-94rm-hx3p — DoS via sparse-array deserialization in 5.6.3–5.8.0.
   # Pulled in by @nuxtjs/i18n; remove when that package bumps.
   devalue: ^5.8.1
