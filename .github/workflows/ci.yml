@@ -1,12 +1,32 @@
 name: CI
 
+# 🔴 INGEN `paths-ignore` HER — og det er ikke en forglemmelse.
+#
+# 10 af `main`s 13 required checks kommer fra denne fil. Med et sti-filter
+# koerer de slet ikke paa en PR der kun roerer markdown — og en required check
+# der ikke rapporterer BLOKERER. Ikke roedt: "Expected — waiting for status",
+# i al evighed.
+#
+# Maalt paa PR #213 (aendrede kun CONTRIBUTING.md), foer dette fix:
+#   required:                     13
+#   rapporterede paa PR'en:        3
+#   rapporterede ALDRIG:          10
+#   mergeStateStatus:         BLOCKED
+#
+# Defekten havde ligget latent lige saa laenge listen har vaeret required;
+# docs-only-PR'er er sjaeldne, saa #213 var den foerste der ramte den.
+#
+# Alternativet — beholde filteret og flytte det ind paa TRINNENE, saa jobbene
+# altid konkluderer under deres stabile navn — er formen vi bruger i
+# build.yml, hvor image-buildet er dyrt. Her koster hele suiten faa minutter,
+# og ti jobs med hver sin gate-betingelse er mere maskineri end besparelsen
+# er vaerd. **Vaelger nogen senere at genindfoere filtrering: paa trinnene,
+# aldrig paa jobbet eller paa `on:`.**
 on:
   pull_request:
     branches: [develop, main]
-    paths-ignore: ['**.md', 'docs/**', '.github/dependabot.yml']
   push:
     branches: [develop, main]
-    paths-ignore: ['**.md', 'docs/**', '.github/dependabot.yml']
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
