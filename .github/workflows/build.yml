@@ -91,13 +91,36 @@ jobs:
             echo 'relevant=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Hvad gaten daekker: input der kan braekke IMAGE-buildet eller
+          # BOOTEN. Ikke "hvad aendrer imaget" — Dockerfilens `COPY . .` goer
+          # teknisk set hele repoet til build-input, og en gate paa alt gater
+          # ingenting. En .vue-aendring kan braekke `pnpm build`, og DEN er
+          # daekket af CI-workflowets egne checks.
+          #
           # package.json i ENHVER dybde: #207, som braekkede main, aendrede
-          # apps/studio/package.json. Den blev fanget af lockfilen, men et
-          # moenster der kun kender rod-package.json daekker ikke en workspace-
-          # pakke der aendrer sine deps. build.yml selv er med, saa aendringer
-          # i selve byggedefinitionen ogsaa proeves.
-          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json)$'
-          CHANGED=$(git diff --name-only "$base"...HEAD)
+          # apps/studio/package.json (fanget af lockfilen — men et moenster der
+          # kun kender rod-package.json daekker ikke en workspace-pakke).
+          #
+          # docker/, turbo.json og .npmrc er med, fordi Dockerfilen COPY'er dem
+          # (linje 21 og 105) — [cursor] fandt hullet: entrypointet koerer
+          # migrationer FOER serveren starter, saa boot-smoken afhaenger direkte
+          # af det, og en aendring dér ville ellers slippe forbi ubygget.
+          #
+          # build.yml og boot-smoke.sh selv er med, saa aendringer i selve
+          # byggedefinitionen og i kontrollen ogsaa proeves.
+          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json)$'
+          # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:
+          # en fejlende `git diff` i en kommando-substitution afbryder trinnet
+          # (exit 129) og goer jobbet ROEDT. Det er fail-CLOSED, ikke fail-open
+          # mod at bygge — en forbigaaende git-fejl ville blokere en PR paa
+          # noget uvedkommende. Kan vi ikke se, BYGGER vi. ([cursor]s mekanisme
+          # var en anden — den paastod tavs `relevant=false` — men bekymringen
+          # er rigtig.)
+          if ! CHANGED=$(git diff --name-only "$base"...HEAD); then
+            echo '::notice::git diff fejlede — bygger for en sikkerheds skyld'
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "ændrede filer: $(echo "$CHANGED" | wc -l | tr -d ' ')"
           if echo "$CHANGED" | grep -qE "$PATTERN"; then
             echo 'build-input rørt → bygger:'

@@ -66,7 +66,7 @@ docker run -d --name "$APP" --network "$NET" -p "$PORT:3000" \
 # Assertér at containeren FAKTISK kører, før vi curler. Uden den læses et svar
 # fra en anden lytter på porten som vores eget.
 [ "$(docker inspect -f '{{.State.Running}}' "$APP")" = 'true' ] \
-  || { log "✗ containeren startede ikke"; docker logs "$APP" >&2 2>&1 | tail -30; exit 1; }
+  || { log "✗ containeren startede ikke"; docker logs "$APP" 2>&1 | tail -30 >&2; exit 1; }
 
 for i in $(seq 1 18); do
   if curl -sf "http://127.0.0.1:$PORT/api/healthz" >/dev/null; then
@@ -74,15 +74,15 @@ for i in $(seq 1 18); do
     break
   fi
   if [ "$(docker inspect -f '{{.State.Running}}' "$APP")" != 'true' ]; then
-    log "✗ container died during boot"; docker logs "$APP" >&2 2>&1 | tail -50; exit 1
+    log "✗ container died during boot"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1
   fi
-  [ "$i" = 18 ] && { log "✗ boot-smoke timed out"; docker logs "$APP" >&2 2>&1 | tail -50; exit 1; }
+  [ "$i" = 18 ] && { log "✗ boot-smoke timed out"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1; }
   sleep 5
 done
 
 code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login")
 [ "$code" = '200' ] \
-  || { log "✗ /login returned $code in boot-smoke"; docker logs "$APP" >&2 2>&1 | tail -50; exit 1; }
+  || { log "✗ /login returned $code in boot-smoke"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1; }
 log "✓ /login 200 in boot-smoke"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren
