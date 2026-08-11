@@ -132,9 +132,21 @@ describe('looksLikeSvg er ikke ReDoS-baar (SIK-014)', () => {
   // 🔴 Stoerrelsen er VALGT, ikke tilfaeldig — og grunden er vaerd at kende,
   // fordi den aendrede testens design.
   //
-  // Maalt paa den GAMLE regex: 20 kommentarer = 39 ms · 24 = 120 ms ·
-  // 26 = 491 ms · 30 = ~52 SEKUNDER · 124 (det fulde 1000-tegns loft) =
-  // vender ALDRIG tilbage.
+  // Maalt paa den GAMLE regex (median af tre, ren x4 pr. to kommentarer):
+  //   n=20  (162 B)    9 ms
+  //   n=24  (194 B)  122 ms
+  //   n=26  (210 B)  488 ms
+  //   n=28  (226 B)  1,9 s
+  //   n=30  (242 B)  7,8 s     <- [sikkerhed] maalte 7,5 s · [review] 9,3 s
+  //   n=124 (fuldt 1000-tegns loft)  vender ALDRIG tilbage
+  //
+  // 🔴 En tidligere udgave af denne kommentar skrev "30 = ~52 SEKUNDER".
+  // Det tal var EKSTRAPOLERET, ikke maalt — og ekstrapoleret fra et stoejende
+  // punkt (815 ms ved n=24, hvor medianen er 122 ms). Det stod i en liste
+  // ved siden af maalte tal uden at vaere maerket. Tre uafhaengige maalinger
+  // ligger nu paa 7,5-9,3 s. Konklusionen var uaendret; tallet var det ikke.
+  // Absolutte tider varierer med maskine og belastning — det er VAEKSTEN
+  // (x4) der er egenskaben, ikke tallet.
   //
   // En assertion paa 124 ville derfor ikke FEJLE under en regression — den
   // ville HAENGE, og en synkron regex kan ikke afbrydes af vitest. CI ville
