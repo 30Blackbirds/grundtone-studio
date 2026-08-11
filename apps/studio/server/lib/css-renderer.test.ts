@@ -269,9 +269,18 @@ describe('font-familienavn kan ikke bryde ud af CSS-strengen', () => {
     expect(css.startsWith("'a'")).toBe(true)
   })
 
-  // U+2028/U+2029 skrives som escapes med VILJE: de raa tegn i kildefilen
-  // braekker esbuilds parser (maalt), hvilket i sig selv siger noget om hvor
-  // daarligt de opfoerer sig et sted de ikke hoerer hjemme.
+  // 🔴 HVILKEN AF DISSE BAERER: **`\n` og `\r\n`**. [sikkerhed] maalte mod en
+  // rigtig CSSOM (Blink), med godartet kontrol-input som instrument-bevis:
+  //   `a<LF>}body{display:none`  ->  CSSStyleRule[body] i stylesheetet, og
+  //                                  den efterfoelgende regel destrueret
+  // Det er ikke en parse-fejl — det er en INDSAT regel.
+  //
+  // U+2028/U+2029 parser derimod IDENTISK med et godartet navn: de er ikke
+  // CSS-linjeskift. De staar her som billig ekstra daekning, ikke som
+  // vektoren. **Vil nogen forenkle: det er LF/CR-casene der maa blive.**
+  //
+  // De to skrives som escapes med VILJE — de raa tegn i kildefilen braekker
+  // esbuilds parser (maalt).
   it('fjerner linjeskift, saa der ikke kan indsaettes CSS-linjer', () => {
     for (const nl of ['\n', '\r\n', '\u2028', '\u2029']) {
       const css = fontFamilyChain(slot(`a${nl}b`))
