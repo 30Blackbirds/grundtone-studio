@@ -53,6 +53,13 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      # 🔴 `packages: read` er BAERENDE, ikke hygiejne. Setup-actionen auther
+      # @klanghaus-scopet mod GitHub Packages med `github.token`, og et
+      # eksplicit `permissions:`-blok ERSTATTER standarden frem for at udvide
+      # den. ci.yml saetter ingen permissions og faar derfor read'en gratis;
+      # her ville en snaevring til `contents: read` alene give 401 paa
+      # `pnpm install` — typisk foerst ved et cache-miss, altsaa sporadisk.
+      packages: read
 
     steps:
       - uses: actions/checkout@v7
