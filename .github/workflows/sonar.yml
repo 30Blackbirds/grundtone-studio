@@ -1,0 +1,116 @@
+# SonarQube-analyse mod vores egen instans (sonar.klanghaus.dk).
+#
+# 🔴 FEM AFVIGELSER FRA SONARS ONBOARDING-GUIDE. Den foerste er den vigtigste:
+#
+# 1. FILNAVNET ER FARLIGT HER. Guiden siger "opret eller opdatér
+#    `.github/workflows/build.yml`". **Den fil FINDES allerede i dette repo**
+#    — det er image-buildet, boot-smoken og begge deploy-jobs. At foelge
+#    guiden bogstaveligt ville have overskrevet hele deploy-pipelinen med en
+#    scanner. Derfor `sonar.yml`.
+#
+#    Og navnet er dobbelt uheldigt her: repoet havde i forvejen et job `build`
+#    og et andet `Build`, hvor forskellen paa ét bogstav gjorde en roed main
+#    usynlig i fire runs (rettet i #211). Et tredje `Build` ville have gjort
+#    det vaerre.
+#
+# 2. `ubuntu-latest`, ikke `macos-latest`. Guidens spoergsmaal var "hvilket OS
+#    bruger du?" — det handlede om udviklermaskinen, ikke om runneren.
+#    macOS-minutter koster 10x hos GitHub, og scanneren er identisk.
+#
+# 3. `pull_request` tilfoejet. Guiden gav kun push til main, altsaa EFTER
+#    merge. Et resultat der foerst opstaar efter merge er en rapport, ikke en
+#    barriere — samme grund til at image-buildet blev flyttet til PR-tid.
+#
+# 4. DAEKNING. Guiden naevner den ikke. Uden en koert `test:coverage` FOER
+#    scanneren finder den ingen lcov og melder 0%.
+#
+# 5. `paths-ignore` bevidst UDELADT. Repoet havde netop den fejl i ci.yml:
+#    ti required checks kunne ikke rapportere paa en docs-PR, saa PR'en var
+#    permanent blokeret (rettet i #213). Skal denne check nogensinde goeres
+#    required, maa den kunne konkludere paa enhver PR.
+#
+# Quality gate-steppet staar bevidst udkommenteret: checket rapporterer i dag,
+# det gater ikke. At goere det til en gate er [quality]s flip-procedure, og
+# raekkefoelgen er: merge til main FOERST, derefter required — ellers laaser
+# "Expected — waiting for status" hele PR-koeen.
+
+name: SonarQube
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sonarqube:
+    name: SonarQube analyse
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # 🔴 `packages: read` er BAERENDE, ikke hygiejne. Setup-actionen auther
+      # @klanghaus-scopet mod GitHub Packages med `github.token`, og et
+      # eksplicit `permissions:`-blok ERSTATTER standarden frem for at udvide
+      # den. ci.yml saetter ingen permissions og faar derfor read'en gratis;
+      # her ville en snaevring til `contents: read` alene give 401 paa
+      # `pnpm install` — typisk foerst ved et cache-miss, altsaa sporadisk.
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Sonar bruger historikken til at afgoere hvad der er NY kode. Med en
+          # shallow klon ser alt nyt ud, og "new code"-maalingerne bliver
+          # meningsloese.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      # `--filter` frem for hele turbo-grafen: kun apps/studio har en
+      # coverage-opsaetning, og et `turbo run test:coverage` ville fejle paa de
+      # workspaces der ikke definerer taskken.
+      - name: Test med coverage
+        run: pnpm --filter @grundtone-studio/studio test:coverage
+
+      # 🔴 Stierne i lcov'en er MODUL-relative (`composables/x.ts`), fordi
+      # vitest koerer med `apps/studio` som rod. SonarScanner resolver dem mod
+      # PROJEKT-roden, hvor `composables/x.ts` ikke findes — og en lcov hvis
+      # stier ikke kan opløses ignoreres **tavst**. Resultatet ville vaere 0%
+      # daekning uden en eneste fejl i loggen.
+      #
+      # Maalt: `composables/useAccountDeletionGuards.ts` findes ikke fra roden,
+      # men `apps/studio/composables/useAccountDeletionGuards.ts` goer.
+      #
+      # Praefikset paafoeres her frem for i vitest-configen, saa den lokale
+      # `pnpm test:coverage` beholder stier der virker i en editor.
+      - name: Gør lcov-stier repo-relative + bekræft at de opløser
+        run: |
+          f=apps/studio/coverage/lcov.info
+          if [ ! -s "$f" ]; then
+            echo "::error::$f mangler eller er tom — Sonar ville melde 0% uden grund"
+            exit 1
+          fi
+          sed -i 's#^SF:#SF:apps/studio/#' "$f"
+          first=$(grep -m1 '^SF:' "$f" | cut -d: -f2)
+          if [ ! -e "$first" ]; then
+            echo "::error::lcov-sti '$first' opløser ikke fra repo-roden — Sonar ville ignorere filen tavst"
+            exit 1
+          fi
+          echo "lcov.info: $(grep -c '^SF:' "$f") filer · første sti opløser: $first"
+
+      - uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # Naar checket skal GATE frem for at rapportere, fjernes kommentaren —
+      # og FOERST derefter tilfoejes "SonarQube analyse" til required checks.
+      # - uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+      #   timeout-minutes: 5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
