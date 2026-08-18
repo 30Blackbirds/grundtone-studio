@@ -2,7 +2,11 @@ import { z } from 'zod'
 import { MAX_FONT_FILES_TOTAL } from '~~/lib/plan-catalog'
 import { CSS_COLOR_PATTERN, CSS_LENGTH_PATTERN } from '~~/utils/css-values'
 
-const cssColor = z.string().min(1).max(100).regex(CSS_COLOR_PATTERN, 'must be a valid CSS color')
+const cssColor = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(CSS_COLOR_PATTERN, 'must be a valid CSS color (hex needs exactly 3, 4, 6 or 8 digits)')
 
 const cssLength = z.string().min(1).max(40).regex(CSS_LENGTH_PATTERN, 'must be a valid CSS length')
 
