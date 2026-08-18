@@ -53,6 +53,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Keyless cosign: OIDC-tokenet ER identiteten i signaturen. Verifikation
+      # binder til dette workflows sti (build.yml) — IKKE release.yml.
+      id-token: write
 
     outputs:
       image: ${{ steps.meta.outputs.tags }}
@@ -214,6 +217,11 @@ jobs:
           push: false
           load: true
           tags: studio-pr:${{ github.run_id }}-${{ github.event.pull_request.head.sha }}
+          # head.sha, ikke github.sha: paa et PR-event er github.sha MERGE-
+          # commit'en, og revisionen skal pege paa det der blev reviewet.
+          build-args: |
+            APP_VERSION=pr-${{ github.event.pull_request.number }}
+            REVISION=${{ github.event.pull_request.head.sha }}
           provenance: false
           sbom: false
           cache-from: type=gha,scope=studio-v2
@@ -228,7 +236,17 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          # 🔴 Labels EKSPLICIT, ikke kun metadata-actions defaults (beslutning
+          # AJ): revision-labelet er det ene af tre ben i runtime-assertion #8
+          # (healthz.revision == OCI-label == git-ref). Hviler det paa en
+          # default, kan en actions-opgradering tavst droppe det ben.
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.value }}
+          build-args: |
+            APP_VERSION=${{ steps.tag.outputs.value }}
+            REVISION=${{ github.sha }}
           # scope=studio-v2: frisk cache-scope indført under v0.2.11-runde 4
           # på en stale-cache-hypotese der siden blev AFKRÆFTET (rodårsagen var
           # smoke-før-push, se boot-smoke-steppet). Beholdes som harmløs
@@ -267,6 +285,28 @@ jobs:
           # lowercase repo-navne (metadata-action lowercaser selv, rå env gør ikke)
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
           scripts/boot-smoke.sh "$IMAGE" > /dev/null
+
+      # ── Signér DIGESTEN, efter boot-smoken (beslutning AJ) ───────────────
+      #
+      # Keyless: OIDC-identiteten (dette repo + DENNE workflow-sti, build.yml)
+      # ER signaturen — der findes ingen noegle at laekke. Verifikationens
+      # identitets-regexp binder til `.github/workflows/build.yml`; det er
+      # forskellen fra repos der signerer i release.yml, og den er allerede
+      # skrevet ind i det pinnede verifikations-regexp hos [infra].
+      #
+      # Vi signerer ${DIGEST}, aldrig et tag: et tag er flytbart, og en
+      # signatur paa noget flytbart attesterer det forkerte objekt. Efter
+      # boot-smoken med vilje — et image der ikke booter skal ikke baere en
+      # signatur.
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+      - name: Sign the pushed digest
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
+          cosign sign --yes "$IMAGE"
+          echo "signeret: $IMAGE"
 
       # ── PR-sti: smoken skal binde sig til DET image vi lige byggede ──────
       #
