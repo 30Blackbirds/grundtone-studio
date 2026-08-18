@@ -88,6 +88,18 @@ RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*
  && test -f /deploy/.output/server/node_modules/hookable/package.json
 
 FROM node:24-alpine AS runner
+
+# 🔴 Revision ind i IMAGET, ikke kun i workflowet. /api/healthz laeste allerede
+# NUXT_PUBLIC_APP_VERSION men ingen satte den — prod svarede "dev", og den
+# eneste maade at bekraefte et deploy var at sideindholdet tilfaeldigvis
+# afsloerede versionen (maalt 2026-08-14, beslutning AJ). ENV frem for kun
+# ARG: Nitro laeser process.env ved REQUEST-tid i det prunede image, saa
+# vaerdien skal overleve som containermiljoe. Verificeres af boot-smoke,
+# ikke antaget (v0.2.11-laeren: kun det prunede image taeller).
+ARG APP_VERSION=dev
+ARG REVISION=unknown
+ENV NUXT_PUBLIC_APP_VERSION=$APP_VERSION
+ENV NUXT_PUBLIC_APP_REVISION=$REVISION
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NITRO_PORT=3000

@@ -17,7 +17,13 @@ defineRouteMeta({
 export default defineEventHandler(() => {
   return {
     status: 'ok',
+    service: 'grundtone-studio',
     version: process.env.NUXT_PUBLIC_APP_VERSION ?? 'dev',
+    // Git-sha for den byggede revision (beslutning AJ). Kontrakten er en fuld
+    // 40-tegns sha — runtime-assertion #8 holder den op mod imagets OCI-label
+    // og git-ref'en bag tagget og AFVISER 'dev'/'unknown'/tom, så et image
+    // bygget uden build-arg konverterer til rødt frem for stille grønt.
+    revision: process.env.NUXT_PUBLIC_APP_REVISION ?? 'unknown',
     uptime: Math.round(process.uptime()),
   }
 })
