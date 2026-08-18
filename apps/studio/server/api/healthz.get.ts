@@ -20,9 +20,14 @@ export default defineEventHandler(() => {
     service: 'grundtone-studio',
     version: process.env.NUXT_PUBLIC_APP_VERSION ?? 'dev',
     // Git-sha for den byggede revision (beslutning AJ). Kontrakten er en fuld
-    // 40-tegns sha — runtime-assertion #8 holder den op mod imagets OCI-label
-    // og git-ref'en bag tagget og AFVISER 'dev'/'unknown'/tom, så et image
-    // bygget uden build-arg konverterer til rødt frem for stille grønt.
+    // 40-tegns sha.
+    //
+    // 🔴 Hvad der beskytter i DAG, og hvad der ikke gør: runtime-assertion #8
+    // ([infra], PLANLAGT — ikke bygget) SKAL holde denne værdi op mod imagets
+    // OCI-label og git-ref'en bag tagget og afvise 'dev'/'unknown'/tom.
+    // Indtil den findes, RAPPORTERER healthz kun — et prod-image der
+    // regredierer til revision:"unknown" ville i dag blive meldt stille,
+    // ikke fanget. Feltet er det ene ben; dommeren mangler.
     revision: process.env.NUXT_PUBLIC_APP_REVISION ?? 'unknown',
     uptime: Math.round(process.uptime()),
   }
