@@ -73,8 +73,8 @@
                vendoring erstatter jsDelivr-pinningen fra forlæggets §5.
                🔴 Vendoring FRYSER filen: indtil 2026-08-19 var dette den blå
                placeholder fra core@2.22.0, byte-identisk (sha 2b7c23b2) —
-               ingen core-release retter den af sig selv. Ved nyt mærke i core:
-               kopiér filen igen og sammenlign sha. -->
+               ingen core-release retter den af sig selv. Kilde-PR + sha pr.
+               fil + ét-kalds-kontrol: public/brand/VENDORED.md. -->
           <img src="/brand/logo-32x32.png" width="22" height="22" alt="" class="brand-logo" />
           {{ t('app.name') }}
         </NuxtLink>
