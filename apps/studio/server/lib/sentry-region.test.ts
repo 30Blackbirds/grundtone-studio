@@ -13,6 +13,13 @@ import { describe, it, expect } from 'vitest'
  * Testen er BETINGET af at DSN'en er sat: lokalt og i PR-CI er den tom, og en
  * test der kræver en hemmelighed ville enten være rød for alle eller fristes
  * til at blive slået fra. Den måler dér hvor værdien findes.
+ *
+ * 🔴 DEN BÆRER IKKE DEN JURIDISKE SÆTNING ALENE — [infra]s korrektion: denne
+ * test læser det miljø HVOR DEN KØRER, altså CI's env. Prod's værdi er en
+ * anden, og det er prod's der havner i window.__NUXT__.config under §2.5's
+ * påstand. Den rigtige måling sker i deploy-smoken i .github/workflows/
+ * build.yml, som henter den SERVEREDE side og læser den DSN brugerne faktisk
+ * får. Denne test er supplementet: den fanger en hardkodet DSN i koden.
  */
 const EU_INGEST = /^https:\/\/[^@]+@[^.]+\.ingest\.de\.sentry\.io\//
 
