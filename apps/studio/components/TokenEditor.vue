@@ -29,7 +29,7 @@
   const colors = computed<Colors>({
     get: () =>
       mode.value === 'dark'
-        ? { ...(tokens.value.colors ?? {}), ...darkOverrides.value }
+        ? { ...tokens.value.colors, ...darkOverrides.value }
         : (tokens.value.colors ?? {}),
     set: (v) => (tokens.value = { ...tokens.value, colors: v }),
   })
@@ -64,7 +64,7 @@
   const resolved = computed(() => {
     const theme = createTheme({
       light: tokens.value.colors ?? {},
-      dark: { ...(tokens.value.colors ?? {}), ...darkOverrides.value },
+      dark: { ...tokens.value.colors, ...darkOverrides.value },
     })
     return (mode.value === 'dark' ? theme.dark : theme.light).colors as Record<ColorSlot, string>
   })
@@ -155,10 +155,11 @@
 
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.colors') }}</h3>
-      <!-- Datadrevet efter utils/color-slot-groups.ts ([designer]-forlæg
-           token-editor-grouping.md): 9 base-felter synlige, resten "afledte"
-           bag en toggle PR. GRUPPE. Et felt uden override viser den resolvede
-           værdi som "auto" (stock i dag); udfyldt = "tilpasset" m/ nulstil. -->
+      <!-- Grupperne er data (se color-slot-groups i utils), efter designerens
+           forlæg: ni base-felter er altid synlige, resten er afledte og ligger
+           bag en toggle i hver enkelt gruppe. Et felt uden override viser den
+           resolvede værdi som "auto" — i dag stock, se kommentaren ved
+           resolved ovenfor. Er feltet udfyldt, vises "tilpasset" med nulstil. -->
       <GTAccordion>
         <GTAccordionItem
           v-for="group in COLOR_SLOT_GROUPS"
