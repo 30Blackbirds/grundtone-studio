@@ -20,28 +20,39 @@ export interface ColorSlotGroup {
   derived: readonly ColorSlot[]
   /** Åben som default (Brand + Baggrund) */
   open?: boolean
+  /**
+   * Vis "arver lys tilstand"-signal i dark-visning for slots i denne gruppe.
+   * KUN de fire visuelle grupper ([designer] 2026-08-19): i Fokus/Status/
+   * Neutral er "samme i begge tilstande" som regel tilsigtet, og et signal
+   * dér ville overdøve de rigtige tilfælde.
+   */
+  warnInheritsLight?: boolean
 }
 
 export const COLOR_SLOT_GROUPS: readonly ColorSlotGroup[] = [
   {
     key: 'brand',
+    warnInheritsLight: true,
     base: ['primary', 'secondary'],
     derived: ['primaryLight', 'primaryDark', 'onPrimary', 'secondaryLight', 'secondaryDark'],
     open: true,
   },
   {
     key: 'surfaces',
+    warnInheritsLight: true,
     base: ['background', 'surface'],
     derived: ['backgroundAlt', 'surfaceAlt', 'surfaceRaised', 'surfaceOverlay', 'modalBackdrop'],
     open: true,
   },
   {
     key: 'text',
+    warnInheritsLight: true,
     base: ['text'],
     derived: ['textSecondary', 'textTertiary', 'textPlaceholder', 'textDisabled', 'textInverse'],
   },
   {
     key: 'borders',
+    warnInheritsLight: true,
     base: [],
     derived: ['borderLight', 'borderMedium', 'borderStrong', 'borderInverse'],
   },

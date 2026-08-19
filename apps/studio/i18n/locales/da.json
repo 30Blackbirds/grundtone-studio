@@ -469,7 +469,10 @@
       "customized": "tilpasset",
       "resetToAuto": "Nulstil til auto",
       "modeLight": "Lys",
-      "modeDark": "Mørk"
+      "modeDark": "Mørk",
+      "inheritsLight": "Arver lys tilstand: {value} — måske ikke tilsigtet i mørk",
+      "inheritsLightShort": "arver lys",
+      "inheritsLightCount": "{count} arver lys"
     }
   },
   "brandAssets": {

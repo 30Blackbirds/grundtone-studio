@@ -77,6 +77,7 @@ const GTAccordionItem = defineComponent({
           'data-test': 'accordion-item',
           'data-heading': props.heading,
           'data-open': String(!!props.open),
+          'data-summary': props.summary ?? '',
         },
         slots.default?.(),
       )
@@ -249,5 +250,61 @@ describe('TokenEditor', () => {
     for (const f of colorFields) {
       expect(f.attributes('data-value')).toBe('')
     }
+  })
+
+  // [designer]-spec 2026-08-19: signalér når en slot i DARK arver tenantens
+  // egen LYSE værdi (usat i dark + sat i light). Usat begge steder = to
+  // konsistente stock-defaults, ikke en fælde — intet signal.
+  describe('inherits-light signal (dark mode)', () => {
+    function mountDark(model: Record<string, unknown>) {
+      return mount(TokenEditor, {
+        props: { modelValue: model, mode: 'dark' },
+        global,
+      })
+    }
+
+    it('flags a slot set in light but unset in dark', () => {
+      const w = mountDark({
+        colors: { primary: '#d63a54', background: '#ffffff' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      const flags = w.findAll('.inherits-light')
+      // background: sat i light, usat i dark → flagget.
+      // primary: overstyret i dark → ikke flagget.
+      expect(flags).toHaveLength(1)
+      expect(flags[0]!.attributes('title')).toContain('#ffffff')
+    })
+
+    it('does not flag a slot unset in BOTH modes (two consistent stock defaults)', () => {
+      const w = mountDark({
+        colors: { primary: '#d63a54' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      expect(w.findAll('.inherits-light')).toHaveLength(0)
+    })
+
+    it('does not flag anything in light mode', () => {
+      const w = mount(TokenEditor, {
+        props: {
+          modelValue: {
+            colors: { background: '#ffffff' },
+            dark: { colors: { primary: '#ef6479' } },
+          },
+        },
+        global,
+      })
+      expect(w.findAll('.inherits-light')).toHaveLength(0)
+    })
+
+    it('counts inheriting slots in the group summary', () => {
+      const w = mountDark({
+        colors: { background: '#ffffff', surface: '#f7f5f0' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      const surfaces = w
+        .findAll('[data-test="accordion-item"]')
+        .find((i) => i.attributes('data-heading') === 'tokens.group.surfaces')!
+      expect(surfaces.attributes('data-summary')).toContain('tokens.editor.inheritsLightCount')
+    })
   })
 })
