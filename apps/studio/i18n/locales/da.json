@@ -469,7 +469,10 @@
       "customized": "tilpasset",
       "resetToAuto": "Nulstil til auto",
       "modeLight": "Lys",
-      "modeDark": "Mørk"
+      "modeDark": "Mørk",
+      "inheritsLight": "Arver lys tilstand: {value} — måske ikke tilsigtet i mørk",
+      "inheritsLightShort": "arver lys",
+      "inheritsLightCount": "{count} arver lys"
     }
   },
   "brandAssets": {
@@ -543,7 +546,8 @@
       "textSecondaryOnBackground": "Sekundær tekst på baggrund",
       "textTertiaryOnBackground": "Tertiær tekst på baggrund",
       "onPrimaryOnPrimary": "On-primær på primær",
-      "onPrimaryOnPrimaryDark": "On-primær på primær mørk"
+      "onPrimaryOnPrimaryDark": "On-primær på primær mørk",
+      "onPrimaryOnPrimaryLight": "tekst på primær, lys"
     },
     "inline": {
       "onPrimaryOnPrimary": "tekst på primær",

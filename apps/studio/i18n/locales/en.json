@@ -469,7 +469,10 @@
       "customized": "customized",
       "resetToAuto": "Reset to auto",
       "modeLight": "Light",
-      "modeDark": "Dark"
+      "modeDark": "Dark",
+      "inheritsLight": "Inherits light mode: {value} — may not be intended in dark",
+      "inheritsLightShort": "inherits light",
+      "inheritsLightCount": "{count} inherit light"
     }
   },
   "brandAssets": {
@@ -543,7 +546,8 @@
       "textSecondaryOnBackground": "Secondary text on background",
       "textTertiaryOnBackground": "Tertiary text on background",
       "onPrimaryOnPrimary": "On-primary on primary",
-      "onPrimaryOnPrimaryDark": "On-primary on primary dark"
+      "onPrimaryOnPrimaryDark": "On-primary on primary dark",
+      "onPrimaryOnPrimaryLight": "text on primary, light"
     },
     "inline": {
       "onPrimaryOnPrimary": "text on primary",

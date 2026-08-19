@@ -2,7 +2,11 @@
   import { createTheme } from '@grundtone/core'
   import { isCssLength } from '~~/utils/css-values'
   import type { Tokens, ColorSlot } from '~~/server/lib/tokens'
-  import { COLOR_SLOT_GROUPS, INLINE_CONTRAST } from '~~/utils/color-slot-groups'
+  import {
+    COLOR_SLOT_GROUPS,
+    INLINE_CONTRAST,
+    type ColorSlotGroup,
+  } from '~~/utils/color-slot-groups'
 
   const tokens = defineModel<Tokens>({ required: true })
   const { t } = useI18n()
@@ -29,7 +33,7 @@
   const colors = computed<Colors>({
     get: () =>
       mode.value === 'dark'
-        ? { ...(tokens.value.colors ?? {}), ...darkOverrides.value }
+        ? { ...tokens.value.colors, ...darkOverrides.value }
         : (tokens.value.colors ?? {}),
     set: (v) => (tokens.value = { ...tokens.value, colors: v }),
   })
@@ -64,7 +68,7 @@
   const resolved = computed(() => {
     const theme = createTheme({
       light: tokens.value.colors ?? {},
-      dark: { ...(tokens.value.colors ?? {}), ...darkOverrides.value },
+      dark: { ...tokens.value.colors, ...darkOverrides.value },
     })
     return (mode.value === 'dark' ? theme.dark : theme.light).colors as Record<ColorSlot, string>
   })
@@ -73,6 +77,39 @@
   function isOverridden(slot: ColorSlot): boolean {
     const layer = mode.value === 'dark' ? darkOverrides.value : (tokens.value.colors ?? {})
     return layer[slot] !== undefined && layer[slot] !== ''
+  }
+
+  /**
+   * Arver denne slot LYS tilstand i mørk visning? Sandt når den er usat i
+   * dark-laget MEN eksplicit sat i light — så viser dark tenantens egen lyse
+   * værdi ([designer]s spec 2026-08-19, adfærden målt i
+   * dark-resolution-parity.test.ts). Er den usat begge steder, arver den bare
+   * stock i begge tilstande — konsistent, ikke en fælde, intet signal.
+   * Signal, ikke invariant: hvid surfaceRaised i begge tilstande er tit
+   * rigtigt, så publish blokeres ALDRIG af dette.
+   */
+  function inheritsLight(slot: ColorSlot): boolean {
+    // Ingen eksplicit mode-guard: i light-visning læser isOverridden() SAMME
+    // objekt som lightValue, så "usat i laget MEN sat i light" er en
+    // selvmodsigelse og udtrykket er altid falsk. En guard ville være en gren
+    // ingen test kan skelne — målt ved mutation: fjernes den, ændrer intet
+    // testresultat. Argumentet står her i stedet for i en uobserverbar linje.
+    const lightValue = tokens.value.colors?.[slot]
+    return !isOverridden(slot) && lightValue !== undefined && lightValue !== ''
+  }
+
+  function inheritsLightInGroup(group: ColorSlotGroup): number {
+    if (!group.warnInheritsLight) return 0
+    return [...group.base, ...group.derived].filter(inheritsLight).length
+  }
+
+  function groupSummary(group: ColorSlotGroup): string | undefined {
+    const parts: string[] = []
+    const overridden = overriddenInGroup(group.key)
+    if (overridden) parts.push(`${t('tokens.editor.customized')} · ${overridden}`)
+    const inherits = inheritsLightInGroup(group)
+    if (inherits) parts.push(t('tokens.editor.inheritsLightCount', { count: inherits }))
+    return parts.length ? parts.join(' · ') : undefined
   }
 
   // "Vis afledte" pr. gruppe (designer-regel 2: ikke globalt).
@@ -155,20 +192,17 @@
 
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.colors') }}</h3>
-      <!-- Datadrevet efter utils/color-slot-groups.ts ([designer]-forlæg
-           token-editor-grouping.md): 9 base-felter synlige, resten "afledte"
-           bag en toggle PR. GRUPPE. Et felt uden override viser den resolvede
-           værdi som "auto" (stock i dag); udfyldt = "tilpasset" m/ nulstil. -->
+      <!-- Grupperne er data (se color-slot-groups i utils), efter designerens
+           forlæg: ni base-felter er altid synlige, resten er afledte og ligger
+           bag en toggle i hver enkelt gruppe. Et felt uden override viser den
+           resolvede værdi som "auto" — i dag stock, se kommentaren ved
+           resolved ovenfor. Er feltet udfyldt, vises "tilpasset" med nulstil. -->
       <GTAccordion>
         <GTAccordionItem
           v-for="group in COLOR_SLOT_GROUPS"
           :key="group.key"
           :heading="t(`tokens.group.${group.key}`)"
-          :summary="
-            overriddenInGroup(group.key)
-              ? t('tokens.editor.customized') + ' · ' + overriddenInGroup(group.key)
-              : undefined
-          "
+          :summary="groupSummary(group)"
           :open="group.open"
           :heading-level="4"
         >
@@ -180,6 +214,14 @@
                 @update:model-value="(v) => updateColor(slot, v ?? '')"
               />
               <code class="text-xs text-tertiary">{{ slot }}</code>
+              <span
+                v-if="group.warnInheritsLight && inheritsLight(slot)"
+                class="inherits-light"
+                :title="t('tokens.editor.inheritsLight', { value: resolved[slot] })"
+              >
+                <span aria-hidden="true">●</span>
+                {{ t('tokens.editor.inheritsLightShort') }}
+              </span>
               <ContrastBadge
                 v-if="INLINE_CONTRAST[slot]"
                 :label="t(`contrast.inline.${INLINE_CONTRAST[slot]!.labelKey}`)"
@@ -214,6 +256,14 @@
                 />
                 <span class="flex items-center gap-2 text-xs">
                   <code class="text-tertiary">{{ slot }}</code>
+                  <span
+                    v-if="group.warnInheritsLight && inheritsLight(slot)"
+                    class="inherits-light"
+                    :title="t('tokens.editor.inheritsLight', { value: resolved[slot] })"
+                  >
+                    <span aria-hidden="true">●</span>
+                    {{ t('tokens.editor.inheritsLightShort') }}
+                  </span>
                   <template v-if="isOverridden(slot)">
                     <span class="text-primary" aria-hidden="true">●</span>
                     <span>{{ t('tokens.editor.customized') }}</span>
@@ -235,39 +285,32 @@
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.contrast') }}</h3>
       <p class="text-tertiary text-sm mt-0 mb-3">{{ t('tokens.contrastHint') }}</p>
+      <!-- KUN par der ikke allerede står inline ved et base-felt ([designer]-
+           review af #228): samme tal to steder kan divergere. Inline dækker
+           text/background, text/surface, onPrimary/primary, text/secondary.
+           Her: de sekundære tekst-trin og primærens hover/pressed-tilstande —
+           dem brugere glemmer. -->
       <div class="grid grid-cols-2 gap-3">
-        <!-- Each pair below covers a real visual surface in the rendered theme.
-             AAA = comfortable for body copy; AA = legal minimum; AA-large only
-             passes for headings or UI; fail = needs fixing. -->
-        <ContrastBadge
-          :label="t('contrast.pair.textOnBackground')"
-          :fg="colors.text"
-          :bg="colors.background"
-        />
-        <ContrastBadge
-          :label="t('contrast.pair.textOnSurface')"
-          :fg="colors.text"
-          :bg="colors.surface"
-        />
         <ContrastBadge
           :label="t('contrast.pair.textSecondaryOnBackground')"
-          :fg="colors.textSecondary"
-          :bg="colors.background"
+          :fg="resolved.textSecondary"
+          :bg="resolved.background"
         />
         <ContrastBadge
           :label="t('contrast.pair.textTertiaryOnBackground')"
-          :fg="colors.textTertiary"
-          :bg="colors.background"
-        />
-        <ContrastBadge
-          :label="t('contrast.pair.onPrimaryOnPrimary')"
-          :fg="colors.onPrimary"
-          :bg="colors.primary"
+          :fg="resolved.textTertiary"
+          :bg="resolved.background"
+          size="large"
         />
         <ContrastBadge
           :label="t('contrast.pair.onPrimaryOnPrimaryDark')"
-          :fg="colors.onPrimary"
-          :bg="colors.primaryDark"
+          :fg="resolved.onPrimary"
+          :bg="resolved.primaryDark"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.onPrimaryOnPrimaryLight')"
+          :fg="resolved.onPrimary"
+          :bg="resolved.primaryLight"
         />
       </div>
     </section>
@@ -353,3 +396,15 @@
     </section>
   </div>
 </template>
+
+<style scoped>
+  /* Rav, ikke rød: at arve lys tilstand er et SIGNAL, ikke en fejl — hvid
+     surfaceRaised i begge tilstande er tit tilsigtet ([designer] 2026-08-19).
+     Publish blokeres aldrig af det. */
+  .inherits-light {
+    color: var(--color-warning-dark, #b8860b);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+</style>

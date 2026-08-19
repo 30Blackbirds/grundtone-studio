@@ -77,6 +77,7 @@ const GTAccordionItem = defineComponent({
           'data-test': 'accordion-item',
           'data-heading': props.heading,
           'data-open': String(!!props.open),
+          'data-summary': props.summary ?? '',
         },
         slots.default?.(),
       )
@@ -160,10 +161,10 @@ describe('TokenEditor', () => {
     expect(sl.attributes('data-placeholder')).toMatch(/^#[0-9a-f]{6}$/i)
   })
 
-  it('renders the contrast pairs (6 in the section + 4 inline at base fields) against the right fg/bg', async () => {
+  it('renders the contrast pairs (4 in the section + 4 inline at base fields) against the right fg/bg', async () => {
     const w = mount(TokenEditor, { props: { modelValue: baseTokens() }, global })
     const badges = w.findAll('[data-test="contrast-badge"]')
-    expect(badges).toHaveLength(6 + 4)
+    expect(badges).toHaveLength(4 + 4)
     // text-on-background: dark text against white. Spot-checking one pair is
     // enough to confirm the binding direction; the rest follow the same
     // template pattern.
@@ -249,5 +250,84 @@ describe('TokenEditor', () => {
     for (const f of colorFields) {
       expect(f.attributes('data-value')).toBe('')
     }
+  })
+
+  // [designer]-spec 2026-08-19: signalér når en slot i DARK arver tenantens
+  // egen LYSE værdi (usat i dark + sat i light). Usat begge steder = to
+  // konsistente stock-defaults, ikke en fælde — intet signal.
+  describe('inherits-light signal (dark mode)', () => {
+    function mountDark(model: Record<string, unknown>) {
+      return mount(TokenEditor, {
+        props: { modelValue: model, mode: 'dark' },
+        global,
+      })
+    }
+
+    it('flags a slot set in light but unset in dark', () => {
+      const w = mountDark({
+        colors: { primary: '#d63a54', background: '#ffffff' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      const flags = w.findAll('.inherits-light')
+      // background: sat i light, usat i dark → flagget.
+      // primary: overstyret i dark → ikke flagget.
+      expect(flags).toHaveLength(1)
+      expect(flags[0]!.attributes('title')).toContain('#ffffff')
+    })
+
+    it('does not flag a slot unset in BOTH modes (two consistent stock defaults)', () => {
+      const w = mountDark({
+        colors: { primary: '#d63a54' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      expect(w.findAll('.inherits-light')).toHaveLength(0)
+    })
+
+    it('does not flag anything in light mode', () => {
+      const w = mount(TokenEditor, {
+        props: {
+          modelValue: {
+            colors: { background: '#ffffff' },
+            dark: { colors: { primary: '#ef6479' } },
+          },
+        },
+        global,
+      })
+      expect(w.findAll('.inherits-light')).toHaveLength(0)
+    })
+
+    it('does NOT flag groups outside the four visual ones (focus/status/neutral)', () => {
+      // [designer]-spec: i Fokus/Status/Neutral er "samme i begge tilstande"
+      // som regel tilsigtet — et signal dér ville overdøve de rigtige.
+      // focus er sat i light, usat i dark → ville flage hvis gruppe-flaget
+      // blev ignoreret. Mutations-testet: uden warnInheritsLight-betingelsen
+      // bliver denne rød.
+      const w = mountDark({
+        colors: { focus: '#d63a54', success: '#198754' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      // Åbn de afledte i Fokus-gruppen, så feltet faktisk er i DOM'en
+      const focusGroup = w
+        .findAll('[data-test="accordion-item"]')
+        .find((i) => i.attributes('data-heading') === 'tokens.group.focus')!
+      return focusGroup
+        .find('[data-test="gt-button"]')
+        .trigger('click')
+        .then(() => {
+          expect(w.findAll('.inherits-light')).toHaveLength(0)
+          expect(focusGroup.attributes('data-summary')).toBe('')
+        })
+    })
+
+    it('counts inheriting slots in the group summary', () => {
+      const w = mountDark({
+        colors: { background: '#ffffff', surface: '#f7f5f0' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      const surfaces = w
+        .findAll('[data-test="accordion-item"]')
+        .find((i) => i.attributes('data-heading') === 'tokens.group.surfaces')!
+      expect(surfaces.attributes('data-summary')).toContain('tokens.editor.inheritsLightCount')
+    })
   })
 })
