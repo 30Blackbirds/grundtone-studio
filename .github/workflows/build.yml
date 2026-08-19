@@ -302,11 +302,60 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
       - name: Sign the pushed digest
+        id: sign
         if: github.event_name != 'pull_request'
         run: |
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
           cosign sign --yes "$IMAGE"
           echo "signeret: $IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      # 🔴 En signatur er ikke et vaern — VERIFIKATIONEN med en PINNET identitet
+      # er. [taktart]s fund, reproduceret paa vores EGET image (aa3bf9a):
+      #   pinnet (repo+workflow-fil+tilladte refs)  exit 0
+      #   andet repo                                exit 12
+      #   bredt '^https://github\.com/KlangHaus/'   exit 0   ← ACCEPTERER
+      # Det brede moenster fra ADR-0003 §D godkender altsaa enhver signatur fra
+      # ethvert workflow i ethvert repo i orgen. Fristelsen — naar vores
+      # workflow hedder build.yml og forlaegget hedder release.yml — er at
+      # udvide moenstret indtil det "bare virker". Det er praecis den bevaegelse
+      # der goer gaten til en formalitet.
+      #
+      # Identiteten er LAEST ud af signaturen, ikke gaettet. Refs: main OG
+      # vX.Y.Z-tags (prod-deploys sker fra tags), men ALDRIG refs/pull/.
+      #
+      # Og vi koerer BEGGE retninger hver gang: uden et udfald hvor
+      # verifikationen fejler, er et exit 0 foreneligt med "cosign returnerer
+      # altid 0". Den negative kontrol er en del af gaten, ikke noget nogen
+      # koerte en enkelt gang.
+      - name: Verify the signature with a pinned identity (both directions)
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.sign.outputs.image }}
+          ISSUER: https://token.actions.githubusercontent.com
+          PINNED: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+          WRONG: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/release\.yml@.*$
+        run: |
+          set -euo pipefail
+          [ -n "$IMAGE" ] || { echo "::error::intet image at verificere — signerings-steppet gav ingen output"; exit 1; }
+
+          if ! cosign verify "$IMAGE" \
+                --certificate-identity-regexp "$PINNED" \
+                --certificate-oidc-issuer "$ISSUER" > /dev/null; then
+            echo "::error::signaturen matcher IKKE den pinnede identitet ($PINNED)"
+            exit 1
+          fi
+          echo "✓ signatur verificeret mod pinnet identitet"
+
+          # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
+          # maaler verifikationen ingenting.
+          if cosign verify "$IMAGE" \
+                --certificate-identity-regexp "$WRONG" \
+                --certificate-oidc-issuer "$ISSUER" > /dev/null 2>&1; then
+            echo "::error::verifikationen ACCEPTEREDE en forkert identitet — gaten maaler intet"
+            exit 1
+          fi
+          echo "✓ negativ kontrol: forkert identitet afvist"
 
       # ── PR-sti: smoken skal binde sig til DET image vi lige byggede ──────
       #
