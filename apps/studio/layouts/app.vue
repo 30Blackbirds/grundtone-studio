@@ -68,9 +68,13 @@
         </button>
         <NuxtLink to="/dashboard" class="brand-link flex items-center gap-2">
           <!-- Officielt grundtone-mærke, SELV-HOSTET (vendoret fra
-               @grundtone/core@2.22.0 assets) — jura-consent-notatet: ingen
-               tredjeparts-CDN-loads i appen (IP-deling ved sidevisning);
-               vendoring erstatter jsDelivr-pinningen fra forlæggets §5. -->
+               @grundtone/core assets, grundtone#140) — jura-consent-notatet:
+               ingen tredjeparts-CDN-loads i appen (IP-deling ved sidevisning);
+               vendoring erstatter jsDelivr-pinningen fra forlæggets §5.
+               🔴 Vendoring FRYSER filen: indtil 2026-08-19 var dette den blå
+               placeholder fra core@2.22.0, byte-identisk (sha 2b7c23b2) —
+               ingen core-release retter den af sig selv. Ved nyt mærke i core:
+               kopiér filen igen og sammenlign sha. -->
           <img src="/brand/logo-32x32.png" width="22" height="22" alt="" class="brand-logo" />
           {{ t('app.name') }}
         </NuxtLink>
