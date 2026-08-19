@@ -413,7 +413,34 @@
       "info": "Info",
       "background": "Baggrund",
       "surface": "Overflade",
-      "text": "Tekst"
+      "text": "Tekst",
+      "secondaryLight": "Sekundær, lys",
+      "secondaryDark": "Sekundær, mørk",
+      "successLight": "Succes, lys",
+      "successDark": "Succes, mørk",
+      "warningLight": "Advarsel, lys",
+      "warningDark": "Advarsel, mørk",
+      "errorLight": "Fejl, lys",
+      "errorDark": "Fejl, mørk",
+      "infoLight": "Info, lys",
+      "infoDark": "Info, mørk",
+      "backgroundAlt": "Baggrund, alternativ",
+      "surfaceAlt": "Flade, alternativ",
+      "surfaceRaised": "Flade, hævet",
+      "surfaceOverlay": "Flade, overlay",
+      "modalBackdrop": "Modal-bagtæppe",
+      "textSecondary": "Tekst, sekundær",
+      "textTertiary": "Tekst, tertiær",
+      "textInverse": "Tekst, inverteret",
+      "textPlaceholder": "Tekst, pladsholder",
+      "textDisabled": "Tekst, deaktiveret",
+      "borderLight": "Kant, let",
+      "borderMedium": "Kant, medium",
+      "borderStrong": "Kant, kraftig",
+      "borderInverse": "Kant, inverteret",
+      "focus": "Fokus",
+      "focusRing": "Fokusring",
+      "neutral": "Neutral"
     },
     "font": {
       "base": "Brødtekst-skrifttype",
@@ -424,7 +451,26 @@
     "modeDark": "Dark",
     "clearDark": "Nulstil dark-overrides",
     "darkHint": "Dark-overrides",
-    "darkHintBody": "Dark er et override-lag: kun de farver du ændrer her afviger fra basis. Ryd et felt for at falde tilbage til basis-værdien. Typografi, radius og spacing deles med basis."
+    "darkHintBody": "Dark er et override-lag: kun de farver du ændrer her afviger fra basis. Ryd et felt for at falde tilbage til basis-værdien. Typografi, radius og spacing deles med basis.",
+    "group": {
+      "brand": "Brand",
+      "surfaces": "Baggrund & flader",
+      "text": "Tekst",
+      "borders": "Kanter",
+      "focus": "Fokus",
+      "status": "Status",
+      "neutral": "Neutral"
+    },
+    "editor": {
+      "showDerived": "Vis afledte ({count})",
+      "hideDerived": "Skjul afledte",
+      "auto": "auto",
+      "autoHint": "Stock-værdi fra grundtone (ikke afledt af dine valg). Udfyld for at tilpasse.",
+      "customized": "tilpasset",
+      "resetToAuto": "Nulstil til auto",
+      "modeLight": "Lys",
+      "modeDark": "Mørk"
+    }
   },
   "brandAssets": {
     "logoTitle": "Logo",
@@ -498,6 +544,12 @@
       "textTertiaryOnBackground": "Tertiær tekst på baggrund",
       "onPrimaryOnPrimary": "On-primær på primær",
       "onPrimaryOnPrimaryDark": "On-primær på primær mørk"
+    },
+    "inline": {
+      "onPrimaryOnPrimary": "tekst på primær",
+      "textOnSecondary": "tekst på sekundær",
+      "textOnBackground": "mod baggrund",
+      "textOnSurface": "mod flade"
     }
   },
   "apiKeys": {

@@ -18,7 +18,7 @@ vi.stubGlobal('useI18n', () => ({
 // color picker; we don't want to drag that machinery into a model-flow test.
 const TokenColorField = defineComponent({
   name: 'TokenColorField',
-  props: ['label', 'modelValue'],
+  props: ['label', 'modelValue', 'placeholder'],
   emits: ['update:modelValue'],
   setup(props) {
     return () =>
@@ -26,6 +26,7 @@ const TokenColorField = defineComponent({
         'data-test': 'color-field',
         'data-label': props.label,
         'data-value': props.modelValue ?? '',
+        'data-placeholder': props.placeholder ?? '',
       })
   },
 })
@@ -59,8 +60,40 @@ const GTInput = defineComponent({
   },
 })
 
+const GTAccordion = defineComponent({
+  name: 'GTAccordion',
+  setup(_, { slots }) {
+    return () => h('div', { 'data-test': 'accordion' }, slots.default?.())
+  },
+})
+const GTAccordionItem = defineComponent({
+  name: 'GTAccordionItem',
+  props: ['heading', 'summary', 'open', 'headingLevel'],
+  setup(props, { slots }) {
+    return () =>
+      h(
+        'section',
+        {
+          'data-test': 'accordion-item',
+          'data-heading': props.heading,
+          'data-open': String(!!props.open),
+        },
+        slots.default?.(),
+      )
+  },
+})
+const GTButton = defineComponent({
+  name: 'GTButton',
+  props: ['variant', 'size', 'ariaExpanded', 'ariaPressed'],
+  emits: ['click'],
+  setup(props, { slots, emit }) {
+    return () =>
+      h('button', { 'data-test': 'gt-button', onClick: () => emit('click') }, slots.default?.())
+  },
+})
+
 const global = {
-  components: { TokenColorField, ContrastBadge, GTInput },
+  components: { TokenColorField, ContrastBadge, GTInput, GTAccordion, GTAccordionItem, GTButton },
   mocks: {
     $t: (k: string) => k,
   },
@@ -94,22 +127,43 @@ function baseTokens() {
 }
 
 describe('TokenEditor', () => {
-  it('renders a color field per editable color slot', async () => {
-    const w = mount(TokenEditor, {
-      props: { modelValue: baseTokens() },
-      global,
-    })
-    // 12 colors are surfaced as editable fields in the template — secondary +
-    // textSecondary + textTertiary are read but not edited here (they show up
-    // in the contrast section). If a future field is added, update both the
-    // template and this count in the same change.
-    expect(w.findAll('[data-test="color-field"]')).toHaveLength(12)
+  it('renders the 9 base colour fields by default; derived fields sit behind a per-group toggle', async () => {
+    const w = mount(TokenEditor, { props: { modelValue: baseTokens() }, global })
+    // [designer]-forlæg token-editor-grouping.md: 9 base-beslutninger synlige,
+    // resten "afledte" bag "Vis afledte" PR. GRUPPE — 39 felter må aldrig
+    // vises som 39 felter. Antallet er bundet til COLOR_SLOT_GROUPS (egen test).
+    expect(w.findAll('[data-test="color-field"]')).toHaveLength(9)
+    expect(w.findAll('[data-test="accordion-item"]')).toHaveLength(7)
+    const openGroups = w
+      .findAll('[data-test="accordion-item"]')
+      .filter((i) => i.attributes('data-open') === 'true')
+      .map((i) => i.attributes('data-heading'))
+    expect(openGroups).toEqual(['tokens.group.brand', 'tokens.group.surfaces'])
+
+    // Åbn "Vis afledte" i Brand-gruppen → 5 afledte felter mere (ikke alle 30)
+    const brand = w.findAll('[data-test="accordion-item"]')[0]!
+    await brand.find('[data-test="gt-button"]').trigger('click')
+    expect(w.findAll('[data-test="color-field"]')).toHaveLength(9 + 5)
   })
 
-  it('renders the six contrast pairs against the right fg/bg colors', async () => {
+  it('shows the resolved value as placeholder for an un-overridden derived slot, the set value for an overridden one', async () => {
+    const w = mount(TokenEditor, { props: { modelValue: baseTokens() }, global })
+    const brand = w.findAll('[data-test="accordion-item"]')[0]!
+    await brand.find('[data-test="gt-button"]').trigger('click')
+    const fields = w.findAll('[data-test="color-field"]')
+    // primaryLight ER sat i baseTokens → tilpasset: value, ikke placeholder
+    const pl = fields.find((f) => f.attributes('data-label') === 'tokens.color.primaryLight')!
+    expect(pl.attributes('data-value')).toBe('#818CF8')
+    // secondaryLight er IKKE sat → auto: tom value, resolved stock som placeholder
+    const sl = fields.find((f) => f.attributes('data-label') === 'tokens.color.secondaryLight')!
+    expect(sl.attributes('data-value')).toBe('')
+    expect(sl.attributes('data-placeholder')).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
+  it('renders the contrast pairs (6 in the section + 4 inline at base fields) against the right fg/bg', async () => {
     const w = mount(TokenEditor, { props: { modelValue: baseTokens() }, global })
     const badges = w.findAll('[data-test="contrast-badge"]')
-    expect(badges).toHaveLength(6)
+    expect(badges).toHaveLength(6 + 4)
     // text-on-background: dark text against white. Spot-checking one pair is
     // enough to confirm the binding direction; the rest follow the same
     // template pattern.
@@ -191,7 +245,7 @@ describe('TokenEditor', () => {
     // `{}`, so every color field renders with an empty model-value rather than
     // throwing on `.primary` access.
     const colorFields = w.findAll('[data-test="color-field"]')
-    expect(colorFields).toHaveLength(12)
+    expect(colorFields).toHaveLength(9)
     for (const f of colorFields) {
       expect(f.attributes('data-value')).toBe('')
     }

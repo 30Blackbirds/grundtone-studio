@@ -10,24 +10,63 @@ const cssColor = z
 
 const cssLength = z.string().min(1).max(40).regex(CSS_LENGTH_PATTERN, 'must be a valid CSS length')
 
+// 🔴 Slot-sættet SKAL være identisk med @grundtone/core's resolvede palette
+// (createTheme({}).light.colors). Studio er tema-KILDEN for konsumenter der
+// kører core — udtrykker Studio færre slots, kan en tenant aldrig sætte dem,
+// og de arver tavst stock (blå fokus-ring under røde knapper; #227). Listen
+// er ordnet som core's ThemeColors og bundet af tokens-palette-parity.test.ts,
+// der fejler ved core-bump hvis paletten driver. Tilføj ALDRIG en slot her
+// uden at core har den — rendereren ville emitte et dødt --color-*.
+export const COLOR_SLOTS = [
+  'primary',
+  'primaryLight',
+  'primaryDark',
+  'onPrimary',
+  'secondary',
+  'secondaryLight',
+  'secondaryDark',
+  'success',
+  'successLight',
+  'successDark',
+  'warning',
+  'warningLight',
+  'warningDark',
+  'error',
+  'errorLight',
+  'errorDark',
+  'info',
+  'infoLight',
+  'infoDark',
+  'background',
+  'backgroundAlt',
+  'surface',
+  'surfaceAlt',
+  'surfaceRaised',
+  'surfaceOverlay',
+  'modalBackdrop',
+  'text',
+  'textSecondary',
+  'textTertiary',
+  'textInverse',
+  'textPlaceholder',
+  'textDisabled',
+  'borderLight',
+  'borderMedium',
+  'borderStrong',
+  'borderInverse',
+  'focus',
+  'focusRing',
+  'neutral',
+] as const
+export type ColorSlot = (typeof COLOR_SLOTS)[number]
+
 const colorGroup = z
-  .object({
-    primary: cssColor.optional(),
-    primaryLight: cssColor.optional(),
-    primaryDark: cssColor.optional(),
-    onPrimary: cssColor.optional(),
-    secondary: cssColor.optional(),
-    success: cssColor.optional(),
-    warning: cssColor.optional(),
-    error: cssColor.optional(),
-    info: cssColor.optional(),
-    background: cssColor.optional(),
-    surface: cssColor.optional(),
-    surfaceRaised: cssColor.optional(),
-    text: cssColor.optional(),
-    textSecondary: cssColor.optional(),
-    textTertiary: cssColor.optional(),
-  })
+  .object(
+    Object.fromEntries(COLOR_SLOTS.map((k) => [k, cssColor.optional()])) as Record<
+      ColorSlot,
+      z.ZodOptional<typeof cssColor>
+    >,
+  )
   .partial()
 
 // Brand-assets (schema låst m/ [designer] 2026-08-03, forlæg
