@@ -353,6 +353,29 @@ jobs:
       url: https://studio.staging.grundtone.com
 
     steps:
+      # 🔴 Compose-filen SKAL synkroniseres ved hvert deploy. Indtil 2026-08-19
+      # kørte deploy-scriptet `compose -f docker-compose.production.yml` mod den
+      # fil der TILFÆLDIGVIS lå på VM'en — en håndplaceret kopi fra før #147.
+      # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
+      # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
+      # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            docker-compose.production.yml
+            Caddyfile
+          sparse-checkout-cone-mode: false
+
+      - name: Sync compose + Caddyfile to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: docker-compose.production.yml,Caddyfile
+          target: ~/grundtone-studio
+          overwrite: true
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -368,7 +391,13 @@ jobs:
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            # 🔴 sed der matcher INGEN linje er et stille no-op: IMAGE_TAG-linjen
+            # bliver ikke skrevet, og compose faldt (med det gamle `:-latest`)
+            # tilbage til et forældet image (AJ-opgave 3). Assertér at linjen
+            # FINDES bagefter med den værdi vi ville skrive.
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
+            grep -qx "IMAGE_TAG=${IMAGE_TAG}" .env.production \
+              || { echo "::error::.env.production bærer ikke IMAGE_TAG=${IMAGE_TAG} efter sed — linjen mangler"; exit 1; }
             docker compose --env-file .env.production -f docker-compose.production.yml pull
             docker logout ghcr.io
             docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
@@ -432,6 +461,29 @@ jobs:
             cd ~/grundtone-studio
             cp .env.production .env.production.bak.$(date +%Y%m%d-%H%M%S)
 
+      # 🔴 Compose-filen SKAL synkroniseres ved hvert deploy. Indtil 2026-08-19
+      # kørte deploy-scriptet `compose -f docker-compose.production.yml` mod den
+      # fil der TILFÆLDIGVIS lå på VM'en — en håndplaceret kopi fra før #147.
+      # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
+      # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
+      # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            docker-compose.production.yml
+            Caddyfile
+          sparse-checkout-cone-mode: false
+
+      - name: Sync compose + Caddyfile to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          source: docker-compose.production.yml,Caddyfile
+          target: ~/grundtone-studio
+          overwrite: true
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -450,7 +502,13 @@ jobs:
             cd ~/grundtone-studio
             export IMAGE_TAG=${{ needs.build.outputs.tag }}
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            # 🔴 sed der matcher INGEN linje er et stille no-op: IMAGE_TAG-linjen
+            # bliver ikke skrevet, og compose faldt (med det gamle `:-latest`)
+            # tilbage til et forældet image (AJ-opgave 3). Assertér at linjen
+            # FINDES bagefter med den værdi vi ville skrive.
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
+            grep -qx "IMAGE_TAG=${IMAGE_TAG}" .env.production \
+              || { echo "::error::.env.production bærer ikke IMAGE_TAG=${IMAGE_TAG} efter sed — linjen mangler"; exit 1; }
             docker compose --env-file .env.production -f docker-compose.production.yml pull
             docker logout ghcr.io
             docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
