@@ -160,10 +160,10 @@ describe('TokenEditor', () => {
     expect(sl.attributes('data-placeholder')).toMatch(/^#[0-9a-f]{6}$/i)
   })
 
-  it('renders the contrast pairs (6 in the section + 4 inline at base fields) against the right fg/bg', async () => {
+  it('renders the contrast pairs (4 in the section + 4 inline at base fields) against the right fg/bg', async () => {
     const w = mount(TokenEditor, { props: { modelValue: baseTokens() }, global })
     const badges = w.findAll('[data-test="contrast-badge"]')
-    expect(badges).toHaveLength(6 + 4)
+    expect(badges).toHaveLength(4 + 4)
     // text-on-background: dark text against white. Spot-checking one pair is
     // enough to confirm the binding direction; the rest follow the same
     // template pattern.

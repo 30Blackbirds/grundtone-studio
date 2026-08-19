@@ -543,7 +543,8 @@
       "textSecondaryOnBackground": "Sekundær tekst på baggrund",
       "textTertiaryOnBackground": "Tertiær tekst på baggrund",
       "onPrimaryOnPrimary": "On-primær på primær",
-      "onPrimaryOnPrimaryDark": "On-primær på primær mørk"
+      "onPrimaryOnPrimaryDark": "On-primær på primær mørk",
+      "onPrimaryOnPrimaryLight": "tekst på primær, lys"
     },
     "inline": {
       "onPrimaryOnPrimary": "tekst på primær",

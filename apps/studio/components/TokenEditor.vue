@@ -235,39 +235,32 @@
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.contrast') }}</h3>
       <p class="text-tertiary text-sm mt-0 mb-3">{{ t('tokens.contrastHint') }}</p>
+      <!-- KUN par der ikke allerede står inline ved et base-felt ([designer]-
+           review af #228): samme tal to steder kan divergere. Inline dækker
+           text/background, text/surface, onPrimary/primary, text/secondary.
+           Her: de sekundære tekst-trin og primærens hover/pressed-tilstande —
+           dem brugere glemmer. -->
       <div class="grid grid-cols-2 gap-3">
-        <!-- Each pair below covers a real visual surface in the rendered theme.
-             AAA = comfortable for body copy; AA = legal minimum; AA-large only
-             passes for headings or UI; fail = needs fixing. -->
-        <ContrastBadge
-          :label="t('contrast.pair.textOnBackground')"
-          :fg="colors.text"
-          :bg="colors.background"
-        />
-        <ContrastBadge
-          :label="t('contrast.pair.textOnSurface')"
-          :fg="colors.text"
-          :bg="colors.surface"
-        />
         <ContrastBadge
           :label="t('contrast.pair.textSecondaryOnBackground')"
-          :fg="colors.textSecondary"
-          :bg="colors.background"
+          :fg="resolved.textSecondary"
+          :bg="resolved.background"
         />
         <ContrastBadge
           :label="t('contrast.pair.textTertiaryOnBackground')"
-          :fg="colors.textTertiary"
-          :bg="colors.background"
-        />
-        <ContrastBadge
-          :label="t('contrast.pair.onPrimaryOnPrimary')"
-          :fg="colors.onPrimary"
-          :bg="colors.primary"
+          :fg="resolved.textTertiary"
+          :bg="resolved.background"
+          size="large"
         />
         <ContrastBadge
           :label="t('contrast.pair.onPrimaryOnPrimaryDark')"
-          :fg="colors.onPrimary"
-          :bg="colors.primaryDark"
+          :fg="resolved.onPrimary"
+          :bg="resolved.primaryDark"
+        />
+        <ContrastBadge
+          :label="t('contrast.pair.onPrimaryOnPrimaryLight')"
+          :fg="resolved.onPrimary"
+          :bg="resolved.primaryLight"
         />
       </div>
     </section>

@@ -543,7 +543,8 @@
       "textSecondaryOnBackground": "Secondary text on background",
       "textTertiaryOnBackground": "Tertiary text on background",
       "onPrimaryOnPrimary": "On-primary on primary",
-      "onPrimaryOnPrimaryDark": "On-primary on primary dark"
+      "onPrimaryOnPrimaryDark": "On-primary on primary dark",
+      "onPrimaryOnPrimaryLight": "text on primary, light"
     },
     "inline": {
       "onPrimaryOnPrimary": "text on primary",
