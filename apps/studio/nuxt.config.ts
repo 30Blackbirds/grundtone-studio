@@ -40,6 +40,20 @@ export default defineNuxtConfig({
     // ingen production-nøgle = spec + UI'er findes kun i dev (lokal DX).
     // Build-time spec-artefakt til docs-pipelinen er et separat [docs]-spor.
   },
+  // Favicon/apple-touch fra det officielle grundtone-maerke (grundtone#140),
+  // SELV-HOSTET fra public/ som /brand/logo-32x32.png — aldrig jsDelivr (jura-
+  // consent). Uden disse serverede Nuxt sin 1x1-GIF-fallback paa /favicon.ico
+  // (maalt i prod 2026-08-19: 200, image/x-icon, 78 bytes, tom). Samme frys-
+  // regel som i layouts/app.vue: nyt maerke i core = kopier filerne igen.
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      ],
+    },
+  },
+
   modules: ['@nuxt/eslint', '@grundtone/nuxt', '@nuxtjs/i18n', '@sentry/nuxt/module'],
   css: ['@grundtone/design-system/css', '~/assets/css/app.css'],
   i18n: {
