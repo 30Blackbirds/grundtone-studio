@@ -16,8 +16,13 @@ import { describe, it, expect } from 'vitest'
  * Den er fjernet frem for at blive "repareret" med en env-var i CI, for så
  * ville den måle CI's konfiguration og påstå noget om prods.
  *
- * Det der bliver tilbage er ægte og lille: mønstret selv. Deploy-smoken bruger
- * samme regel, så en fejl i regexen ville ellers gøre BEGGE blinde.
+ * Det der bliver tilbage er ægte og lille: mønstret selv. Deploy-smoken
+ * håndhæver SAMME form (forankret, ikke en substring-søgning), så disse cases
+ * vogter begge steder. Den lighed er ikke gratis: første udgave af smoken
+ * brugte et løst `grep 'ingest.de.sentry.io'`, som accepterede
+ * `evil.ingest.de.sentry.io.attacker.example` mens regexen afviste den
+ * ([review]-fund 2026-08-19). To håndhævelser af "samme regel" er kun samme
+ * regel så længe nogen måler det — ændres den ene, skal den anden følge.
  */
 const EU_INGEST = /^https:\/\/[^@]+@[^.]+\.ingest\.de\.sentry\.io\//
 

@@ -544,8 +544,15 @@ jobs:
           # at teksten er rørt ([infra]-fund 2026-08-19, [jura] bekræftede at
           # teksten er korrekt i dag). En unit-test ville måle CI's env — her
           # måles den værdi der FAKTISK serveres til brugerne.
+          # 🔴 FORANKRET, ikke en substring-søgning ([review]-fund): et løst
+          # grep paa 'ingest.de.sentry.io' accepterer ogsaa
+          # evil.ingest.de.sentry.io.attacker.example, fordi substrengen findes
+          # et sted. Moenstret skal matche SAMME form som EU_INGEST-regexen i
+          # server/lib/sentry-region.test.ts — ellers er de to haandhaevelser
+          # ikke samme regel, og enhedstesten vogter kun det ene sted.
           dsn=$(curl -s "$BASE/" | grep -o 'sentryDsn:"[^"]*"' | head -1)
-          if [ -n "$dsn" ] && ! printf '%s' "$dsn" | grep -q 'ingest\.de\.sentry\.io'; then
+          if [ -n "$dsn" ] && ! printf '%s' "$dsn" \
+            | grep -qE '^sentryDsn:"https://[^@"]+@[^.")]+\.ingest\.de\.sentry\.io/'; then
             echo "::error::Serveret sentryDsn peger IKKE på EU-ingest. Privatlivspolitikkens §2.5 og §6 siger 'Sentry, EU-region' — flyt DSN'en tilbage, eller ret begge tekster med [jura]."
             exit 1
           fi
