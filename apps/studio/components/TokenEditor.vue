@@ -89,13 +89,17 @@
    * rigtigt, så publish blokeres ALDRIG af dette.
    */
   function inheritsLight(slot: ColorSlot): boolean {
-    if (mode.value !== 'dark') return false
+    // Ingen eksplicit mode-guard: i light-visning læser isOverridden() SAMME
+    // objekt som lightValue, så "usat i laget MEN sat i light" er en
+    // selvmodsigelse og udtrykket er altid falsk. En guard ville være en gren
+    // ingen test kan skelne — målt ved mutation: fjernes den, ændrer intet
+    // testresultat. Argumentet står her i stedet for i en uobserverbar linje.
     const lightValue = tokens.value.colors?.[slot]
     return !isOverridden(slot) && lightValue !== undefined && lightValue !== ''
   }
 
   function inheritsLightInGroup(group: ColorSlotGroup): number {
-    if (!group.warnInheritsLight || mode.value !== 'dark') return 0
+    if (!group.warnInheritsLight) return 0
     return [...group.base, ...group.derived].filter(inheritsLight).length
   }
 

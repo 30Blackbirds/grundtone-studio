@@ -296,6 +296,29 @@ describe('TokenEditor', () => {
       expect(w.findAll('.inherits-light')).toHaveLength(0)
     })
 
+    it('does NOT flag groups outside the four visual ones (focus/status/neutral)', () => {
+      // [designer]-spec: i Fokus/Status/Neutral er "samme i begge tilstande"
+      // som regel tilsigtet — et signal dér ville overdøve de rigtige.
+      // focus er sat i light, usat i dark → ville flage hvis gruppe-flaget
+      // blev ignoreret. Mutations-testet: uden warnInheritsLight-betingelsen
+      // bliver denne rød.
+      const w = mountDark({
+        colors: { focus: '#d63a54', success: '#198754' },
+        dark: { colors: { primary: '#ef6479' } },
+      })
+      // Åbn de afledte i Fokus-gruppen, så feltet faktisk er i DOM'en
+      const focusGroup = w
+        .findAll('[data-test="accordion-item"]')
+        .find((i) => i.attributes('data-heading') === 'tokens.group.focus')!
+      return focusGroup
+        .find('[data-test="gt-button"]')
+        .trigger('click')
+        .then(() => {
+          expect(w.findAll('.inherits-light')).toHaveLength(0)
+          expect(focusGroup.attributes('data-summary')).toBe('')
+        })
+    })
+
     it('counts inheriting slots in the group summary', () => {
       const w = mountDark({
         colors: { background: '#ffffff', surface: '#f7f5f0' },
