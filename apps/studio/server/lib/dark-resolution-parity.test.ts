@@ -24,7 +24,15 @@ function editorResolvedDark(): Colors {
   return asColors(createTheme({ light, dark: { ...light, ...darkOverrides } }).dark.colors)
 }
 function sdkResolvedDark(): Colors {
-  // ordret efter saas-client/src/index.ts
+  // Strukturelt tro mod saas-client/src/index.ts, men IKKE samme kald:
+  // SDK'en sender wrapper-objektet ({ colors, ...rest }) til createTheme,
+  // denne test ekstraherer .colors først. De giver samme resultat FORDI den
+  // publicerede @grundtone/core@2.22.0 har en normalise() der udjævner begge
+  // former ([review]-fund, verificeret mod dist'en — ikke mod repo-kilden).
+  // Paritetet hviler altså på en IMPLICIT afhængighed af normalise(), ikke på
+  // at de to veje deler kode. Forsvinder normalise() i en fremtidig core,
+  // består denne test mens SDK'en kan divergere — så bind den til den ægte
+  // resolver den dag saas-client eksporterer den.
   const { dark, ...base } = tokens
   const darkTokens =
     dark?.colors && Object.keys(dark.colors).length > 0
