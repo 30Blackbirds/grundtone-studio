@@ -1,6 +1,8 @@
 <script setup lang="ts">
+  import { createTheme } from '@grundtone/core'
   import { isCssLength } from '~~/utils/css-values'
-  import type { Tokens } from '~~/server/lib/tokens'
+  import type { Tokens, ColorSlot } from '~~/server/lib/tokens'
+  import { COLOR_SLOT_GROUPS, INLINE_CONTRAST } from '~~/utils/color-slot-groups'
 
   const tokens = defineModel<Tokens>({ required: true })
   const { t } = useI18n()
@@ -53,6 +55,32 @@
     get: () => typography.value.fontFamily ?? {},
     set: (v) => (typography.value = { ...typography.value, fontFamily: v }),
   })
+
+  // "Auto"-værdien for en slot uden override = hvad @grundtone/core's
+  // createTheme RESOLVER for det aktuelle sæt. I dag er det stock (core afleder
+  // ikke — ren spread over defaultColorPreset), og UI'et siger det ærligt i
+  // tooltip'en. Den dag core afleder, viser denne computed automatisk det
+  // rigtige tal — intet i editoren skal ændres.
+  const resolved = computed(() => {
+    const theme = createTheme({
+      light: tokens.value.colors ?? {},
+      dark: { ...(tokens.value.colors ?? {}), ...darkOverrides.value },
+    })
+    return (mode.value === 'dark' ? theme.dark : theme.light).colors as Record<ColorSlot, string>
+  })
+
+  /** Er slotten eksplicit sat i det lag vi redigerer (base eller dark-override)? */
+  function isOverridden(slot: ColorSlot): boolean {
+    const layer = mode.value === 'dark' ? darkOverrides.value : (tokens.value.colors ?? {})
+    return layer[slot] !== undefined && layer[slot] !== ''
+  }
+
+  // "Vis afledte" pr. gruppe (designer-regel 2: ikke globalt).
+  const showDerived = reactive<Record<string, boolean>>({})
+  function overriddenInGroup(key: string): number {
+    const g = COLOR_SLOT_GROUPS.find((x) => x.key === key)
+    return g ? g.derived.filter(isOverridden).length : 0
+  }
 
   function updateColor(key: keyof NonNullable<Tokens['colors']>, value: string) {
     if (mode.value === 'dark') {
@@ -127,68 +155,81 @@
 
     <section>
       <h3 class="mt-0 mb-3">{{ t('tokens.colors') }}</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <TokenColorField
-          :label="t('tokens.color.primary')"
-          :model-value="colors.primary"
-          @update:model-value="(v) => updateColor('primary', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.primaryLight')"
-          :model-value="colors.primaryLight"
-          @update:model-value="(v) => updateColor('primaryLight', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.primaryDark')"
-          :model-value="colors.primaryDark"
-          @update:model-value="(v) => updateColor('primaryDark', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.onPrimary')"
-          :model-value="colors.onPrimary"
-          @update:model-value="(v) => updateColor('onPrimary', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.secondary')"
-          :model-value="colors.secondary"
-          @update:model-value="(v) => updateColor('secondary', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.success')"
-          :model-value="colors.success"
-          @update:model-value="(v) => updateColor('success', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.warning')"
-          :model-value="colors.warning"
-          @update:model-value="(v) => updateColor('warning', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.error')"
-          :model-value="colors.error"
-          @update:model-value="(v) => updateColor('error', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.info')"
-          :model-value="colors.info"
-          @update:model-value="(v) => updateColor('info', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.background')"
-          :model-value="colors.background"
-          @update:model-value="(v) => updateColor('background', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.surface')"
-          :model-value="colors.surface"
-          @update:model-value="(v) => updateColor('surface', v ?? '')"
-        />
-        <TokenColorField
-          :label="t('tokens.color.text')"
-          :model-value="colors.text"
-          @update:model-value="(v) => updateColor('text', v ?? '')"
-        />
-      </div>
+      <!-- Datadrevet efter utils/color-slot-groups.ts ([designer]-forlæg
+           token-editor-grouping.md): 9 base-felter synlige, resten "afledte"
+           bag en toggle PR. GRUPPE. Et felt uden override viser den resolvede
+           værdi som "auto" (stock i dag); udfyldt = "tilpasset" m/ nulstil. -->
+      <GTAccordion>
+        <GTAccordionItem
+          v-for="group in COLOR_SLOT_GROUPS"
+          :key="group.key"
+          :heading="t(`tokens.group.${group.key}`)"
+          :summary="
+            overriddenInGroup(group.key)
+              ? t('tokens.editor.customized') + ' · ' + overriddenInGroup(group.key)
+              : undefined
+          "
+          :open="group.open"
+          :heading-level="4"
+        >
+          <div v-if="group.base.length" class="grid grid-cols-2 gap-4">
+            <div v-for="slot in group.base" :key="slot" class="flex flex-col gap-1">
+              <TokenColorField
+                :label="t(`tokens.color.${slot}`)"
+                :model-value="colors[slot]"
+                @update:model-value="(v) => updateColor(slot, v ?? '')"
+              />
+              <code class="text-xs text-tertiary">{{ slot }}</code>
+              <ContrastBadge
+                v-if="INLINE_CONTRAST[slot]"
+                :label="t(`contrast.inline.${INLINE_CONTRAST[slot]!.labelKey}`)"
+                :fg="resolved[INLINE_CONTRAST[slot]!.fg]"
+                :bg="resolved[INLINE_CONTRAST[slot]!.bg]"
+              />
+            </div>
+          </div>
+
+          <div v-if="group.derived.length" class="mt-3">
+            <GTButton
+              variant="unstyled"
+              size="sm"
+              class="text-sm"
+              :aria-expanded="!!showDerived[group.key]"
+              @click="showDerived[group.key] = !showDerived[group.key]"
+            >
+              {{
+                showDerived[group.key]
+                  ? t('tokens.editor.hideDerived')
+                  : t('tokens.editor.showDerived', { count: group.derived.length })
+              }}
+            </GTButton>
+            <div v-if="showDerived[group.key]" class="grid grid-cols-2 gap-4 mt-3">
+              <div v-for="slot in group.derived" :key="slot" class="flex flex-col gap-1">
+                <TokenColorField
+                  :label="t(`tokens.color.${slot}`)"
+                  :model-value="isOverridden(slot) ? colors[slot] : undefined"
+                  :placeholder="resolved[slot]"
+                  :title="isOverridden(slot) ? undefined : t('tokens.editor.autoHint')"
+                  @update:model-value="(v) => updateColor(slot, v ?? '')"
+                />
+                <span class="flex items-center gap-2 text-xs">
+                  <code class="text-tertiary">{{ slot }}</code>
+                  <template v-if="isOverridden(slot)">
+                    <span class="text-primary" aria-hidden="true">●</span>
+                    <span>{{ t('tokens.editor.customized') }}</span>
+                    <GTButton variant="unstyled" size="sm" @click="updateColor(slot, '')">
+                      {{ t('tokens.editor.resetToAuto') }}
+                    </GTButton>
+                  </template>
+                  <span v-else class="text-tertiary"
+                    >{{ t('tokens.editor.auto') }} · {{ resolved[slot] }}</span
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+        </GTAccordionItem>
+      </GTAccordion>
     </section>
 
     <section>

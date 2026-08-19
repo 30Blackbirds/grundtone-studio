@@ -413,7 +413,34 @@
       "info": "Info",
       "background": "Background",
       "surface": "Surface",
-      "text": "Text"
+      "text": "Text",
+      "secondaryLight": "Secondary, light",
+      "secondaryDark": "Secondary, dark",
+      "successLight": "Success, light",
+      "successDark": "Success, dark",
+      "warningLight": "Warning, light",
+      "warningDark": "Warning, dark",
+      "errorLight": "Error, light",
+      "errorDark": "Error, dark",
+      "infoLight": "Info, light",
+      "infoDark": "Info, dark",
+      "backgroundAlt": "Background, alternate",
+      "surfaceAlt": "Surface, alternate",
+      "surfaceRaised": "Surface, raised",
+      "surfaceOverlay": "Surface, overlay",
+      "modalBackdrop": "Modal backdrop",
+      "textSecondary": "Text, secondary",
+      "textTertiary": "Text, tertiary",
+      "textInverse": "Text, inverse",
+      "textPlaceholder": "Text, placeholder",
+      "textDisabled": "Text, disabled",
+      "borderLight": "Border, light",
+      "borderMedium": "Border, medium",
+      "borderStrong": "Border, strong",
+      "borderInverse": "Border, inverse",
+      "focus": "Focus",
+      "focusRing": "Focus ring",
+      "neutral": "Neutral"
     },
     "font": {
       "base": "Body font family",
@@ -424,7 +451,26 @@
     "modeDark": "Dark",
     "clearDark": "Clear dark overrides",
     "darkHint": "Dark overrides",
-    "darkHintBody": "Dark is an override layer: only the colors you change here diverge from base. Clear a field to fall back to the base value. Typography, radius and spacing are shared with base."
+    "darkHintBody": "Dark is an override layer: only the colors you change here diverge from base. Clear a field to fall back to the base value. Typography, radius and spacing are shared with base.",
+    "group": {
+      "brand": "Brand",
+      "surfaces": "Background & surfaces",
+      "text": "Text",
+      "borders": "Borders",
+      "focus": "Focus",
+      "status": "Status",
+      "neutral": "Neutral"
+    },
+    "editor": {
+      "showDerived": "Show derived ({count})",
+      "hideDerived": "Hide derived",
+      "auto": "auto",
+      "autoHint": "Stock value from grundtone (not derived from your choices). Fill in to customize.",
+      "customized": "customized",
+      "resetToAuto": "Reset to auto",
+      "modeLight": "Light",
+      "modeDark": "Dark"
+    }
   },
   "brandAssets": {
     "logoTitle": "Logo",
@@ -498,6 +544,12 @@
       "textTertiaryOnBackground": "Tertiary text on background",
       "onPrimaryOnPrimary": "On-primary on primary",
       "onPrimaryOnPrimaryDark": "On-primary on primary dark"
+    },
+    "inline": {
+      "onPrimaryOnPrimary": "text on primary",
+      "textOnSecondary": "text on secondary",
+      "textOnBackground": "on background",
+      "textOnSurface": "on surface"
     }
   },
   "apiKeys": {
