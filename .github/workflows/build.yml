@@ -466,6 +466,17 @@ jobs:
             echo "waiting ($i/30)…"
             sleep 5
           done
+
+          # 🔴 Svaret LAESES, ikke bare hentes. Foer denne assertion kastede
+          # smoken bodyen vaek (`> /dev/null`) og beviste kun, at endpointet
+          # SVAREDE — et image der regredierede til revision:"unknown" ville
+          # have bestaaet. Handlerens egen kommentar sagde det: feltet er det
+          # ene ben, dommeren manglede.
+          #
+          # Maales paa den OFFENTLIGE vhost, ikke over localhost: en Caddy der
+          # svarer fra en foraeldet upstream er praecis det, dette fanger.
+          ./.github/scripts/assert-served-revision.sh "$BASE" "$GITHUB_SHA"
+
           for path in /login /signup /dashboard; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
             if [ "$code" != "200" ]; then
@@ -577,6 +588,17 @@ jobs:
             echo "waiting ($i/30)…"
             sleep 5
           done
+
+          # 🔴 Svaret LAESES, ikke bare hentes. Foer denne assertion kastede
+          # smoken bodyen vaek (`> /dev/null`) og beviste kun, at endpointet
+          # SVAREDE — et image der regredierede til revision:"unknown" ville
+          # have bestaaet. Handlerens egen kommentar sagde det: feltet er det
+          # ene ben, dommeren manglede.
+          #
+          # Maales paa den OFFENTLIGE vhost, ikke over localhost: en Caddy der
+          # svarer fra en foraeldet upstream er praecis det, dette fanger.
+          ./.github/scripts/assert-served-revision.sh "$BASE" "$GITHUB_SHA"
+
           for path in /login /signup /dashboard; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
             if [ "$code" != "200" ]; then
