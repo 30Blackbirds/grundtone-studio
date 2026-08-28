@@ -1,9 +1,9 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
-import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
-import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
-import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
+import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
 // §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
 // aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
@@ -16,7 +16,7 @@ const acceptProof = z.object({
 
 const bodySchema = z.object({
   organizationSlug: z.string().min(1),
-  planKey: z.enum(['studio_solo', 'studio_studio', 'studio_scale']),
+  planKey: z.enum(CHECKOUT_PLAN_KEYS),
   // Two legal effects, two proof trails (jura §0 krav 1+3) — the attestation
   // carries its own version+timestamp exactly like the terms accept.
   businessAttestation: acceptProof,
@@ -37,70 +37,48 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
-  const actor = event.context.auth
-  if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-
-  const parsed = bodySchema.safeParse(await readBody(event))
-  if (!parsed.success) {
-    throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
-  }
-  if (!getPlan(parsed.data.planKey as PlanKey).purchasable) {
+  const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
+  // Bliver stående FØR org-opslaget. MÅLT 2026-08-28: tjekket kan i dag ikke
+  // fyre — `bodySchema`s enum admitterer kun studio_solo/_studio/_scale, og
+  // alle tre er purchasable. Det er altså defence in depth, ikke en aktiv
+  // gren, og placeringen er derfor uobserverbar lige nu. Den bliver
+  // observerbar i samme øjeblik en ikke-købbar nøgle kommer ind i enummet:
+  // så svarer en ukendt org med den nøgle 400 herfra i stedet for 404 fra
+  // opslaget. Testen "hver plan i enummet er købbar" nedenfor er den, der
+  // siger til, når den dag kommer.
+  if (!getPlan(data.planKey as PlanKey).purchasable) {
     throw createError({ statusCode: 400, statusMessage: 'Plan is not purchasable' })
   }
 
-  const org = await lookupOrgBySlug(event, parsed.data.organizationSlug)
-  if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
-
   // Purchases change the org's billing relationship — Sentry-style role model
   // reserves that for owner/billing (not admin/manager, who manage people).
-  const role = org.members?.find((m) => m.userId === actor.sub)?.role
-  if (!role || !orgRoleHelpers.canManageBilling(role as OrgRole)) {
-    throw createError({ statusCode: 403, statusMessage: 'Requires the owner or billing role' })
-  }
+  const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
 
-  const accountUrl = process.env.ACCOUNT_URL
-  if (!accountUrl) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Billing is not available yet',
-      data: { code: 'billing_unavailable' },
-    })
-  }
-
+  // Dormant-503 FØR runtime-config og body: et usat ACCOUNT_URL skal
+  // rapportere sig som dormant, ikke som en fejl længere inde.
+  const accountUrl = requireAccountUrl()
   const appUrl = useRuntimeConfig(event).public.appUrl
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  const token = process.env.ACCOUNT_S2S_TOKEN
-  if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${accountUrl}/v1/billing/checkout-sessions`, {
-    method: 'POST',
-    headers,
-    signal: AbortSignal.timeout(5_000),
-    body: JSON.stringify({
+  const { checkoutUrl } = await postToAccount<{ checkoutUrl: string }>(
+    accountUrl,
+    '/v1/billing/checkout-sessions',
+    {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
-      planKey: parsed.data.planKey,
+      planKey: data.planKey,
       // §1a: accept-bevis + B2B-attestation følger med mintet (accounts
       // §8-krav — de persisterer version+timestamp); locale=da så Stripes
       // hostede side matcher flowet sprogligt.
       // Flad feltform jf. §8c (account adopterede vores form 1:1); de sætter
       // tax-id'et på Stripe-customeren (VIES + reverse charge bag mintet).
-      businessAttestation: parsed.data.businessAttestation,
-      vatNumber: parsed.data.vatNumber,
-      termsAccepted: parsed.data.termsAccepted,
+      businessAttestation: data.businessAttestation,
+      vatNumber: data.vatNumber,
+      termsAccepted: data.termsAccepted,
       locale: 'da',
-      successUrl: `${appUrl}/orgs/${parsed.data.organizationSlug}?upgrade=success`,
-      cancelUrl: `${appUrl}/plans?org=${parsed.data.organizationSlug}&upgrade=cancelled`,
-    }),
-  })
-  if (!res.ok) {
-    throw createError({
-      statusCode: 502,
-      statusMessage: 'Could not create checkout session',
-      data: { code: 'checkout_failed' },
-    })
-  }
-
-  const { checkoutUrl } = (await res.json()) as { checkoutUrl: string }
+      successUrl: `${appUrl}/orgs/${data.organizationSlug}?upgrade=success`,
+      cancelUrl: `${appUrl}/plans?org=${data.organizationSlug}&upgrade=cancelled`,
+    },
+    { statusMessage: 'Could not create checkout session', code: 'checkout_failed' },
+  )
   return { checkoutUrl }
 })

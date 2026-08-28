@@ -1,8 +1,7 @@
-import { createError, defineEventHandler, getQuery } from 'h3'
+import { defineEventHandler, getQuery } from 'h3'
 import { z } from 'zod'
 import { getBillingInvoices, getBillingSubscription } from '~~/server/lib/billing-read'
-import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
-import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
+import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
 const querySchema = z.object({ organizationSlug: z.string().min(1) })
 
@@ -16,21 +15,9 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
-  const actor = event.context.auth
-  if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  const { actor, data } = requireAuthedRequest(event, querySchema, getQuery(event))
 
-  const parsed = querySchema.safeParse(getQuery(event))
-  if (!parsed.success) {
-    throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
-  }
-
-  const org = await lookupOrgBySlug(event, parsed.data.organizationSlug)
-  if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
-
-  const role = org.members?.find((m) => m.userId === actor.sub)?.role
-  if (!role || !orgRoleHelpers.canManageBilling(role as OrgRole)) {
-    throw createError({ statusCode: 403, statusMessage: 'Requires the owner or billing role' })
-  }
+  const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
 
   const [subscription, invoices] = await Promise.all([
     getBillingSubscription(org.id),
