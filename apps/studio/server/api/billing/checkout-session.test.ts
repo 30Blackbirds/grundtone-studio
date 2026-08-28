@@ -109,6 +109,14 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
       'Requires the owner or billing role',
     )
+    // Laaser ogsaa mockens egen form: fjernes `err.statusMessage` fra
+    // createError-mocken ovenfor, bliver DENNE linje roed. Uden den var
+    // mock-rettelsen sand men ikke holdt fast — og en senere kopi-indsaettelse
+    // af den gamle mock ville gaa ubemaerket igennem.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 403,
+      statusMessage: 'Requires the owner or billing role',
+    })
   })
 
   // 🔴 RAEKKEFOELGEN rolle-tjek FOER beta-vaernet, pinnet gennem den ENESTE
