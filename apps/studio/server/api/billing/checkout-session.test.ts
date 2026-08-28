@@ -18,9 +18,16 @@ vi.mock('h3', () => {
     createError: (opts: { statusCode: number; statusMessage?: string; data?: unknown }) => {
       const err = new Error(opts.statusMessage ?? '') as Error & {
         statusCode: number
+        statusMessage?: string
         data?: unknown
       }
       err.statusCode = opts.statusCode
+      // statusMessage SKAL saettes som egen property, ikke kun som
+      // Error.message — det goer den rigtige h3-createError. Den delte
+      // `tests/helpers/endpoint-fixtures.ts` blev rettet i SIK-011, men denne
+      // fil har sin EGEN inline-kopi, som rettelsen aldrig naaede. Fire andre
+      // testfiler har samme kopi og mangler den stadig (meldt videre).
+      err.statusMessage = opts.statusMessage
       err.data = opts.data
       return err
     },
