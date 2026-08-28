@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
 // Relayet var før 16 linjer kopieret mellem checkout og portal, og kun dets
@@ -10,6 +10,8 @@ vi.mock('h3', () => mockH3())
 const { requireAccountUrl, postToAccount } = await import('./account-relay')
 
 const FAIL = { statusMessage: 'Could not create portal session', code: 'portal_failed' }
+const originalAccountUrl = process.env.ACCOUNT_URL
+const originalAccountS2SToken = process.env.ACCOUNT_S2S_TOKEN
 
 beforeEach(() => {
   delete process.env.ACCOUNT_URL
@@ -17,6 +19,13 @@ beforeEach(() => {
 })
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+afterAll(() => {
+  if (originalAccountUrl === undefined) delete process.env.ACCOUNT_URL
+  else process.env.ACCOUNT_URL = originalAccountUrl
+
+  if (originalAccountS2SToken === undefined) delete process.env.ACCOUNT_S2S_TOKEN
+  else process.env.ACCOUNT_S2S_TOKEN = originalAccountS2SToken
 })
 
 describe('requireAccountUrl', () => {

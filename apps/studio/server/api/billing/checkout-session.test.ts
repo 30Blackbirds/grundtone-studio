@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
 import { CHECKOUT_PLAN_KEYS, getPlan } from '~~/lib/plan-catalog'
 
@@ -46,6 +46,10 @@ function authedEvent(body: Record<string, unknown>): FakeEvent {
 beforeEach(() => {
   nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'owner' }] }
   delete process.env.ACCOUNT_URL
+})
+
+afterEach(() => {
+  delete process.env.STUDIO_INTERNAL_ORG_IDS
 })
 
 describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
@@ -110,7 +114,6 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
       await expect(handler(authedEvent({ ...VALID_BODY, planKey }))).rejects.toMatchObject({
         statusCode: 503,
       })
-      delete process.env.STUDIO_INTERNAL_ORG_IDS
     },
   )
 
@@ -130,7 +133,6 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
   // vedkommende ikke er autoriseret til at spoerge om. Autorisation foerst.
   it('lader rolle-tjekket fyre FOER beta-vaernet, ikke omvendt', async () => {
     nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'member' }] }
-    delete process.env.STUDIO_INTERNAL_ORG_IDS
     await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
       'Requires the owner or billing role',
     )
@@ -153,8 +155,6 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
       statusCode: 503,
       data: { code: 'billing_unavailable' },
     })
-
-    delete process.env.STUDIO_INTERNAL_ORG_IDS
   })
 })
 
@@ -188,8 +188,6 @@ describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
     nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
 
     await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 503 })
-
-    delete process.env.STUDIO_INTERNAL_ORG_IDS
   })
 
   // Undtagelsen hviler på org-id'et fra auth, ikke på noget klienten sender.
@@ -200,8 +198,6 @@ describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
     await expect(
       handler(authedEvent({ ...VALID_BODY, organizationSlug: 'org-internal' })),
     ).rejects.toMatchObject({ statusCode: 403, data: { code: 'beta_paid_plans_closed' } })
-
-    delete process.env.STUDIO_INTERNAL_ORG_IDS
   })
 
   // 🔴 Usat liste = INGEN undtagelse. En glemt konfiguration skal lukke mere,
