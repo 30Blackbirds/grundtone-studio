@@ -134,6 +134,20 @@ export const PLAN_CATALOG: PlanDef[] = [
  * (per tier? on upgrade? new features?); if they scope it differently, the
  * marketing copy must be able to follow without a code change.
  */
+/**
+ * De plan-nøgler checkout-endepunktets body-skema accepterer.
+ *
+ * Bor her frem for i ruten, så testen kan læse den SAMME liste som skemaet
+ * bruger. Stod listen som et literal i `checkout-session.post.ts` og et andet
+ * literal i testen, målte testen sin egen kopi: en ny nøgle i ruten ville
+ * ikke gøre noget rødt. Mutationstest 2026-08-28 viste præcis det.
+ *
+ * Alle nøgler her SKAL være `purchasable` — pinnet i checkout-session.test.ts.
+ * Det er dét, der holder handlerens purchasable-tjek som en ubrugt backstop
+ * frem for en gren, hvis placering nogen skal gætte sig til.
+ */
+export const CHECKOUT_PLAN_KEYS = ['studio_solo', 'studio_studio', 'studio_scale'] as const
+
 export const SHOW_PRICE_LOCK_LINE = true
 
 // ─── Beslutning AL (Allan, 2026-08-27): Q4 2026 = BETA ──────────────────────

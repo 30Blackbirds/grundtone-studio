@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
+import { CHECKOUT_PLAN_KEYS, getPlan } from '~~/lib/plan-catalog'
 
 // §1a-ruling (jura): no Stripe session without active terms accept + business
 // attestation — the 400 is a legal requirement, not incidental validation.
@@ -9,15 +10,6 @@ let nextOrg: {
   members: { userId: string; role: string }[]
 } | null = null
 
-// Den delte mock i `tests/helpers/endpoint-fixtures.ts` saetter BAADE
-// statusMessage og data som egne properties (SIK-011). Denne fil havde sin
-// egen inline-kopi med begrundelsen "the shared mock drops it" — maalt
-// 2026-08-28: det gaelder ikke laengere. Helperen blev rettet, kopien blev
-// aldrig fjernet, og det var praecis DEN kopi der lod statusMessage falde
-// og pressede en assertion ned til `toMatchObject({ statusCode: 403 })`.
-//
-// 🔴 En kopi med en forældet begrundelse ser identisk ud med en kopi der
-// stadig er noedvendig. Begrundelsen skal maales, ikke laeses.
 vi.mock('h3', () => mockH3())
 
 vi.mock('~~/server/lib/org-lookup', () => ({
@@ -106,6 +98,28 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     })
   })
 
+  // 🔴 Gør purchasable-tjekkets LATENS eksekverbar. Tjekket i handleren er i
+  // dag en død gren, fordi enummet kun admitterer købbare planer — og en død
+  // gren siger intet om, hvor den skal stå. Kommer en ikke-købbar nøgle ind i
+  // enummet, bliver DENNE rød, og så skal placeringen (400 fra tjekket vs 404
+  // fra org-opslaget) besluttes bevidst frem for at skifte tavst.
+  it.each([...CHECKOUT_PLAN_KEYS])(
+    'lader planen %s passere purchasable-tjekket',
+    async (planKey) => {
+      process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+      await expect(handler(authedEvent({ ...VALID_BODY, planKey }))).rejects.toMatchObject({
+        statusCode: 503,
+      })
+      delete process.env.STUDIO_INTERNAL_ORG_IDS
+    },
+  )
+
+  // Og den DIREKTE form af samme påstand: hver nøgle skemaet accepterer er
+  // købbar. Læser CHECKOUT_PLAN_KEYS — altså den liste ruten selv bruger —
+  // så en ny nøgle i skemaet ikke kan snige sig forbi en kopi i testen.
+  it.each([...CHECKOUT_PLAN_KEYS])('plan %s er købbar i kataloget', (planKey) => {
+    expect(getPlan(planKey).purchasable).toBe(true)
+  })
   // 🔴 RAEKKEFOELGEN rolle-tjek FOER beta-vaernet, pinnet gennem den ENESTE
   // observerbare forskel: fejlkoden. Uden denne test er raekkefoelgen frit
   // omflyttelig, fordi begge svarer 403.

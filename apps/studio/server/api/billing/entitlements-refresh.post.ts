@@ -1,7 +1,7 @@
-import { createError, defineEventHandler, readBody } from 'h3'
+import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { clearEntitlementsCacheFor } from '~~/server/lib/entitlements'
-import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
+import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
 const bodySchema = z.object({ organizationSlug: z.string().min(1) })
 
@@ -15,18 +15,11 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
-  const actor = event.context.auth
-  if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-
-  const parsed = bodySchema.safeParse(await readBody(event))
-  if (!parsed.success) {
-    throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
-  }
+  const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
 
   // Membership-scoped lookup is the gate; busting a cache is harmless beyond
   // forcing a refetch, so no elevated role is needed.
-  const org = await lookupOrgBySlug(event, parsed.data.organizationSlug)
-  if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
+  const org = await requireOrg(event, actor, data.organizationSlug, 'lookup-only')
 
   clearEntitlementsCacheFor(org.id)
   return { ok: true }

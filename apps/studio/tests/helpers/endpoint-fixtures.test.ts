@@ -30,7 +30,45 @@ describe('mockH3().createError', () => {
 
   it('udelader statusMessage helt når den ikke er givet', () => {
     const err = mockH3().createError({ statusCode: 404 }) as Error & { statusMessage?: string }
+    // `toBeUndefined()` alene ville også bestå på en mock der intet satte —
+    // altså også på selve den defekt testen skal fange. Derfor spørges der
+    // på property'ens TILSTEDEVÆRELSE: her skal den mangle helt, mens den i
+    // testen ovenfor skal være der med den rigtige værdi. De to sammen kan
+    // ikke bestå tomt.
+    expect('statusMessage' in err).toBe(false)
     expect(err.statusMessage).toBeUndefined()
+  })
+
+  // 🔴 Selve grunden til at createError er skrevet som
+  // `Object.assign(new Error(…), input)` og ikke felt for felt: den OPREGNER
+  // ikke felterne og kan derfor ikke glemme et. Den felt-for-felt-form der
+  // stod her før, kunne — `statusMessage` blev tabt i fem inline-kopier af
+  // netop den form.
+  //
+  // Testen bruger et felt der IKKE står i mockens signatur, fordi det er den
+  // egenskab der skal låses: at et felt h3 måtte tilføje i morgen bæres med
+  // uden at nogen husker at udvide en liste. Bliver formen igen felt-for-felt,
+  // bliver denne test rød.
+  it('bærer ETHVERT felt med — også et mocken ikke kender', () => {
+    const err = mockH3().createError({
+      statusCode: 429,
+      statusMessage: 'Too many requests',
+      data: { code: 'quota_exceeded' },
+      // Uden for signaturen med vilje — h3's createError tager flere felter
+      // end de tre vi har skrevet op.
+      fatal: true,
+    } as Parameters<ReturnType<typeof mockH3>['createError']>[0]) as Error & {
+      statusCode: number
+      statusMessage?: string
+      data?: unknown
+      fatal?: boolean
+    }
+    expect(err).toMatchObject({
+      statusCode: 429,
+      statusMessage: 'Too many requests',
+      data: { code: 'quota_exceeded' },
+      fatal: true,
+    })
   })
 })
 
