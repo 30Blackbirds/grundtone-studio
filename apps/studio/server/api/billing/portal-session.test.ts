@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
 
 // Portal-sessionen var hidtil kun dækket i ANDEN HÅND — gennem checkout-testen,
@@ -12,6 +12,7 @@ let nextOrg: {
   id: string
   members?: { userId: string; role: string }[]
 } | null = null
+const originalAccountUrl = process.env.ACCOUNT_URL
 
 vi.mock('h3', () => mockH3())
 vi.mock('~~/server/lib/org-lookup', () => ({
@@ -36,6 +37,11 @@ function authedEvent(body: Record<string, unknown>): FakeEvent {
 beforeEach(() => {
   nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'owner' }] }
   delete process.env.ACCOUNT_URL
+})
+
+afterAll(() => {
+  if (originalAccountUrl === undefined) delete process.env.ACCOUNT_URL
+  else process.env.ACCOUNT_URL = originalAccountUrl
 })
 
 describe('POST /api/billing/portal-session (§7a kortskifte)', () => {
