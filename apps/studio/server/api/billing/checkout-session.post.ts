@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
-import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
@@ -15,7 +15,7 @@ const acceptProof = z.object({
 
 const bodySchema = z.object({
   organizationSlug: z.string().min(1),
-  planKey: z.enum(['studio_solo', 'studio_studio', 'studio_scale']),
+  planKey: z.enum(CHECKOUT_PLAN_KEYS),
   // Two legal effects, two proof trails (jura §0 krav 1+3) — the attestation
   // carries its own version+timestamp exactly like the terms accept.
   businessAttestation: acceptProof,
@@ -37,8 +37,14 @@ defineRouteMeta({
 
 export default defineEventHandler(async (event) => {
   const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
-  // Bliver stående FØR org-opslaget: flyttet bagom ville en ukendt org med en
-  // ikke-købbar plan svare 404 i stedet for 400.
+  // Bliver stående FØR org-opslaget. MÅLT 2026-08-28: tjekket kan i dag ikke
+  // fyre — `bodySchema`s enum admitterer kun studio_solo/_studio/_scale, og
+  // alle tre er purchasable. Det er altså defence in depth, ikke en aktiv
+  // gren, og placeringen er derfor uobserverbar lige nu. Den bliver
+  // observerbar i samme øjeblik en ikke-købbar nøgle kommer ind i enummet:
+  // så svarer en ukendt org med den nøgle 400 herfra i stedet for 404 fra
+  // opslaget. Testen "hver plan i enummet er købbar" nedenfor er den, der
+  // siger til, når den dag kommer.
   if (!getPlan(data.planKey as PlanKey).purchasable) {
     throw createError({ statusCode: 400, statusMessage: 'Plan is not purchasable' })
   }
