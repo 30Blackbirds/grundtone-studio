@@ -36,6 +36,16 @@ describe('studio-beta-1.0 — ordret pinning', () => {
 
   // Beslutning AL's egen ordlyd. Den ERSTATTER købs-knapperne, så den er det
   // eneste, en læser får at vide om hvornår køb åbner.
+  //
+  // 🔴 PROVENANS, fordi den ikke er den samme for de to sprog: den danske kom
+  // fra `consent-tekster.md`. Den ENGELSKE gjorde ikke — dokumentet gav en
+  // tosproget notice og kun en dansk badge, så den engelske blev formuleret
+  // her, på fladen. [jura] har siden adopteret den ordret (docs@3a0722f), og
+  // først dér fik den et kanonisk hjem.
+  //
+  // Læren er testens egen begrænsning: en byte-for-byte-pinning beviser at
+  // fladen og konstanten er ens. Den kan IKKE se, at konstanten aldrig kom
+  // fra et forlæg. Grøn her betyder "uændret", ikke "godkendt".
   it('pinner badge-teksten ordret på begge sprog', () => {
     expect(da.plans.beta.comingSoon).toBe('Kommer 1. januar 2027')
     expect(en.plans.beta.comingSoon).toBe('Coming 1 January 2027')

@@ -42,3 +42,16 @@ function internalOrgIds(): Set<string> {
 export function isInternalOrg(orgId: string): boolean {
   return internalOrgIds().has(orgId)
 }
+
+/**
+ * Antal konfigurerede interne orgs. Bruges til boot-loggen.
+ *
+ * 🔴 [sikkerhed]s tilføjelse, og grunden er diagnostik frem for sikkerhed: en
+ * tastefejl i et UUID fejler TAVST lukket. Den interne tenant rammer så
+ * paywallet, og fejlen ligner en produktfejl frem for en konfigurationsfejl.
+ * En kontrol der kun larmer ved fejl, gør tavshed tvetydig — derfor siger vi
+ * ved boot, hvor mange id'er der faktisk blev læst.
+ */
+export function internalOrgCount(): number {
+  return internalOrgIds().size
+}
