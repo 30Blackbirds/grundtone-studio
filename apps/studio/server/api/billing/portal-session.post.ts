@@ -1,5 +1,6 @@
-import { createError, defineEventHandler, readBody } from 'h3'
+import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
+import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
@@ -19,38 +20,18 @@ export default defineEventHandler(async (event) => {
 
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
 
-  const accountUrl = process.env.ACCOUNT_URL
-  if (!accountUrl) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Billing is not available yet',
-      data: { code: 'billing_unavailable' },
-    })
-  }
-
+  const accountUrl = requireAccountUrl()
   const appUrl = useRuntimeConfig(event).public.appUrl
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  const token = process.env.ACCOUNT_S2S_TOKEN
-  if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${accountUrl}/v1/billing/portal-sessions`, {
-    method: 'POST',
-    headers,
-    signal: AbortSignal.timeout(5_000),
-    body: JSON.stringify({
+  const { portalUrl } = await postToAccount<{ portalUrl: string }>(
+    accountUrl,
+    '/v1/billing/portal-sessions',
+    {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
       returnUrl: `${appUrl}/orgs/${data.organizationSlug}/billing`,
-    }),
-  })
-  if (!res.ok) {
-    throw createError({
-      statusCode: 502,
-      statusMessage: 'Could not create portal session',
-      data: { code: 'portal_failed' },
-    })
-  }
-
-  const { portalUrl } = (await res.json()) as { portalUrl: string }
+    },
+    { statusMessage: 'Could not create portal session', code: 'portal_failed' },
+  )
   return { portalUrl }
 })

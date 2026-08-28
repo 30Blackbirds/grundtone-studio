@@ -1,6 +1,7 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
@@ -53,25 +54,15 @@ export default defineEventHandler(async (event) => {
   // reserves that for owner/billing (not admin/manager, who manage people).
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
 
-  const accountUrl = process.env.ACCOUNT_URL
-  if (!accountUrl) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Billing is not available yet',
-      data: { code: 'billing_unavailable' },
-    })
-  }
-
+  // Dormant-503 FØR runtime-config og body: et usat ACCOUNT_URL skal
+  // rapportere sig som dormant, ikke som en fejl længere inde.
+  const accountUrl = requireAccountUrl()
   const appUrl = useRuntimeConfig(event).public.appUrl
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  const token = process.env.ACCOUNT_S2S_TOKEN
-  if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${accountUrl}/v1/billing/checkout-sessions`, {
-    method: 'POST',
-    headers,
-    signal: AbortSignal.timeout(5_000),
-    body: JSON.stringify({
+  const { checkoutUrl } = await postToAccount<{ checkoutUrl: string }>(
+    accountUrl,
+    '/v1/billing/checkout-sessions',
+    {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
       planKey: data.planKey,
@@ -86,16 +77,8 @@ export default defineEventHandler(async (event) => {
       locale: 'da',
       successUrl: `${appUrl}/orgs/${data.organizationSlug}?upgrade=success`,
       cancelUrl: `${appUrl}/plans?org=${data.organizationSlug}&upgrade=cancelled`,
-    }),
-  })
-  if (!res.ok) {
-    throw createError({
-      statusCode: 502,
-      statusMessage: 'Could not create checkout session',
-      data: { code: 'checkout_failed' },
-    })
-  }
-
-  const { checkoutUrl } = (await res.json()) as { checkoutUrl: string }
+    },
+    { statusMessage: 'Could not create checkout session', code: 'checkout_failed' },
+  )
   return { checkoutUrl }
 })
