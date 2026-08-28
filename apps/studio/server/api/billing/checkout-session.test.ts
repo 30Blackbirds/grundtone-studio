@@ -10,23 +10,8 @@ let nextOrg: {
   members: { userId: string; role: string }[]
 } | null = null
 
-vi.mock('h3', () => {
-  const base = mockH3()
-  return {
-    ...base,
-    // The endpoint attaches machine-readable data ({code}) to errors — the
-    // shared mock drops it, and the dormant-503 assertion needs it.
-    createError: (opts: { statusCode: number; statusMessage?: string; data?: unknown }) => {
-      const err = new Error(opts.statusMessage ?? '') as Error & {
-        statusCode: number
-        data?: unknown
-      }
-      err.statusCode = opts.statusCode
-      err.data = opts.data
-      return err
-    },
-  }
-})
+vi.mock('h3', () => mockH3())
+
 vi.mock('~~/server/lib/org-lookup', () => ({
   lookupOrgBySlug: () => Promise.resolve(nextOrg),
 }))
