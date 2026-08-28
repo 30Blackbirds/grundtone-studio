@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import { mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
 const inserts: Array<Record<string, unknown>> = []
 
@@ -13,17 +14,15 @@ vi.mock('~~/server/db', () => {
 })
 vi.mock('~~/server/db/schema', () => ({ emailEvent: {} }))
 
-// h3 isn't a direct dep — stub the helpers we use, same pattern as audit.test.ts.
+// h3 isn't a direct dep — stub the helpers we use. createError kommer fra den
+// DELTE mock; den inline kopi der stod her, tabte statusMessage. Kun de to
+// event-form-følsomme helpers overskrives, fordi testene kalder handleren med
+// et løst `{ headers?, body? }` frem for fakeEvent-formen.
 vi.mock('h3', () => ({
-  defineEventHandler: (fn: unknown) => fn,
+  ...mockH3(),
   getRequestHeader: (event: { headers?: Record<string, string> }, name: string) =>
     event?.headers?.[name.toLowerCase()] ?? null,
   readBody: (event: { body?: unknown }) => Promise.resolve(event?.body ?? null),
-  createError: (opts: { statusCode: number; statusMessage?: string }) => {
-    const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
-    err.statusCode = opts.statusCode
-    return err
-  },
 }))
 
 // EventHandler's signature carries Nitro typing we don't need in tests; cast
@@ -138,5 +137,19 @@ describe('postmark webhook receiver', () => {
       recipient: 'spammed@example.com',
       eventType: 'SpamComplaint',
     })
+  })
+
+  // 🔴 LÅSER at fejlbeskeden kan asserteres — se den udførlige begrundelse i
+  // server/api/account/deleted.post.test.ts. Kort: filens egen inline
+  // createError-mock satte aldrig `statusMessage`, så beskeden var ikke til
+  // at binde. Mocken kommer nu fra den delte helper.
+  //
+  // 400-beskeden er den mest værdifulde at pinne her: 'Missing
+  // Recipient/Email' navngiver HVILKE felter kontrakten kræver, og det er
+  // netop det en fremtidig omskrivning kan komme til at ændre i stilhed.
+  it('bærer 400-beskeden frem, så de krævede felter er pinnet', async () => {
+    await expect(
+      handler({ headers: { authorization: basic(USER, PASS) }, body: { RecordType: 'Delivery' } }),
+    ).rejects.toMatchObject({ statusCode: 400, statusMessage: 'Missing Recipient/Email' })
   })
 })

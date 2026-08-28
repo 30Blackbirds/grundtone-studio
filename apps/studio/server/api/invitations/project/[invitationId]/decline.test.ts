@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
-// Same standalone harness as accept.test.ts: inline h3/db mocks, identity on
-// event.context.auth. Decline has no PDP grant and no transaction — it only
-// flips the invitation status, so the mock surface is smaller.
+// Same standalone harness as accept.test.ts: inline db mock og delt h3-mock,
+// identity on event.context.auth. Decline has no PDP grant and no transaction
+// — it only flips the invitation status, so the mock surface is smaller.
 interface FakeEvent {
   params: Record<string, string>
   context: { auth?: { sub: string; tenant: string; email: string } }
@@ -18,17 +19,10 @@ function fakeEvent(
     context: opts.auth ? { auth: opts.auth } : {},
   }
 }
-function mockH3() {
-  return {
-    defineEventHandler: (fn: unknown) => fn,
-    getRouterParam: (event: FakeEvent, name: string) => event.params[name],
-    createError: (opts: { statusCode: number; statusMessage?: string }) => {
-      const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
-      err.statusCode = opts.statusCode
-      return err
-    },
-  }
-}
+// Som i accept.test.ts: h3-mocken kommer fra tests/helpers/endpoint-fixtures.
+// Den lokale `function mockH3()` der stod her, skyggede for den delte helper
+// af samme navn og tabte statusMessage. Handleren læser kun getRouterParam og
+// createError, som begge findes i den delte mock.
 
 interface InviteRow {
   id: string
@@ -134,5 +128,36 @@ describe('POST /api/invitations/project/[invitationId]/decline', () => {
     )
     expect(res).toEqual({ declined: true })
     expect(statusUpdates).toEqual([{ status: 'declined' }])
+  })
+
+  // 🔴 LÅSER at fejlbeskeden kan asserteres — se
+  // server/api/account/deleted.post.test.ts for den fulde begrundelse. Også
+  // denne fil bar en lokal `function mockH3()`, der skyggede for den delte
+  // helper af samme navn; den er nu fjernet til fordel for importen.
+  it('bærer 409-beskeden frem med invitationens faktiske status', async () => {
+    invites.push(freshInvite({ status: 'accepted' }))
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: INVITE_ID },
+          auth: { sub: 'u1', tenant: 'o1', email: 'invitee@example.com' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409, statusMessage: 'Invitation is accepted' })
+  })
+
+  it('bærer 403-beskeden frem, så afvisningsgrunden er pinnet', async () => {
+    invites.push(freshInvite())
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: INVITE_ID },
+          auth: { sub: 'u1', tenant: 'o1', email: 'someone-else@example.com' },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      statusMessage: 'Invitation is for a different email',
+    })
   })
 })
