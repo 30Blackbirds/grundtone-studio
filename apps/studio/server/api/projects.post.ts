@@ -5,7 +5,7 @@ import { project } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
-import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
+import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 import { grantProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
 
 const bodySchema = z.object({
@@ -29,32 +29,15 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
-  const actor = event.context.auth
-  if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-
-  const parsed = bodySchema.safeParse(await readBody(event))
-  if (!parsed.success) {
-    throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
-  }
-
-  const org = await lookupOrgBySlug(event, parsed.data.organizationSlug)
-  if (!org) throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
+  const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
 
   // Membership is proven by the org lookup being scoped to the caller; the org
   // role gate (only admin/manager/owner create projects) is enforced by the PDP
   // — a member without create rights gets the lookup but the grant below would
   // still leave them as project admin, so we additionally require that the
-  // caller actually appears in the resolved org membership.
-  //
-  // 🔴 `?? false`, ikke `?? true` (SIK-003). Faldet rammer, når `org.members`
-  // er undefined — altså når vi IKKE fik en medlemsliste at tjekke imod. Den
-  // gamle default lod tvivlen komme kalderen til gode og gav dermed adgang
-  // præcis i det tilfælde, hvor vi vidste mindst. Mangler listen, ved vi ikke,
-  // om de er medlem, og så er svaret nej.
-  const isMember = org.members?.some((m) => m.userId === actor.sub) ?? false
-  if (!isMember) {
-    throw createError({ statusCode: 403, statusMessage: 'Not a member of this organization' })
-  }
+  // caller actually appears in the resolved org membership. `member`-gaten
+  // bærer SIK-003-defaulten (`?? false`); se org-request.ts.
+  const org = await requireOrg(event, actor, data.organizationSlug, 'member')
 
   // Free-tier project quota (kontrakt: .orchestration/STUDIO-KVOTE-
   // ENTITLEMENTS-KONTRAKT.md). The limit comes from account, the count lives
@@ -91,8 +74,8 @@ export default defineEventHandler(async (event) => {
     .insert(project)
     .values({
       organizationId: org.id,
-      slug: parsed.data.slug,
-      name: parsed.data.name,
+      slug: data.slug,
+      name: data.name,
     })
     .returning()
 
