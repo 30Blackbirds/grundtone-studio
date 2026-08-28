@@ -1,8 +1,8 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
-import { BETA_MODE, getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
-import { isInternalOrg } from '~~/server/lib/internal-orgs'
+import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 
@@ -70,16 +70,7 @@ export default defineEventHandler(async (event) => {
   // `lookupOrgBySlug` — altsaa fra auth, ikke fra request-bodyen. En klient
   // kan hverken vaelge listen eller hvilket org der slaas op; ellers ville
   // undtagelsen selv vaere omgaaelsesvejen ([sikkerheds] krav).
-  if (BETA_MODE && !isInternalOrg(org.id)) {
-    console.warn(
-      `[billing] beta: checkout attempt rejected (org=${parsed.data.organizationSlug}, plan=${parsed.data.planKey})`,
-    )
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Paid plans open 1 January 2027',
-      data: { code: 'beta_paid_plans_closed' },
-    })
-  }
+  assertBetaPurchasesClosed(org.id, 'checkout')
 
   const accountUrl = process.env.ACCOUNT_URL
   if (!accountUrl) {
