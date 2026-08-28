@@ -9,22 +9,16 @@
 // der skal kunne animere), ville læse det og konkludere at saniteringen
 // dækker. Det gør den ikke.
 //
-// Regex mod HTML har strukturelle grænser. Verificeret mod vores egen kode
-// 2026-08-04 — disse fire OVERLEVER saniteringen og er kun inerte fordi
-// /k svarer med `CSP: sandbox; default-src 'none'` (sandbox uden
-// allow-scripts slår scriptudførelse helt fra):
-//   · <svg/onload=…>          — `/` er gyldig attribut-separator; vores
-//                                mønster kræver whitespace før `on…`
-//   · <svg:script>            — namespace-præfikset matcher ikke `<script`
-//   · <animate attributeName="href" values="javascript:…">
-//   · <set attributeName="onload" …>
-//     ^ SMIL sætter attributter på RENDERTIDSPUNKTET; ingen af mønstrene
-//       her ser på elementer, kun på attributter og blokke.
+// Regex mod HTML har strukturelle grænser. De vektorer der stadig overlever
+// — og som derfor kræver CSP'en — er pinnet i `uncaught`-blokken i
+// `svg-sanitize.test.ts`; læs dem dér frem for her, så listen ikke kan drive
+// fra koden. SIK-010-opstramningen lukkede `<svg/onload=>` og `<svg:script>`;
+// SMIL-vektorerne (`animate`/`set` mod `href`/`onload`) overlever fortsat.
 //
-// svg-sanitize.test.ts har dem som eksplicitte "forventes at overleve"-
-// cases, så begrænsningen er eksekverbar frem for kun beskrevet — og
-// [file].test.ts asserterer på CSP-headeren, så et fjernet header giver
-// rødt her frem for at blive opdaget af en kunde.
+// De overlevende er kun inerte fordi /k svarer med
+// `CSP: sandbox; default-src 'none'` (sandbox uden allow-scripts slår
+// scriptudførelse helt fra) — og `[...file].test.ts` asserterer på den header,
+// så et fjernet header giver rødt her frem for at blive opdaget af en kunde.
 //
 // Vil vi have saniteringen til at BÆRE forsvaret, skal den skiftes til en
 // parser-baseret allowlist (fx DOMPurify i jsdom). Regexen nedenfor er
