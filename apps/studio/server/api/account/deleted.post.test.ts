@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import { mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
 const deletes: string[] = []
 const updates: Array<{ table: string; values: Record<string, unknown> }> = []
@@ -36,16 +37,17 @@ vi.mock('~~/server/db/schema', () => ({
   projectInvitation: { _: { name: 'project_invitation' }, invitedBy: 'invitedBy' },
 }))
 
+// createError kommer fra den DELTE mock, ikke fra en kopi her. Filen bar sin
+// egen inline kopi, som satte statusCode men aldrig statusMessage — samme
+// tabte felt som i fire andre filer. Kun de to helpers, der er følsomme over
+// for event-formen, overskrives: testene her kalder handleren med et løst
+// `{ headers?, body? }` uden altid at sætte `headers`, hvor den delte mock
+// forudsætter fakeEvent-formen med felterne til stede.
 vi.mock('h3', () => ({
-  defineEventHandler: (fn: unknown) => fn,
+  ...mockH3(),
   getRequestHeader: (event: { headers?: Record<string, string> }, name: string) =>
     event?.headers?.[name.toLowerCase()] ?? null,
   readBody: (event: { body?: unknown }) => Promise.resolve(event?.body ?? null),
-  createError: (opts: { statusCode: number; statusMessage?: string }) => {
-    const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
-    err.statusCode = opts.statusCode
-    return err
-  },
 }))
 
 const handler = (await import('./deleted.post')).default as unknown as (event: {
@@ -117,5 +119,31 @@ describe('account deleted webhook', () => {
       'config_version',
       'project_invitation',
     ])
+  })
+
+  // 🔴 LÅSER at fejlbeskeden overhovedet KAN asserteres.
+  //
+  // Filen bar sin egen inline kopi af h3-mocken. Den satte `statusCode`, men
+  // aldrig `statusMessage` — så enhver assertion på beskeden blev rød,
+  // uanset hvad handleren faktisk svarede. Ingen grøn test løj; hullet var
+  // BLOKERENDE, ikke tavst. Prisen var, at den der ville pinne en besked
+  // måtte nøjes med statuskoden — altså en svagere assertion, valgt af
+  // forhindringen frem for af hvad der var værd at binde.
+  //
+  // Mocken kommer nu fra tests/helpers/endpoint-fixtures.ts. Fjernes
+  // `statusMessage` fra den delte createError igen, bliver DENNE test rød
+  // frem for at goere en hel kategori af assertions uskrivelig.
+  it('bærer handlerens EGEN fejlbesked frem, ikke kun statuskoden', async () => {
+    delete process.env.ACCOUNT_DELETED_WEBHOOK_SECRET
+    await expect(
+      handler({ headers: { authorization: `Bearer ${SECRET}` }, body: { userId: 'u1' } }),
+    ).rejects.toMatchObject({ statusCode: 503, statusMessage: 'Webhook not configured' })
+  })
+
+  it('skelner 401-beskeden fra 503-beskeden', async () => {
+    await expect(handler({ body: { userId: 'u1' } })).rejects.toMatchObject({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+    })
   })
 })

@@ -97,35 +97,42 @@ export function mockH3() {
     setResponseStatus: (event: FakeEvent, status: number) => {
       event.responseStatus = status
     },
-    // `data` bæres med, så tests kan assertere på fejl-koder (fx
-    // quota_exceeded, licence_attestation_required) og ikke kun statuskoder.
-    createError: (opts: { statusCode: number; statusMessage?: string; data?: unknown }) => {
-      const err = new Error(opts.statusMessage ?? '') as Error & {
+    // Spread-formen er bevidst: `Object.assign(new Error(…), input)` OPREGNER
+    // ikke felterne, og kan derfor ikke GLEMME et. Den felt-for-felt-form der
+    // stod her før, kunne — og gjorde det: `statusMessage` blev tabt i fem
+    // inline-kopier af netop den form. `data` bæres med, så tests kan
+    // assertere på fejl-koder (fx quota_exceeded, licence_attestation_required)
+    // og ikke kun på statuskoder; et felt h3 måtte tilføje i morgen bæres med
+    // uden at nogen skal huske at udvide listen her.
+    //
+    // Object.assign kopierer kun de nøgler input FAKTISK har, så
+    // `createError({ statusCode: 404 })` giver stadig en fejl helt uden
+    // `statusMessage` — pinnet i endpoint-fixtures.test.ts.
+    //
+    // Baggrund: statusMessage SKAL sættes som egen property, ikke kun som
+    // Error.message. Den rigtige h3-createError sætter begge; mocken satte kun
+    // message, så en assertion på `err.statusMessage` læste `undefined`. Fundet
+    // da 403-beskeden på font-leveringen (SIK-011) skulle pinnes.
+    //
+    // Rettelse til en tidligere version af denne kommentar: den påstod, at
+    // `toMatchObject` ville bestå TAVST, fordi statusMessage ikke er
+    // enumerable. Det er MÅLT forkert — Vitests toMatchObject bruger
+    // property-adgang på det modtagne objekt og fanger både et felt der
+    // mangler helt og et non-enumerable felt med forkert værdi.
+    //
+    // Hullet var altså BLOKERENDE, ikke tavst: man kunne ikke skrive en
+    // meningsfuld assertion på en fejlbesked, for ethvert forsøg blev rødt.
+    // Ingen grøn test løj. Det er en mindre alvorlig fejl end først meldt, og
+    // forskellen er værd at holde fast i — "grønt uden dækning" og "kan ikke
+    // skrives" kræver hver sin reaktion. Prisen for den blokerende variant er
+    // dokumenteret: forfattere valgte en svagere assertion frem for den de
+    // ville skrive.
+    createError: (input: { statusCode: number; statusMessage?: string; data?: unknown }) =>
+      Object.assign(new Error(input.statusMessage ?? ''), input) as Error & {
         statusCode: number
         statusMessage?: string
         data?: unknown
-      }
-      err.statusCode = opts.statusCode
-      // statusMessage SKAL sættes som egen property, ikke kun som Error.message.
-      // Den rigtige h3-createError sætter begge; mocken satte kun message, så
-      // en assertion på `err.statusMessage` læste `undefined`. Fundet da
-      // 403-beskeden på font-leveringen (SIK-011) skulle pinnes.
-      //
-      // Rettelse til en tidligere version af denne kommentar: den påstod, at
-      // `toMatchObject` ville bestå TAVST, fordi statusMessage ikke er
-      // enumerable. Det er MÅLT forkert — Vitests toMatchObject bruger
-      // property-adgang på det modtagne objekt og fanger både et felt der
-      // mangler helt og et non-enumerable felt med forkert værdi.
-      //
-      // Hullet var altså BLOKERENDE, ikke tavst: man kunne ikke skrive en
-      // meningsfuld assertion på en fejlbesked, for ethvert forsøg blev rødt.
-      // Ingen grøn test løj. Det er en mindre alvorlig fejl end først meldt,
-      // og forskellen er værd at holde fast i — "grønt uden dækning" og
-      // "kan ikke skrives" kræver hver sin reaktion.
-      if (opts.statusMessage !== undefined) err.statusMessage = opts.statusMessage
-      if (opts.data !== undefined) err.data = opts.data
-      return err
-    },
+      },
   }
 }
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
-// Minimal inline event + h3 mock. Identity now rides on event.context.auth
-// (set by server/middleware/auth.ts), and the PDP grant is mocked so the test
-// stays standalone.
+// Minimal inline event; h3-mocken kommer fra den delte helper. Identity now
+// rides on event.context.auth (set by server/middleware/auth.ts), and the PDP
+// grant is mocked so the test stays standalone.
 interface FakeEvent {
   params: Record<string, string>
   body: unknown
@@ -21,19 +22,11 @@ function fakeEvent(
     context: opts.auth ? { auth: opts.auth } : {},
   }
 }
-function mockH3() {
-  return {
-    defineEventHandler: (fn: unknown) => fn,
-    getRouterParam: (event: FakeEvent, name: string) => event.params[name],
-    readBody: (event: FakeEvent) => Promise.resolve(event.body),
-    getRequestHeader: (event: FakeEvent, name: string) => event.headers[name.toLowerCase()] ?? null,
-    createError: (opts: { statusCode: number; statusMessage?: string }) => {
-      const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
-      err.statusCode = opts.statusCode
-      return err
-    },
-  }
-}
+// h3-mocken kommer fra tests/helpers/endpoint-fixtures. Her stod tidligere en
+// LOKAL `function mockH3()` med præcis det navn — den lignede den delte kode
+// og var en privat kopi, hvis createError tabte statusMessage. Den lokale
+// fakeEvent ovenfor bevares: dens felter (params/body/headers) er dem den
+// delte mock læser.
 
 interface InviteRow {
   id: string
@@ -218,5 +211,49 @@ describe('POST /api/invitations/project/[invitationId]/accept', () => {
     expect(memberInserts[0]).toMatchObject({ projectId: PROJECT_ID, userId: 'u1', role: 'admin' })
     expect(inviteStatusUpdates).toHaveLength(1)
     expect(inviteStatusUpdates[0].status).toBe('accepted')
+  })
+
+  // 🔴 LÅSER at fejlbeskeden kan asserteres — begrundelsen står udførligt i
+  // server/api/account/deleted.post.test.ts.
+  //
+  // Denne fil bar sin egen lokale `function mockH3()`, der SKYGGEDE for den
+  // delte helper af samme navn: den lignede fælles kode og var en privat
+  // kopi, som satte statusCode men aldrig statusMessage. Den lokale er nu
+  // fjernet, og mocken importeres.
+  //
+  // Sporet efter hullet står lige ovenfor: 409-testen asserterer på
+  // `message` frem for `statusMessage`, fordi `statusMessage` ikke var til at
+  // læse. Begge bindes nu, så de to felter ikke kan drive fra hinanden.
+  it('bærer 409-beskeden på BÅDE statusMessage og message', async () => {
+    invites.push(freshInvite({ status: 'accepted' }))
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      statusMessage: 'Invitation is accepted',
+      message: 'Invitation is accepted',
+    })
+  })
+
+  // 403 og 401 svarer forskellige koder, så beskeden er ikke den eneste
+  // forskel her — værdien er, at afvisningsgrunden overhovedet ER bundet.
+  it('bærer 403-beskeden frem, så afvisningsgrunden er pinnet', async () => {
+    invites.push(freshInvite())
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('attacker@evil.dk', 'attacker'),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      statusMessage: 'Invitation is for a different email',
+    })
   })
 })
