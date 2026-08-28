@@ -90,9 +90,39 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
   })
 
-  it('403s for roles without billing rights', async () => {
+  // 🔴 Assertionen binder til statusMessage, ikke bare til 403. Rolle-tjekket
+  // OG beta-vaernet svarer begge 403, saa `toMatchObject({ statusCode: 403 })`
+  // alene kan ikke se forskel paa dem — den bestaar uanset hvilket af dem der
+  // fyrede. [review] maalte det: de byttede raekkefoelgen og fik 12/12 groenne.
+  it('403s for roles without billing rights — med rollens EGEN besked', async () => {
     nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'member' }] }
-    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
+    // `statusMessage` er ikke en egen enumerable property paa h3's error, saa
+    // toMatchObject kan ikke se den — beskeden naas via Error.message, og
+    // `data` er den anden observerbare forskel.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
+      'Requires the owner or billing role',
+    )
+  })
+
+  // 🔴 RAEKKEFOELGEN rolle-tjek FOER beta-vaernet, pinnet gennem den ENESTE
+  // observerbare forskel: fejlkoden. Uden denne test er raekkefoelgen frit
+  // omflyttelig, fordi begge svarer 403.
+  //
+  // Hvorfor raekkefoelgen betyder noget: fyrede beta-vaernet foerst, ville en
+  // kaldere UDEN billing-rettigheder faa at vide at betalte planer aabner
+  // 1. januar 2027 — altsaa laere noget om vores billing-tilstand, som
+  // vedkommende ikke er autoriseret til at spoerge om. Autorisation foerst.
+  it('lader rolle-tjekket fyre FOER beta-vaernet, ikke omvendt', async () => {
+    nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'member' }] }
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
+      'Requires the owner or billing role',
+    )
+    // Og eksplicit: beta-koden maa IKKE vaere den der naaede frem foerst.
+    // Begge svarer 403, saa fejlkoden er den eneste observerbare forskel.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.not.toMatchObject({
+      data: { code: 'beta_paid_plans_closed' },
+    })
   })
 
   // Beta-vaernet staar foran den dormante 503, saa et almindeligt org naar den
