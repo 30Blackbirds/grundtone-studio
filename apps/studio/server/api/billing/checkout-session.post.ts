@@ -1,7 +1,8 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
-import { getPlan, type PlanKey } from '~~/lib/plan-catalog'
+import { BETA_MODE, getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
+import { isInternalOrg } from '~~/server/lib/internal-orgs'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 
@@ -56,6 +57,28 @@ export default defineEventHandler(async (event) => {
   const role = org.members?.find((m) => m.userId === actor.sub)?.role
   if (!role || !orgRoleHelpers.canManageBilling(role as OrgRole)) {
     throw createError({ statusCode: 403, statusMessage: 'Requires the owner or billing role' })
+  }
+
+  // Beslutning AL (Allan, 2026-08-27) + jura-kravliste studio-beta-1.0 pkt. 2:
+  // Q4 2026 = beta — betalte abonnementer kan først tegnes 1/1-2027. Værnet
+  // står EFTER rolle-tjekket (400/403/404 beholder hver sin betydning) og FØR
+  // dormant-503: svaret på et gyldigt købsforsøg i beta er "køb er lukket",
+  // ikke "billing er utilgængelig". Fejlkoden `beta_paid_plans_closed` er
+  // juras; afvisningen er larmende (fejlsvar + log), aldrig et stille 200.
+  // Beslutning AL's tillæg (Allan): KlangHaus' EGNE tenants rammes ikke af
+  // vaernet. Kontrollen er SERVER-SIDE og hviler paa org-id'et fra
+  // `lookupOrgBySlug` — altsaa fra auth, ikke fra request-bodyen. En klient
+  // kan hverken vaelge listen eller hvilket org der slaas op; ellers ville
+  // undtagelsen selv vaere omgaaelsesvejen ([sikkerheds] krav).
+  if (BETA_MODE && !isInternalOrg(org.id)) {
+    console.warn(
+      `[billing] beta: checkout attempt rejected (org=${parsed.data.organizationSlug}, plan=${parsed.data.planKey})`,
+    )
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Paid plans open 1 January 2027',
+      data: { code: 'beta_paid_plans_closed' },
+    })
   }
 
   const accountUrl = process.env.ACCOUNT_URL

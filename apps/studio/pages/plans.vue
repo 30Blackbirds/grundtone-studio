@@ -1,7 +1,13 @@
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue'
   import { TERMS_URL, PRIVACY_URL, TERMS_VERSION, ATTESTATION_VERSION } from '~~/lib/legal'
-  import { PLAN_CATALOG, SHOW_PRICE_LOCK_LINE, getPlan, type PlanKey } from '~~/lib/plan-catalog'
+  import {
+    BETA_MODE,
+    PLAN_CATALOG,
+    SHOW_PRICE_LOCK_LINE,
+    getPlan,
+    type PlanKey,
+  } from '~~/lib/plan-catalog'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
   definePageMeta({ layout: 'app' })
@@ -46,6 +52,9 @@
   )
 
   function choose(key: PlanKey) {
+    // Beslutning AL: i beta findes ingen vælg-CTA, men UI-tilstand er ikke
+    // håndhævelsen — serveren afviser uanset (403 `beta_paid_plans_closed`).
+    if (BETA_MODE) return
     checkoutError.value = null
     businessConfirmed.value = false
     tosAccepted.value = false
@@ -98,8 +107,18 @@
       <GTBadge variant="warning">{{ t('plans.introBadge') }}</GTBadge>
       <h1 class="mt-3 mb-2">{{ t('plans.title') }}</h1>
       <p class="text-tertiary m-0">{{ t('plans.lead') }}</p>
-      <p v-if="SHOW_PRICE_LOCK_LINE" class="text-tertiary text-sm mt-2 mb-0">
+      <!-- Jura-krav studio-beta-1.0 pkt. 6: intro-pris-løftet ("beholder
+           deres pris i minimum 12 måneder") må IKKE vises i beta — det lover
+           noget til folk, der ikke kan tegne. Efter launch må linjen KUN
+           genopstå som juras kanoniske §6-kortformulering. -->
+      <p v-if="SHOW_PRICE_LOCK_LINE && !BETA_MODE" class="text-tertiary text-sm mt-2 mb-0">
         {{ t('plans.priceLock') }}
+      </p>
+      <!-- Jura-krav studio-beta-1.0 pkt. 7 (stående krav): "Priser er ekskl.
+           moms" skal stå på selve prissiden — modalens vatNote er ikke nok,
+           og i beta åbner modalen slet ikke. -->
+      <p class="text-tertiary text-sm mt-2 mb-0">
+        {{ t('plans.vatExclNote') }}
       </p>
       <!-- Jura-krav 2026-08-04: font-fil-loftet skal fremgå af prissiden
            (aftale-kilden) — bevidst IKKE i ToS. Ordret "4 fontfiler i alt". -->
@@ -115,6 +134,14 @@
         />
       </div>
     </header>
+
+    <!-- Beslutning AL (2026-08-27): beta-notits. Ordlyden er [jura]s
+         KANONISKE tekst (docs-repoet legal/consent-tekster.md, label
+         studio-beta-1.0) og pinnes ordret i tests/beta-copy.test.ts —
+         det viste = det kanoniske, byte-identisk (kravliste pkt. 1+5). -->
+    <GTAlert v-if="BETA_MODE" variant="info" :heading="t('plans.beta.title')" class="mb-6">
+      {{ t('plans.beta.notice') }}
+    </GTAlert>
 
     <div class="plans-grid">
       <article
@@ -161,7 +188,14 @@
           </GTButton>
         </template>
         <template v-else-if="plan.purchasable">
+          <!-- Beta (Beslutning AL): betalte tiers vises ANNONCERET, ikke
+               købbare — købs-CTA'en ERSTATTES af den kanoniske "Kommer
+               1. januar 2027" (jura-kravliste, badge/CTA-erstatning). -->
+          <GTButton v-if="BETA_MODE" variant="secondary" size="sm" block disabled>
+            {{ t('plans.beta.comingSoon') }}
+          </GTButton>
           <GTButton
+            v-else
             :variant="plan.highlighted ? 'primary' : 'secondary'"
             size="sm"
             block

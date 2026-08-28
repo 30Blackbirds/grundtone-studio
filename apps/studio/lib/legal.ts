@@ -26,6 +26,13 @@ export const ATTESTATION_VERSION = 'studio-b2b-erklaering-2026-08-02'
 // ændres ordlyden, skal denne bumpes i samme diff, og tests/legal-copy.test.ts
 // pinner ordlydens substans så en ændring ikke kan ske ubemærket.
 export const FONT_LICENCE_VERSION = 'studio-font-licence-1.0'
+// Beta-notice + tier-annoncering (Beslutning AL). VIST tekst, ikke en
+// afkrydsning — intet bevis-spor pr. person (juras kravliste pkt. 4);
+// dokumentationen af hvad der blev vist hvornår er pinning-testen
+// (tests/beta-copy.test.ts) + kildens git-historik. Kanonisk hjem:
+// docs-repoet legal/consent-tekster.md. Ved launch UDGÅR labelen (fladen
+// fjerner teksten og testen i samme commit); genbruges aldrig.
+export const BETA_NOTICE_VERSION = 'studio-beta-1.0'
 // Retention for bevis-rækken (jura §16a): slettes N år efter at filen SIDST
 // blev serveret — uanset hvorfor leveringen ophørte. 10 år er det konservative
 // valg: 3-årsfristen løber ved ukendskab først fra det tidspunkt rettighedshaveren

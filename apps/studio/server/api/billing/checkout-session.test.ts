@@ -95,10 +95,82 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
   })
 
+  // Beta-vaernet staar foran den dormante 503, saa et almindeligt org naar den
+  // ikke laengere. Testens intention — at et usat ACCOUNT_URL rapporteres som
+  // dormant og ikke som noget andet — er uaendret gyldig og maales nu gennem et
+  // internt org, der passerer vaernet. Testen er tilpasset, ikke slettet:
+  // 503-kontrakten er stadig en kontrakt, den er bare flyttet bagom vaernet.
   it('503s dormant when ACCOUNT_URL is unset — with a fully valid body', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+
     await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
       statusCode: 503,
       data: { code: 'billing_unavailable' },
     })
+
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+  })
+})
+
+describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
+  // 🔴 Den NEGATIVE test: et direkte POST med en fuldt gyldig body afvises.
+  // Det er hele pointen med server-side lukning — en skjult eller disabled
+  // knap i UI'et er ingen håndhævelse, og denne test går uden om UI'et.
+  it('403er et gyldigt købsforsøg med juras fejlkode', async () => {
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'beta_paid_plans_closed' },
+    })
+  })
+
+  it('afviser hver betalt plan, ikke kun én', async () => {
+    for (const planKey of ['studio_solo', 'studio_studio', 'studio_scale']) {
+      await expect(handler(authedEvent({ ...VALID_BODY, planKey }))).rejects.toMatchObject({
+        statusCode: 403,
+        data: { code: 'beta_paid_plans_closed' },
+      })
+    }
+  })
+
+  // 🔴 POSITIV KONTROL. Uden den beviser testene ovenfor kun, at ALT afvises —
+  // og en gate, der afviser alt, er ikke til at skelne fra en i stykker.
+  // KlangHaus' egne orgs skal komme FORBI værnet (Allans tillæg), og det ses
+  // ved, at kaldet nu fejler på den dormante 503 i stedet: et andet svar,
+  // længere nede i handleren.
+  it('lader KlangHaus egne orgs passere værnet (Allans tillæg)', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-internal'
+    nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 503 })
+
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+  })
+
+  // Undtagelsen hviler på org-id'et fra auth, ikke på noget klienten sender.
+  it('lader ikke et org slippe forbi ved at ligne et internt i bodyen', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-internal'
+    nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(
+      handler(authedEvent({ ...VALID_BODY, organizationSlug: 'org-internal' })),
+    ).rejects.toMatchObject({ statusCode: 403, data: { code: 'beta_paid_plans_closed' } })
+
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+  })
+
+  // 🔴 Usat liste = INGEN undtagelse. En glemt konfiguration skal lukke mere,
+  // ikke mindre — den modsatte default ville gøre en tastefejl til en åben dør.
+  it('giver ingen undtagelse når listen er usat', async () => {
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+    nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  // Rækkefølgen bærer betydning: svaret på et gyldigt købsforsøg i beta er
+  // "køb er lukket", ikke "billing er utilgængelig".
+  it('står før den dormante 503', async () => {
+    delete process.env.ACCOUNT_URL
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
   })
 })

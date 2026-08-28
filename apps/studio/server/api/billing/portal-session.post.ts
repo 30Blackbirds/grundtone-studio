@@ -1,6 +1,8 @@
 import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
+import { BETA_MODE } from '~~/lib/plan-catalog'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
+import { isInternalOrg } from '~~/server/lib/internal-orgs'
 import { lookupOrgBySlug } from '~~/server/lib/org-lookup'
 import { orgRoleHelpers, type OrgRole } from '~~/server/lib/project-access'
 
@@ -30,6 +32,28 @@ export default defineEventHandler(async (event) => {
   const role = org.members?.find((m) => m.userId === actor.sub)?.role
   if (!role || !orgRoleHelpers.canManageBilling(role as OrgRole)) {
     throw createError({ statusCode: 403, statusMessage: 'Requires the owner or billing role' })
+  }
+
+  // Beslutning AL + jura-kravliste studio-beta-1.0 pkt. 2: Stripe Billing
+  // Portal kan — afhængigt af accounts portal-konfiguration — også skifte
+  // plan, så den er en opgraderings-sidedør, ikke kun kortskifte. I beta
+  // findes ingen betalende kunder (AL's målte baggrund: 0 i Stripe live-mode),
+  // så en lukket dør koster intet og lukker sidedøren server-side sammen med
+  // checkout. Samme jura-fejlkode, samme larmende afvisning.
+  // Beslutning AL's tillæg (Allan): KlangHaus' EGNE tenants rammes ikke af
+  // vaernet. Kontrollen er SERVER-SIDE og hviler paa org-id'et fra
+  // `lookupOrgBySlug` — altsaa fra auth, ikke fra request-bodyen. En klient
+  // kan hverken vaelge listen eller hvilket org der slaas op; ellers ville
+  // undtagelsen selv vaere omgaaelsesvejen ([sikkerheds] krav).
+  if (BETA_MODE && !isInternalOrg(org.id)) {
+    console.warn(
+      `[billing] beta: portal-session attempt rejected (org=${parsed.data.organizationSlug})`,
+    )
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Paid plans open 1 January 2027',
+      data: { code: 'beta_paid_plans_closed' },
+    })
   }
 
   const accountUrl = process.env.ACCOUNT_URL
