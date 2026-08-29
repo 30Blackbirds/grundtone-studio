@@ -14,6 +14,7 @@
   },
   "footer": {
     "installGuide": "Install guide",
+    "terms": "Subscription Terms",
     "privacy": "Privacy",
     "dpa": "DPA",
     "subProcessors": "Sub-processors"
@@ -874,6 +875,12 @@
     "title": "Pricing that follows your brands, not your colleagues",
     "lead": "Per brand, not per seat. Invite the whole team — pay only for what is actually live.",
     "priceLock": "Introductory pricing — prices rise as the product grows. Early customers keep their price for at least 12 months.",
+    "vatExclNote": "Prices are exclusive of VAT.",
+    "beta": {
+      "title": "Beta",
+      "notice": "Grundtone Studio is in beta. The free plan is the only plan available during the beta period. The paid plans are announced and open for purchase on 1 January 2027 — until then they can be neither purchased nor pre-ordered. Announced prices are introductory prices and are indicative until launch.",
+      "comingSoon": "Coming 1 January 2027"
+    },
     "orgSelect": "Organization",
     "names": {
       "studio_free": "Free",

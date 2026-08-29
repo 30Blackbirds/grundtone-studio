@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
 import { CHECKOUT_PLAN_KEYS, getPlan } from '~~/lib/plan-catalog'
 
@@ -48,6 +48,10 @@ beforeEach(() => {
   delete process.env.ACCOUNT_URL
 })
 
+afterEach(() => {
+  delete process.env.STUDIO_INTERNAL_ORG_IDS
+})
+
 describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
   it('401s without auth', async () => {
     await expect(handler(fakeEvent({ body: VALID_BODY, context: {} }))).rejects.toMatchObject({
@@ -76,9 +80,26 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
     await expect(handler(authedEvent(body))).rejects.toMatchObject({ statusCode: 400 })
   })
 
-  it('403s for roles without billing rights', async () => {
+  // 🔴 Assertionen binder til statusMessage, ikke bare til 403. Rolle-tjekket
+  // OG beta-vaernet svarer begge 403, saa `toMatchObject({ statusCode: 403 })`
+  // alene kan ikke se forskel paa dem — den bestaar uanset hvilket af dem der
+  // fyrede. [review] maalte det: de byttede raekkefoelgen og fik 12/12 groenne.
+  it('403s for roles without billing rights — med rollens EGEN besked', async () => {
     nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'member' }] }
-    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
+    // `statusMessage` er ikke en egen enumerable property paa h3's error, saa
+    // toMatchObject kan ikke se den — beskeden naas via Error.message, og
+    // `data` er den anden observerbare forskel.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
+      'Requires the owner or billing role',
+    )
+    // Laaser ogsaa mockens egen form: fjernes `err.statusMessage` fra
+    // createError-mocken ovenfor, bliver DENNE linje roed. Uden den var
+    // mock-rettelsen sand men ikke holdt fast — og en senere kopi-indsaettelse
+    // af den gamle mock ville gaa ubemaerket igennem.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 403,
+      statusMessage: 'Requires the owner or billing role',
+    })
   })
 
   // 🔴 Gør purchasable-tjekkets LATENS eksekverbar. Tjekket i handleren er i
@@ -89,6 +110,7 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
   it.each([...CHECKOUT_PLAN_KEYS])(
     'lader planen %s passere purchasable-tjekket',
     async (planKey) => {
+      process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
       await expect(handler(authedEvent({ ...VALID_BODY, planKey }))).rejects.toMatchObject({
         statusCode: 503,
       })
@@ -101,11 +123,96 @@ describe('POST /api/billing/checkout-session (§1a accept-gate)', () => {
   it.each([...CHECKOUT_PLAN_KEYS])('plan %s er købbar i kataloget', (planKey) => {
     expect(getPlan(planKey).purchasable).toBe(true)
   })
+  // 🔴 RAEKKEFOELGEN rolle-tjek FOER beta-vaernet, pinnet gennem den ENESTE
+  // observerbare forskel: fejlkoden. Uden denne test er raekkefoelgen frit
+  // omflyttelig, fordi begge svarer 403.
+  //
+  // Hvorfor raekkefoelgen betyder noget: fyrede beta-vaernet foerst, ville en
+  // kaldere UDEN billing-rettigheder faa at vide at betalte planer aabner
+  // 1. januar 2027 — altsaa laere noget om vores billing-tilstand, som
+  // vedkommende ikke er autoriseret til at spoerge om. Autorisation foerst.
+  it('lader rolle-tjekket fyre FOER beta-vaernet, ikke omvendt', async () => {
+    nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'member' }] }
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toThrowError(
+      'Requires the owner or billing role',
+    )
+    // Og eksplicit: beta-koden maa IKKE vaere den der naaede frem foerst.
+    // Begge svarer 403, saa fejlkoden er den eneste observerbare forskel.
+    await expect(handler(authedEvent(VALID_BODY))).rejects.not.toMatchObject({
+      data: { code: 'beta_paid_plans_closed' },
+    })
+  })
 
+  // Beta-vaernet staar foran den dormante 503, saa et almindeligt org naar den
+  // ikke laengere. Testens intention — at et usat ACCOUNT_URL rapporteres som
+  // dormant og ikke som noget andet — er uaendret gyldig og maales nu gennem et
+  // internt org, der passerer vaernet. Testen er tilpasset, ikke slettet:
+  // 503-kontrakten er stadig en kontrakt, den er bare flyttet bagom vaernet.
   it('503s dormant when ACCOUNT_URL is unset — with a fully valid body', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+
     await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
       statusCode: 503,
       data: { code: 'billing_unavailable' },
     })
+  })
+})
+
+describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
+  // 🔴 Den NEGATIVE test: et direkte POST med en fuldt gyldig body afvises.
+  // Det er hele pointen med server-side lukning — en skjult eller disabled
+  // knap i UI'et er ingen håndhævelse, og denne test går uden om UI'et.
+  it('403er et gyldigt købsforsøg med juras fejlkode', async () => {
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'beta_paid_plans_closed' },
+    })
+  })
+
+  it('afviser hver betalt plan, ikke kun én', async () => {
+    for (const planKey of ['studio_solo', 'studio_studio', 'studio_scale']) {
+      await expect(handler(authedEvent({ ...VALID_BODY, planKey }))).rejects.toMatchObject({
+        statusCode: 403,
+        data: { code: 'beta_paid_plans_closed' },
+      })
+    }
+  })
+
+  // 🔴 POSITIV KONTROL. Uden den beviser testene ovenfor kun, at ALT afvises —
+  // og en gate, der afviser alt, er ikke til at skelne fra en i stykker.
+  // KlangHaus' egne orgs skal komme FORBI værnet (Allans tillæg), og det ses
+  // ved, at kaldet nu fejler på den dormante 503 i stedet: et andet svar,
+  // længere nede i handleren.
+  it('lader KlangHaus egne orgs passere værnet (Allans tillæg)', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-internal'
+    nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 503 })
+  })
+
+  // Undtagelsen hviler på org-id'et fra auth, ikke på noget klienten sender.
+  it('lader ikke et org slippe forbi ved at ligne et internt i bodyen', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-internal'
+    nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(
+      handler(authedEvent({ ...VALID_BODY, organizationSlug: 'org-internal' })),
+    ).rejects.toMatchObject({ statusCode: 403, data: { code: 'beta_paid_plans_closed' } })
+  })
+
+  // 🔴 Usat liste = INGEN undtagelse. En glemt konfiguration skal lukke mere,
+  // ikke mindre — den modsatte default ville gøre en tastefejl til en åben dør.
+  it('giver ingen undtagelse når listen er usat', async () => {
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+    nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
+
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  // Rækkefølgen bærer betydning: svaret på et gyldigt købsforsøg i beta er
+  // "køb er lukket", ikke "billing er utilgængelig".
+  it('står før den dormante 503', async () => {
+    delete process.env.ACCOUNT_URL
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
   })
 })

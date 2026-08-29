@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
+import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
@@ -19,6 +20,7 @@ export default defineEventHandler(async (event) => {
   const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
 
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
+  assertBetaPurchasesClosed(org.id, 'portal-session')
 
   const accountUrl = requireAccountUrl()
   const appUrl = useRuntimeConfig(event).public.appUrl

@@ -150,6 +150,23 @@ export const CHECKOUT_PLAN_KEYS = ['studio_solo', 'studio_studio', 'studio_scale
 
 export const SHOW_PRICE_LOCK_LINE = true
 
+// ─── Beslutning AL (Allan, 2026-08-27): Q4 2026 = BETA ──────────────────────
+// Kun gratis-modellen kan vælges. De betalte tiers VISES som "Kommer
+// 1. januar 2027" (annonceret, ikke købbar), og købs-stien er lukket
+// SERVER-SIDE i server/api/billing/checkout-session.post.ts +
+// portal-session.post.ts (403, juras fejlkode `beta_paid_plans_closed`) —
+// en skjult knap er ingen håndhævelse. Kanonisk tekst + kravliste:
+// docs-repoet legal/consent-tekster.md, label `studio-beta-1.0`.
+//
+// Jura-krav pkt. 3: genåbning ved EKSPLICIT konfiguration, ikke ur — flippes
+// til false i sin EGEN PR ved officiel launch 1/1-2027, en menneskelig
+// handling gennem Allans tag-cut. Et ur ville åbne salget, selv hvis en
+// launch-gate (jura/billing/Billy-cutover) var skredet. Ved flip: fjern
+// beta-teksterne + tests/beta-copy.test.ts i samme commit (labelen udgår),
+// og priceLock-linjen må KUN genopstå som juras kanoniske §6-kortformulering.
+// tests/beta-copy.test.ts pinner flaget, så flip-PR'en SKAL røre testen.
+export const BETA_MODE = true
+
 export function getPlan(key: PlanKey): PlanDef {
   return PLAN_CATALOG.find((p) => p.key === key)!
 }

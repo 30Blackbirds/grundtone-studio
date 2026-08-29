@@ -2,6 +2,7 @@ import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
+import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 
@@ -53,6 +54,8 @@ export default defineEventHandler(async (event) => {
   // Purchases change the org's billing relationship — Sentry-style role model
   // reserves that for owner/billing (not admin/manager, who manage people).
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')
+
+  assertBetaPurchasesClosed(org.id, 'checkout')
 
   // Dormant-503 FØR runtime-config og body: et usat ACCOUNT_URL skal
   // rapportere sig som dormant, ikke som en fejl længere inde.

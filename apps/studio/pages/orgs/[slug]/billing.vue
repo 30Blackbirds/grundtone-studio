@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue'
-  import { PLAN_CATALOG, type PlanDef } from '~~/lib/plan-catalog'
+  import { BETA_MODE, PLAN_CATALOG, type PlanDef } from '~~/lib/plan-catalog'
   import type { BillingInvoice, BillingSubscription } from '~~/server/lib/billing-read'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
@@ -190,7 +190,13 @@
           </div>
 
           <div class="flex gap-2">
-            <GTButton v-if="upgradeTarget" size="sm" @click="navigateTo(`/plans?org=${slug}`)">
+            <!-- Beta (Beslutning AL): ingen opgraderings-CTA — /plans viser
+                 beta-tilstanden, og serveren afviser købet uanset. -->
+            <GTButton
+              v-if="upgradeTarget && !BETA_MODE"
+              size="sm"
+              @click="navigateTo(`/plans?org=${slug}`)"
+            >
               {{ t('billing.upgradeTo', { plan: t(`plans.names.${upgradeTarget}`) }) }}
             </GTButton>
             <GTButton variant="secondary" size="sm" @click="navigateTo(`/plans?org=${slug}`)">

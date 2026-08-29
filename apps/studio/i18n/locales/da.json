@@ -14,6 +14,7 @@
   },
   "footer": {
     "installGuide": "Installations-guide",
+    "terms": "Abonnementsvilkår",
     "privacy": "Privatlivspolitik",
     "dpa": "Databehandleraftale",
     "subProcessors": "Underleverandører"
@@ -874,6 +875,12 @@
     "title": "Priser der følger dine brands, ikke dine kolleger",
     "lead": "Per brand, ikke per bruger. Inviter hele holdet — betal kun for det der faktisk er live.",
     "priceLock": "Introduktionspriser — priserne stiger i takt med at produktet vokser. Tidlige kunder beholder deres pris i minimum 12 måneder.",
+    "vatExclNote": "Priser er ekskl. moms.",
+    "beta": {
+      "title": "Beta",
+      "notice": "Grundtone Studio er i beta. Den gratis plan er den eneste, der kan tegnes i beta-perioden. De betalte planer er annonceret og åbner for køb den 1. januar 2027 — indtil da kan de hverken købes eller forudbestilles. Annoncerede priser er introduktionspriser og er vejledende frem til lanceringen.",
+      "comingSoon": "Kommer 1. januar 2027"
+    },
     "orgSelect": "Organisation",
     "names": {
       "studio_free": "Free",

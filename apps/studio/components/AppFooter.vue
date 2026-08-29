@@ -12,6 +12,13 @@
       {{ t('changelog.title') }}
     </NuxtLink>
     <span>·</span>
+    <!-- Jura-krav studio-beta-1.0 pkt. 8: vilkårene (og dermed aftaleparten
+         Asp Productions ApS) skal være ét klik væk fra prissiden — footeren
+         linkede privacy/dpa/sub-processors, men ikke vilkårene. -->
+    <NuxtLink to="/legal/terms" class="no-underline text-inherit">
+      {{ t('footer.terms') }}
+    </NuxtLink>
+    <span>·</span>
     <NuxtLink to="/privacy" class="no-underline text-inherit">
       {{ t('footer.privacy') }}
     </NuxtLink>

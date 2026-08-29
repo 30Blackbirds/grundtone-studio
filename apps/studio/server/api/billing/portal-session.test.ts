@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fixtures'
 
 // Portal-sessionen var hidtil kun dækket i ANDEN HÅND — gennem checkout-testen,
@@ -12,6 +12,7 @@ let nextOrg: {
   id: string
   members?: { userId: string; role: string }[]
 } | null = null
+const originalAccountUrl = process.env.ACCOUNT_URL
 
 vi.mock('h3', () => mockH3())
 vi.mock('~~/server/lib/org-lookup', () => ({
@@ -36,6 +37,19 @@ function authedEvent(body: Record<string, unknown>): FakeEvent {
 beforeEach(() => {
   nextOrg = { id: 'org-1', members: [{ userId: 'user-1', role: 'owner' }] }
   delete process.env.ACCOUNT_URL
+})
+
+// Samme oprydning som i checkout-session.test.ts: env-variablen maa ikke
+// laekke til de foelgende tests. En test der bestaar, fordi en variabel blev
+// sat i en TIDLIGERE test, er ikke til at skelne fra en der bestaar af egen
+// kraft — og raekkefoelgen kan aendre sig uden at nogen roerer testen.
+afterEach(() => {
+  delete process.env.STUDIO_INTERNAL_ORG_IDS
+})
+
+afterAll(() => {
+  if (originalAccountUrl === undefined) delete process.env.ACCOUNT_URL
+  else process.env.ACCOUNT_URL = originalAccountUrl
 })
 
 describe('POST /api/billing/portal-session (§7a kortskifte)', () => {
@@ -66,10 +80,38 @@ describe('POST /api/billing/portal-session (§7a kortskifte)', () => {
     })
   })
 
+  // 🔴 BETA-VAERNET PAA DENNE RUTE var UMAALT indtil nu. Maalt: neutraliseres
+  // `assertBetaPurchasesClosed`, bestod hele filen alligevel 5/5 — kun den
+  // DELTE funktion var daekket (`beta-purchases.test.ts`), ikke rutens VALG om
+  // at kalde den. Det er samme klasse som "ekstraktion goer vaernet til et
+  // argument": helperen er testet, kaldestedet er det ikke.
+  //
+  // Portal-doeren er ikke mindre vigtig end checkout: Stripe-portalen kan
+  // skifte plan afhaengigt af konfiguration, saa et aabent portal-endpoint
+  // ville vaere en opgraderingsvej udenom beta-lukningen.
+  it('403er et almindeligt org med juras fejlkode (beta-vaernet paa portal-ruten)', async () => {
+    delete process.env.STUDIO_INTERNAL_ORG_IDS
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'beta_paid_plans_closed' },
+    })
+  })
+
   // 🔴 POSITIV KONTROL. Uden den beviser testene ovenfor kun, at ALT afvises —
   // og en gate der afviser alt er ikke til at skelne fra en i stykker. Et
   // gyldigt kald skal nå LÆNGERE ned i handleren: til den dormante 503.
   it('503s dormant when ACCOUNT_URL is unset — with a valid body and the billing role', async () => {
+    // Beta-vaernet (Beslutning AL) staar mellem rolle-tjekket og den dormante
+    // 503, saa et almindeligt org naar den ikke laengere. Kontrollen maales
+    // derfor gennem et INTERNT org, der passerer vaernet.
+    //
+    // 🔴 Den nemme "rettelse" ville vaere at forvente 403 her. Det ville
+    // OEDELAEGGE kontrollen: den ville saa assertere praecis det samme som de
+    // negative tests ovenfor, og filen ville kun bevise at ALT afvises — som
+    // er nøjagtig det, kommentaren ovenfor siger at kontrollen findes for at
+    // udelukke. Et gyldigt kald skal naa LAENGERE ned, ikke lige saa kort.
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+
     await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
       statusCode: 503,
       data: { code: 'billing_unavailable' },
