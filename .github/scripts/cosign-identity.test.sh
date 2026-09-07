@@ -66,6 +66,26 @@ run "revision er ikke 40 hex"  "{\"Cert\":{\"Raw\":\"$BAD_REV\"}}" 2 "ikke 40 he
 BAD_REF=$(mkcert "https://token.actions.githubusercontent.com" "$REV" "hovedgren")
 run "ref er ikke en git-ref"   "{\"Cert\":{\"Raw\":\"$BAD_REF\"}}" 2 "ligner ikke en git-ref"
 run "ukendt bundle-form"       '{"noget":"andet"}'                 2 "ukendt bundle-form"
+
+# 🔴 MANGLENDE felter. [review]s fund: de oevrige fejl-testcases kortslutter
+# i TIDLIGERE grene og naar aldrig frem til udtraekket, saa en regression
+# dér ville ikke blive fanget. Certifikatet skal derfor vaere velformet paa
+# alt ANDET end det felt vi fjerner.
+NO_SAN=$(openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+  -keyout "$TMP/k.pem" -out "$TMP/c.pem" -days 1 -subj "/CN=t" \
+  -addext "1.3.6.1.4.1.57264.1.1=DER:$(hexof 'https://token.actions.githubusercontent.com')" \
+  -addext "1.3.6.1.4.1.57264.1.3=DER:$(hexof "$REV")" \
+  -addext "1.3.6.1.4.1.57264.1.6=DER:$(hexof 'refs/heads/main')" >/dev/null 2>&1; \
+  openssl x509 -in "$TMP/c.pem" -outform DER | base64 | tr -d '\n')
+run "cert UDEN URI-SAN"        "{\"Cert\":{\"Raw\":\"$NO_SAN\"}}"        2 "felt 'identitet' mangler"
+
+NO_ISS=$(openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+  -keyout "$TMP/k.pem" -out "$TMP/c.pem" -days 1 -subj "/CN=t" \
+  -addext "subjectAltName=URI:$IDENT" \
+  -addext "1.3.6.1.4.1.57264.1.3=DER:$(hexof "$REV")" \
+  -addext "1.3.6.1.4.1.57264.1.6=DER:$(hexof 'refs/heads/main')" >/dev/null 2>&1; \
+  openssl x509 -in "$TMP/c.pem" -outform DER | base64 | tr -d '\n')
+run "cert UDEN issuer-OID"     "{\"Cert\":{\"Raw\":\"$NO_ISS\"}}"        2 "felt 'issuer' mangler"
 run "tom bundle"               ''                                  2 "tom bundle"
 
 # identitet der ikke matcher det pinnede moenster
