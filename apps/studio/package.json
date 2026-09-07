@@ -37,7 +37,7 @@
     "@grundtone/core": "^2.22.0",
     "@grundtone/nuxt": "^2.23.3",
     "@grundtone/vue": "^2.23.3",
-    "@klanghaus/auth-jwt": "0.1.0-local.0",
+    "@klanghaus/auth-jwt": "^0.2.0",
     "@klanghaus/permissions-client": "0.3.0-local.0",
     "@noble/hashes": "^2.2.0",
     "@nuxtjs/i18n": "^10.4.0",
