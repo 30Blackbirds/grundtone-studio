@@ -405,9 +405,12 @@ jobs:
           # men den kunne ikke laenger AFLAESES. Scriptet laeser certifikatets
           # SAN og daekker BEGGE bundle-former, saa linjen overlever et
           # signer-versionsskift i begge retninger.
-          IDENT_LINE=$(.github/scripts/cosign-identity.sh "$IMAGE")
-          echo "  identitet i signaturen: $(printf '%s' "$IDENT_LINE" | cut -f1)"
-          echo "  issuer i signaturen:    $(printf '%s' "$IDENT_LINE" | cut -f2)"
+          # Identiteten haandhaeves ovenfor af --certificate-identity-regexp;
+          # her UDLEDES den af certifikatet og kontrolleres mod det SAMME
+          # pinnede moenster — to uafhaengige veje til samme svar. Skriver
+          # ogsaa kilde-revision og ref, som er kryptografisk bundet til
+          # imaget og derfor kryds-bekraefter hvilken koersel der byggede det.
+          .github/scripts/cosign-identity.sh "$IMAGE" "$PINNED"
 
           # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
           # maaler verifikationen ingenting.
