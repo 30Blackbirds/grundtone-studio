@@ -385,29 +385,32 @@ jobs:
           set -euo pipefail
           [ -n "$IMAGE" ] || { echo "::error::intet image at verificere — signerings-steppet gav ingen output"; exit 1; }
 
-          # stdout FANGES i stedet for at ryge i /dev/null: identiteten staar
-          # i payloaden, og uden den er post-merge-beviset kun "steppet blev
-          # groent". Den forventede observation er skrevet ned i PR-teksten
-          # FOER foerste main-push — ellers er "det blev groent" en erindring,
-          # ikke en maaling.
-          if ! VERIFIED=$(cosign verify "$IMAGE" \
+          # stdout i /dev/null: payloaden er stoejende, og identiteten staar
+          # den IKKE laenger i — cosign 3.0.6 skriver "optional":{} (tom),
+          # hvor 2.x bar Subject og Issuer. Den blev tidligere fanget her
+          # netop for at goere post-merge-beviset mere end "steppet blev
+          # groent"; den opgave er nu flyttet til cosign-identity.sh, som
+          # laeser certifikatet i ARTEFAKTET og virker i begge bundle-former.
+          if ! cosign verify "$IMAGE" \
                 --certificate-identity-regexp "$PINNED" \
-                --certificate-oidc-issuer "$ISSUER"); then
+                --certificate-oidc-issuer "$ISSUER" > /dev/null; then
             echo "::error::signaturen matcher IKKE den pinnede identitet ($PINNED)"
             exit 1
           fi
           echo "✓ signatur verificeret mod pinnet identitet"
-          # MAALT paa run 34131844473: .optional.Subject/.Issuer findes IKKE i
-          # cosign 3.0.6's payload — begge kom ud som "ukendt". Vi leder derfor
-          # bredt og DUMPER payloaden hvis felterne ikke findes, saa linjen
-          # aldrig igen paastaar at maale noget den ikke maaler.
-          IDENT=$(printf '%s' "$VERIFIED" | jq -r '[.. | objects | (.Subject? // .subject?)] | map(select(type == "string")) | first // empty' 2>/dev/null || true)
-          if [ -n "$IDENT" ]; then
-            echo "  identitet i signaturen: $IDENT"
-          else
-            echo "  ⚠ kunne ikke laese identiteten ud af payloaden — feltnavnene er aendret:"
-            printf '%s\n' "$VERIFIED" | head -c 1500
-          fi
+          # Identiteten udledes af signatur-ARTEFAKTET, ikke af verify-payloaden.
+          # MAALT paa run 34131844473: cosign 3.0.6's payload har
+          # "optional":{} — helt tom, hvor 2.x bar Subject og Issuer.
+          # Identiteten HAANDHAEVES fortsat af --certificate-identity-regexp,
+          # men den kunne ikke laenger AFLAESES. Scriptet laeser certifikatets
+          # SAN og daekker BEGGE bundle-former, saa linjen overlever et
+          # signer-versionsskift i begge retninger.
+          # Identiteten haandhaeves ovenfor af --certificate-identity-regexp;
+          # her UDLEDES den af certifikatet og kontrolleres mod det SAMME
+          # pinnede moenster — to uafhaengige veje til samme svar. Skriver
+          # ogsaa kilde-revision og ref, som er kryptografisk bundet til
+          # imaget og derfor kryds-bekraefter hvilken koersel der byggede det.
+          .github/scripts/cosign-identity.sh "$IMAGE" "$PINNED"
 
           # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
           # maaler verifikationen ingenting.
