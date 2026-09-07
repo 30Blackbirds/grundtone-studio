@@ -351,8 +351,17 @@ jobs:
             exit 1
           fi
           echo "✓ signatur verificeret mod pinnet identitet"
-          echo "  identitet i signaturen: $(printf '%s' "$VERIFIED" | jq -r '.[0].optional.Subject // "ukendt"')"
-          echo "  issuer i signaturen:    $(printf '%s' "$VERIFIED" | jq -r '.[0].optional.Issuer // "ukendt"')"
+          # MAALT paa run 34131844473: .optional.Subject/.Issuer findes IKKE i
+          # cosign 3.0.6's payload — begge kom ud som "ukendt". Vi leder derfor
+          # bredt og DUMPER payloaden hvis felterne ikke findes, saa linjen
+          # aldrig igen paastaar at maale noget den ikke maaler.
+          IDENT=$(printf '%s' "$VERIFIED" | jq -r '[.. | objects | (.Subject? // .subject?)] | map(select(type == "string")) | first // empty' 2>/dev/null || true)
+          if [ -n "$IDENT" ]; then
+            echo "  identitet i signaturen: $IDENT"
+          else
+            echo "  ⚠ kunne ikke laese identiteten ud af payloaden — feltnavnene er aendret:"
+            printf '%s\n' "$VERIFIED" | head -c 1500
+          fi
 
           # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
           # maaler verifikationen ingenting.
@@ -369,11 +378,27 @@ jobs:
           # fail-open paa — en parse-fejl paa noget der ikke er der.
           #
           # Maalet er vores EGET signatur-artefakt: cosign gemmer signaturen
-          # som tagget sha256-<digest>.sig, og vi signerer aldrig signaturer.
+          # som et tag afledt af digest'et, og vi signerer aldrig signaturer.
           # Det er derfor et objekt i vores eget registry som deterministisk
           # er usigneret — ingen ekstern afhaengighed, ingen Docker Hub-rate-
           # limit, og ingen tvivl om hvem der ejer det.
-          UNSIGNED="${IMAGE%@*}:$(echo "${IMAGE#*@}" | tr ':' '-').sig"
+          # 🔴 Signatur-tagget skifter format med cosign-versionen. MAALT paa
+          # run 34131844473: cosign 2.x lagde signaturen paa
+          # sha256-<digest>.sig, mens 3.0.6 laegger den paa sha256-<digest>
+          # UDEN suffiks. Vi hardkoder derfor ingen af delene, men proever
+          # begge og fejler HOEJLYDT hvis ingen findes.
+          SIGBASE="${IMAGE%@*}:$(echo "${IMAGE#*@}" | tr ':' '-')"
+          UNSIGNED=""
+          for CAND in "$SIGBASE" "$SIGBASE.sig"; do
+            if docker buildx imagetools inspect "$CAND" > /dev/null 2>&1; then
+              UNSIGNED="$CAND"; break
+            fi
+          done
+          if [ -z "$UNSIGNED" ]; then
+            echo "::error::fandt intet signatur-artefakt paa hverken $SIGBASE eller $SIGBASE.sig — cellen kan ikke maale noget"
+            exit 1
+          fi
+          echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
           if OUT=$(cosign verify "$UNSIGNED" \
                 --certificate-identity-regexp "$PINNED" \
                 --certificate-oidc-issuer "$ISSUER" 2>&1); then
@@ -425,7 +450,23 @@ jobs:
             echo "::error::kunne ikke slaa $NAME:latest op — cellen kan ikke maale noget, og et tavst spring ville se ud som success"
             exit 1
           }
-          UNSIGNED="$NAME:$(echo "$DIGEST" | tr ':' '-').sig"
+          # Samme to-kandidat-probe som celle 4: signatur-tagget skifter format
+          # med cosign-versionen (2.x: sha256-<digest>.sig · 3.0.6:
+          # sha256-<digest> uden suffiks). Hardkoder vi ét af dem, fejler
+          # cellen naar formatet skifter — praecis som den gjorde paa
+          # run 34131844473.
+          SIGBASE="$NAME:$(echo "$DIGEST" | tr ':' '-')"
+          UNSIGNED=""
+          for CAND in "$SIGBASE" "$SIGBASE.sig"; do
+            if docker buildx imagetools inspect "$CAND" > /dev/null 2>&1; then
+              UNSIGNED="$CAND"; break
+            fi
+          done
+          if [ -z "$UNSIGNED" ]; then
+            echo "::error::fandt intet signatur-artefakt paa hverken $SIGBASE eller $SIGBASE.sig — cellen kan ikke maale noget"
+            exit 1
+          fi
+          echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
 
           if OUT=$(cosign verify "$UNSIGNED" \
                 --certificate-identity-regexp "$PINNED" \
