@@ -230,3 +230,15 @@ jobs:
         with:
           node-version-file: .nvmrc
       - uses: raven-actions/actionlint@v2
+
+      # 🔴 Koerbart vaern for .github/scripts/cosign-sig-ref.sh. Det ligger
+      # her og ikke i en commit-besked, fordi en engangsmaaling er en
+      # PAASTAND: de tre tag-format-tilstande var testet én gang lokalt mod
+      # stubs der aldrig blev committet, saa [review] kunne ikke genskabe
+      # dem, og ingen ville opdage hvis scriptet holdt op med at virke.
+      #
+      # En hardkodet antagelse om ét tag-format gjorde main roed TO gange
+      # (#245, #246). Testen er selv mutationstestet: den fanger begge
+      # hardkodninger og et manglende exit 1 naar intet artefakt findes.
+      - name: Cosign sig-ref script guard
+        run: ./.github/scripts/cosign-sig-ref.test.sh
