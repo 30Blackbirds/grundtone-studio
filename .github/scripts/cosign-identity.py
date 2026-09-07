@@ -13,6 +13,20 @@ udtraek og fandt TO defekter i det:
      ud som en git-SHA. Et forkert svar der ser rigtigt ud er vaerre end et
      tomt.
 
+🔴 x509CertificateChain-grenen (v0.3+-bundles): HVAD DER ER MAALT, OG HVAD
+DER IKKE ER. Begge retninger er maalt med AEGTE certifikater fra vores egen
+kaede (aeb4f67f):
+  leaf paa [0]          -> korrekt udtraek, alle fire felter
+  intermediate paa [0]  -> exit 2, "felt 'identitet' mangler" (fail-closed,
+                           fordi et intermediate hverken baerer URI-SAN
+                           eller Fulcio-OID'er)
+ANTAGET er kun RAEKKEFOELGEN: at et aegte v0.3+-bundle fra vores pipeline
+laegger leaf'en paa [0]. Ingen har set et endnu — vores egne 2.x-bundles har
+leaf i .Cert og .Chain = [intermediate, root]. Ser nogen et aegte
+kaede-bundle: bekraeft raekkefoelgen foer den behandles som maalt.
+Konsekvensen af at antagelsen er forkert er kendt og ufarlig: vi fejler
+LUKKET med en navngivet fejl, ikke med en tom eller gaettet identitet.
+
 Derfor: EKSAKT OID-match, FAIL-CLOSED paa alt uventet, og VAERDI-formede
 assertions — "afviser den skrald?" og "laeser den det rigtige felt?" er to
 forskellige spoergsmaal, og exit-koden alene svarer kun paa det foerste.

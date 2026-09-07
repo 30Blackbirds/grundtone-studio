@@ -86,6 +86,21 @@ NO_ISS=$(openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nod
   -addext "1.3.6.1.4.1.57264.1.6=DER:$(hexof 'refs/heads/main')" >/dev/null 2>&1; \
   openssl x509 -in "$TMP/c.pem" -outform DER | base64 | tr -d '\n')
 run "cert UDEN issuer-OID"     "{\"Cert\":{\"Raw\":\"$NO_ISS\"}}"        2 "felt 'issuer' mangler"
+
+# 🔴 x509CertificateChain-grenen (v0.3+). ANTAGELSEN er at certificates[0]
+# er LEAF'en; kun FEJL-retningen er maalt. Et intermediate baerer hverken
+# URI-SAN eller Fulcio-OID'er, saa staar det paa plads [0], SKAL vi fejle
+# lukket frem for at rapportere en tom identitet. ([sikkerhed]s fund i den
+# opskrift de selv gav os.)
+BARE=$(openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+  -keyout "$TMP/k.pem" -out "$TMP/c.pem" -days 1 -subj "/CN=sigstore-intermediate" >/dev/null 2>&1; \
+  openssl x509 -in "$TMP/c.pem" -outform DER | base64 | tr -d '\n')
+run "kaede: leaf paa plads [0]" \
+    "{\"verificationMaterial\":{\"x509CertificateChain\":{\"certificates\":[{\"rawBytes\":\"$OK\"}]}}}" \
+    0 "$REV"
+run "kaede: intermediate paa [0] -> fail-closed" \
+    "{\"verificationMaterial\":{\"x509CertificateChain\":{\"certificates\":[{\"rawBytes\":\"$BARE\"}]}}}" \
+    2 "felt 'identitet' mangler"
 run "tom bundle"               ''                                  2 "tom bundle"
 
 # identitet der ikke matcher det pinnede moenster
