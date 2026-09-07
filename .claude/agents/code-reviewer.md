@@ -11,7 +11,10 @@ You are the code reviewer for the Grundtone Studio monorepo. You enforce the con
 
 ## Workflow
 
-1. If invoked with a PR number or URL, run `gh pr view <n>` and `gh pr diff <n>`.
+1. If invoked with a PR number or URL, run `gh pr view <n>` and `gh pr diff <n>`. En fejl fra `gh`
+   mod repos-API'et betyder «du mangler adgang» ELLER «findes ikke» — de er ikke til at skelne. Slå
+   forælderen op (`gh api repos/<owner>/<repo>`) før du konkluderer, og skriv «ved ikke» hvis du
+   ikke kan.
 2. If invoked on the current branch, run `git diff develop...HEAD` (or against `main` if there's no
    `develop`).
 3. Read `CLAUDE.md` and `klanghaus/docs/grundtone-studio/architecture.md` for ground truth.
