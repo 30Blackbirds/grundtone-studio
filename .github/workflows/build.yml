@@ -339,13 +339,20 @@ jobs:
           set -euo pipefail
           [ -n "$IMAGE" ] || { echo "::error::intet image at verificere — signerings-steppet gav ingen output"; exit 1; }
 
-          if ! cosign verify "$IMAGE" \
+          # stdout FANGES i stedet for at ryge i /dev/null: identiteten staar
+          # i payloaden, og uden den er post-merge-beviset kun "steppet blev
+          # groent". Den forventede observation er skrevet ned i PR-teksten
+          # FOER foerste main-push — ellers er "det blev groent" en erindring,
+          # ikke en maaling.
+          if ! VERIFIED=$(cosign verify "$IMAGE" \
                 --certificate-identity-regexp "$PINNED" \
-                --certificate-oidc-issuer "$ISSUER" > /dev/null; then
+                --certificate-oidc-issuer "$ISSUER"); then
             echo "::error::signaturen matcher IKKE den pinnede identitet ($PINNED)"
             exit 1
           fi
           echo "✓ signatur verificeret mod pinnet identitet"
+          echo "  identitet i signaturen: $(printf '%s' "$VERIFIED" | jq -r '.[0].optional.Subject // "ukendt"')"
+          echo "  issuer i signaturen:    $(printf '%s' "$VERIFIED" | jq -r '.[0].optional.Issuer // "ukendt"')"
 
           # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
           # maaler verifikationen ingenting.
