@@ -6,6 +6,15 @@
 # fandt to defekter i deres eget udtraek: fail-open med tavst nul, og en
 # PLAUSIBEL FORKERT vaerdi hvor issuer kom ud som en git-SHA.)
 #
+# 🔴 HVAD DENNE FIL IKKE DAEKKER: Fulcio-KODNINGEN. Fixturerne er syntetiske
+# og koder OID-vaerdier som raa DER, fordi det er saadan Fulcio gjorde det da
+# vi maalte. Aendrer Fulcio kodningen, bliver disse celler ved med at bestaa
+# paa en fiktion. Det hul er IKKE aabent i systemet: Verify-cellen koerer
+# cosign-identity.sh mod det AEGTE artefakt hver main-koersel, fail-closed
+# gennem set -euo pipefail -> sys.exit(2), saa en kodningsaendring fejler
+# haardt dér. ([sikkerheds] votum c695426 — bekymringen var sand om testen
+# og falsk om systemet.) Risikoen her er LAESNING, ikke detektion.
+#
 # Certifikaterne genereres paa stedet. OID-vaerdierne kodes som RAA DER uden
 # tag/laengde, fordi det er saadan Fulcio koder dem — en ASN1:UTF8String
 # ville give to praefiks-bytes som openssl renderer som prikker, og saa
@@ -95,12 +104,25 @@ run "cert UDEN issuer-OID"     "{\"Cert\":{\"Raw\":\"$NO_ISS\"}}"        2 "felt
 BARE=$(openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
   -keyout "$TMP/k.pem" -out "$TMP/c.pem" -days 1 -subj "/CN=sigstore-intermediate" >/dev/null 2>&1; \
   openssl x509 -in "$TMP/c.pem" -outform DER | base64 | tr -d '\n')
-run "kaede: leaf paa plads [0]" \
+run "kaede-gren: parser-logikken laeser certificates[0]" \
     "{\"verificationMaterial\":{\"x509CertificateChain\":{\"certificates\":[{\"rawBytes\":\"$OK\"}]}}}" \
     0 "$REV"
-run "kaede: intermediate paa [0] -> fail-closed" \
+run "kaede-gren: fejl-retning ved intermediate paa [0]" \
     "{\"verificationMaterial\":{\"x509CertificateChain\":{\"certificates\":[{\"rawBytes\":\"$BARE\"}]}}}" \
     2 "felt 'identitet' mangler"
+
+# 🔴 FLERE SIGNATURER paa ét digest (gensigneret image). `cosign verify`
+# bestaar hvis BARE ÉN matcher, saa laeste vi kun den foerste, kunne vi
+# rapportere en ANDEN identitet end den gaten accepterede. Vi kraever derfor
+# at hver enkelt holder. Latent i dag — begge vores images har 1 linje.
+FREMMED=$(IDENT="https://github.com/KlangHaus/grundtone-studio/.github/workflows/release.yml@refs/heads/main" \
+  mkcert "https://token.actions.githubusercontent.com" "$REV" "refs/heads/main")
+run "to signaturer, begge gyldige" \
+    "$(printf '{"Cert":{"Raw":"%s"}}\n{"Cert":{"Raw":"%s"}}' "$OK" "$OK")" \
+    0 "2 signaturer paa dette digest"
+run "to signaturer, nr. 2 er FREMMED -> afvises" \
+    "$(printf '{"Cert":{"Raw":"%s"}}\n{"Cert":{"Raw":"%s"}}' "$OK" "$FREMMED")" \
+    2 "signatur 2: identiteten matcher ikke"
 run "tom bundle"               ''                                  2 "tom bundle"
 
 # identitet der ikke matcher det pinnede moenster

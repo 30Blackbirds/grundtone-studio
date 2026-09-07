@@ -15,7 +15,9 @@ PINNED_RE="${2:-}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
 
-cosign download signature "$REF" | head -1 > "$TMP"
+# ALLE linjer, ikke head -1: én linje pr. signatur, og et gensigneret digest
+# har flere. cosign-identity.py kontrollerer hver enkelt.
+cosign download signature "$REF" > "$TMP"
 
 if [ -n "$PINNED_RE" ]; then
   python3 "$HERE/cosign-identity.py" "$TMP" --expect-identity "$PINNED_RE"
