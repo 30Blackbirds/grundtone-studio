@@ -17,7 +17,7 @@ overrides:
   brace-expansion@>=4.0.0 <5.0.9: ^5.0.9
   immutable: '>=5.1.8'
   svgo: '>=4.0.2'
-  fast-uri: '>=4.1.2'
+  fast-uri: '>=4.1.3 <5'
   postcss: '>=8.5.18'
   esbuild: ^0.28.1
   undici: ^6.24.0
@@ -107,7 +107,7 @@ importers:
         version: 2.23.3(vue@3.5.41(typescript@6.0.3))
       '@klanghaus/auth-jwt':
         specifier: 0.1.0-local.0
-        version: 0.1.0-local.0(@opentelemetry/api@1.9.1)
+        version: 0.1.0-local.0(@opentelemetry/api@1.9.1)(hono@4.13.7)
       '@klanghaus/permissions-client':
         specifier: 0.3.0-local.0
         version: 0.3.0-local.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))
@@ -1303,11 +1303,6 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
       hono: ^4.0.0
-    peerDependenciesMeta:
-      '@opentelemetry/api':
-        optional: true
-      hono:
-        optional: true
 
   '@klanghaus/permissions-client@0.3.0-local.0':
     resolution: {integrity: sha512-9Kao+ffDe1WY3dZXfO9U+YqBcW9HEg6ofrrIY4AD05hKuDlamXhPFIDXx64Asnwt5MgiNx6x6k1aMaZJdhCiGQ==, tarball: https://npm.pkg.github.com/download/@klanghaus/permissions-client/0.3.0-local.0/70ea6f63bf2cf712388e47c4c8569e64e0a8fcdb}
@@ -4760,8 +4755,8 @@ packages:
   fast-string-width@3.0.2:
     resolution: {integrity: sha512-gX8LrtNEI5hq8DVUfRQMbr5lpaS4nMIWV+7XEbXk2b8kiQIizgnlr12B4dA3ZEx3308ze0O4Q1R+cHts8kyUJg==}
 
-  fast-uri@4.1.2:
-    resolution: {integrity: sha512-TyGmBcbDTZXcb2cj5MV89DrF42DKvb3y5DDUNh95iO+IMeAzMkVSxK1PZRrRIpc9yg8U2GhGdbofNa0LS/a4Bw==}
+  fast-uri@4.1.4:
+    resolution: {integrity: sha512-dODXrIxlS9JSdgAnhIUKOosKV1oMtU2VtVw87QRaHzyl5jxO290Ii5tEZfCfzfWNHi3jKWwBSdQj0qIyshdZdQ==}
 
   fast-wrap-ansi@0.1.6:
     resolution: {integrity: sha512-HlUwET7a5gqjURj70D5jl7aC3Zmy4weA1SHUfM0JFI0Ptq987NH2TwbBFLoERhfwk+E+eaq4EK3jXoT+R3yp3w==}
@@ -5006,6 +5001,10 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
+
+  hono@4.13.7:
+    resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
+    engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
@@ -8770,11 +8769,11 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@klanghaus/auth-jwt@0.1.0-local.0(@opentelemetry/api@1.9.1)':
+  '@klanghaus/auth-jwt@0.1.0-local.0(@opentelemetry/api@1.9.1)(hono@4.13.7)':
     dependencies:
-      jose: 6.2.3
-    optionalDependencies:
       '@opentelemetry/api': 1.9.1
+      hono: 4.13.7
+      jose: 6.2.3
 
   '@klanghaus/permissions-client@0.3.0-local.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))':
     dependencies:
@@ -10993,7 +10992,7 @@ snapshots:
       obug: 2.1.3
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@22.19.17)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(vite@7.3.6(@types/node@22.19.17)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@22.20.0)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/expect@4.1.9':
     dependencies:
@@ -11319,14 +11318,14 @@ snapshots:
   ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 4.1.2
+      fast-uri: 4.1.4
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
   ajv@8.20.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 4.1.2
+      fast-uri: 4.1.4
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -12380,7 +12379,7 @@ snapshots:
     dependencies:
       fast-string-truncated-width: 3.0.3
 
-  fast-uri@4.1.2: {}
+  fast-uri@4.1.4: {}
 
   fast-wrap-ansi@0.1.6:
     dependencies:
@@ -12641,6 +12640,8 @@ snapshots:
       function-bind: 1.1.2
 
   he@1.2.0: {}
+
+  hono@4.13.7: {}
 
   hookable@5.5.3: {}
 
