@@ -242,3 +242,5 @@ jobs:
       # hardkodninger og et manglende exit 1 naar intet artefakt findes.
       - name: Cosign sig-ref script guard
         run: ./.github/scripts/cosign-sig-ref.test.sh
+      - name: Cosign identity script guard
+        run: ./.github/scripts/cosign-identity.test.sh
