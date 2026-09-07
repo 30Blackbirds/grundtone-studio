@@ -298,15 +298,61 @@ jobs:
       # signatur paa noget flytbart attesterer det forkerte objekt. Efter
       # boot-smoken med vilje — et image der ikke booter skal ikke baere en
       # signatur.
-      - name: Install cosign
+      # ── 🔴 BEVIDST ASYMMETRI: SIGNÉR med 2.5.2, VERIFICÉR med 3.0.6 ─────
+      #
+      # RYD IKKE OP I DEN HER. To installs ser ud som en fejl og er det ikke.
+      # Begrundelsen, saa den ikke skal genopdages:
+      #
+      # Alle fire CVE'er i cosign 2.5.x ligger i VERIFIKATIONS-stien. En
+      # opgraderet verifikator er derfor hele sikkerhedsgevinsten. En
+      # opgraderet SIGNER giver nul gevinst — og koster: cosign 3.0.6 lagger
+      # signaturen et andet sted (sha256-<digest> uden .sig, hvor 2.x brugte
+      # sha256-<digest>.sig).
+      #
+      # MAALT af [auth]: cosign 2.5.2 kan IKKE verificere et 3.0.6-signeret
+      # image (exit 10, "no signatures found"). Positiv kontrol: 2.5.2 laeser
+      # .sig-naboen fint, og 3.0.6 laeser samme image fint — det er FORMATET,
+      # ikke opsaetningen. Hvert image signeret med 3.x er derfor ulaeseligt
+      # for enhver 2.x-verifikator nedstroems (VM'erne).
+      #
+      # Splitten er selv-begraensende: hvert efterfoelgende build signerer i
+      # 2.x-format igen, saa det ene 3.x-signerede image (86602ca6…) aeldes ud
+      # uden gen-signering. ([sikkerhed]s kald (ii), 2026-09-07.)
+      #
+      # Rakkefoelgen er ikke tilfaeldig: verifikatoren installeres SIDST, saa
+      # `cosign` paa PATH er 3.0.6. Signeren kaldes ved absolut sti.
+      - name: Install cosign for SIGNING (2.5.2 — bevidst gammel, se over)
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.5.2
+          install-dir: ${{ runner.temp }}/cosign-signer
+      - name: Install cosign for VERIFICATION (3.0.6)
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign the pushed digest
         id: sign
         if: github.event_name != 'pull_request'
         run: |
+          set -euo pipefail
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
-          cosign sign --yes "$IMAGE"
+          SIGNER="${{ runner.temp }}/cosign-signer/cosign"
+
+          # 🔴 Asymmetrien skal MAALES, ikke antages. Skifter installerens
+          # default, eller vender PATH-raekkefoelgen, ville vi tavst signere
+          # med 3.x igen — praecis det splitten findes for at undgaa.
+          SIGNER_V=$("$SIGNER" version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          case "$SIGNER_V" in
+            v2.*|2.*) echo "  signer: cosign $SIGNER_V ✓" ;;
+            *) echo "::error::signeren er cosign '$SIGNER_V', ikke 2.x — splitten er brudt og imaget ville blive ulaeseligt for 2.x-verifikatorer"; exit 1 ;;
+          esac
+          VERIFIER_V=$(cosign version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          case "$VERIFIER_V" in
+            v3.*|3.*) echo "  verifikator paa PATH: cosign $VERIFIER_V ✓" ;;
+            *) echo "::error::verifikatoren paa PATH er cosign '$VERIFIER_V', ikke 3.x — CVE-gevinsten udebliver"; exit 1 ;;
+          esac
+
+          "$SIGNER" sign --yes "$IMAGE"
           echo "signeret: $IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
@@ -387,17 +433,7 @@ jobs:
           # sha256-<digest>.sig, mens 3.0.6 laegger den paa sha256-<digest>
           # UDEN suffiks. Vi hardkoder derfor ingen af delene, men proever
           # begge og fejler HOEJLYDT hvis ingen findes.
-          SIGBASE="${IMAGE%@*}:$(echo "${IMAGE#*@}" | tr ':' '-')"
-          UNSIGNED=""
-          for CAND in "$SIGBASE" "$SIGBASE.sig"; do
-            if docker buildx imagetools inspect "$CAND" > /dev/null 2>&1; then
-              UNSIGNED="$CAND"; break
-            fi
-          done
-          if [ -z "$UNSIGNED" ]; then
-            echo "::error::fandt intet signatur-artefakt paa hverken $SIGBASE eller $SIGBASE.sig — cellen kan ikke maale noget"
-            exit 1
-          fi
+          UNSIGNED=$(.github/scripts/cosign-sig-ref.sh "${IMAGE%@*}" "${IMAGE#*@}")
           echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
           if OUT=$(cosign verify "$UNSIGNED" \
                 --certificate-identity-regexp "$PINNED" \
@@ -455,17 +491,7 @@ jobs:
           # sha256-<digest> uden suffiks). Hardkoder vi ét af dem, fejler
           # cellen naar formatet skifter — praecis som den gjorde paa
           # run 34131844473.
-          SIGBASE="$NAME:$(echo "$DIGEST" | tr ':' '-')"
-          UNSIGNED=""
-          for CAND in "$SIGBASE" "$SIGBASE.sig"; do
-            if docker buildx imagetools inspect "$CAND" > /dev/null 2>&1; then
-              UNSIGNED="$CAND"; break
-            fi
-          done
-          if [ -z "$UNSIGNED" ]; then
-            echo "::error::fandt intet signatur-artefakt paa hverken $SIGBASE eller $SIGBASE.sig — cellen kan ikke maale noget"
-            exit 1
-          fi
+          UNSIGNED=$(.github/scripts/cosign-sig-ref.sh "$NAME" "$DIGEST")
           echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
 
           if OUT=$(cosign verify "$UNSIGNED" \
