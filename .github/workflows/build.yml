@@ -384,6 +384,58 @@ jobs:
           fi
           echo "✓ negativ kontrol: image UDEN signatur afvist"
 
+      # ── PR-sti: bevis at cosign-BINAEREN fejler LUKKET ───────────────────
+      #
+      # Signerings- og verifikationstrinnene ovenfor er PR-udelukkede, og det
+      # er korrekt: keyless binder identiteten til OIDC-tokenet, og en PR's
+      # token er refs/pull/N/merge — som det pinnede regexp med vilje afviser.
+      # Man KAN ikke signere PR-image't med main-identiteten.
+      #
+      # Men uden dette trin ville et cosign-bump foerst bevises ved foerste
+      # push til main EFTER merge, og et skipped trin taeller som opfyldt hos
+      # GitHub. Denne fils egen doktrin, tolv linjer over triggeren, siger at
+      # et bevis der foerst opstaar efter merge ikke er en barriere. Saa her
+      # bevises det ene der KAN bevises paa en PR: at binaeren fejler LUKKET
+      # naar der intet er at verificere. Det daekker ikke signerings-stien.
+      - name: Install cosign (PR)
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Cosign fails closed on an unsigned reference (PR)
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        env:
+          ISSUER: https://token.actions.githubusercontent.com
+          PINNED: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+        run: |
+          set -euo pipefail
+          NAME="${REGISTRY}/$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+
+          # Samme maal-konstruktion som celle 4: signatur-artefaktet for et
+          # image vi HAR signeret. Vi signerer aldrig signaturer, saa det er
+          # deterministisk usigneret — i vores eget registry, uden Docker
+          # Hub-rate-limit. Her tages det fra :latest, fordi PR'en ikke selv
+          # pusher noget.
+          DIGEST=$(docker buildx imagetools inspect "$NAME:latest" --format '{{.Manifest.Digest}}') || {
+            echo "::error::kunne ikke slaa $NAME:latest op — cellen kan ikke maale noget, og et tavst spring ville se ud som success"
+            exit 1
+          }
+          UNSIGNED="$NAME:$(echo "$DIGEST" | tr ':' '-').sig"
+
+          if OUT=$(cosign verify "$UNSIGNED" \
+                --certificate-identity-regexp "$PINNED" \
+                --certificate-oidc-issuer "$ISSUER" 2>&1); then
+            echo "::error::cosign ACCEPTEREDE en reference uden signatur — binaeren fejler AABEN"
+            exit 1
+          fi
+          # Samme krav som celle 4: et vilkaarligt exit != 0 er ikke nok. En
+          # netvaerksfejl ville ogsaa "bestaa" cellen, og en negativ kontrol
+          # der er groen fordi instrumentet er i stykker, maaler ingenting.
+          if ! printf '%s' "$OUT" | grep -qiE 'no (matching )?signatures|signature not found'; then
+            echo "::error::verify fejlede, men ikke fordi signaturen manglede — cellen maaler noget andet end den paastaar:"
+            printf '%s\n' "$OUT"
+            exit 1
+          fi
+          echo "✓ cosign $(cosign version --json 2>/dev/null | grep -oE '\"gitVersion\": *\"[^\"]+' | cut -d'"' -f4 || echo '?') fejler lukket paa en usigneret reference"
+
       # ── PR-sti: smoken skal binde sig til DET image vi lige byggede ──────
       #
       # 🔴 Assertionen er ikke pedanteri. `docker/setup-buildx-action` saetter
