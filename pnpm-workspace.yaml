@@ -87,12 +87,29 @@ overrides:
   # intact; patched in 4.0.2. Pulled in via @sentry/nuxt > nuxt > cssnano >
   # postcss-svgo. Build-time SVG optimization only.
   svgo: '>=4.0.2'
-  # GHSA — high (x2): fast-uri host confusion via literal-backslash authority
-  # delimiter + failed IDN canonicalization; both patched in 3.1.4. Pulled in
-  # via @sentry/nuxt > nuxt > vite-plugin-checker > stylelint > table > ajv.
-  # (+ opfølger i 4.x-linjen patched 4.1.2 — samme advisory-familie ramte
-  # >=4.0.0 <4.1.2; gulvet hævet så prod-audit-gaten forbliver grøn.)
-  fast-uri: '>=4.1.2'
+  # GHSA — high (x4): fast-uri SSRF (malformet IPv6, gentaget hostname) og host
+  # confusion (sprunget IDN-kanonisering, percent-kodet scheme). Alle fire er
+  # patched i 4.1.3: GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf,
+  # GHSA-5jgf-p345-68v8, GHSA-jqff-g426-hqxp. Pulled in via
+  # @sentry/nuxt > nuxt > vite-plugin-checker > stylelint > table > ajv, og
+  # ligger i PROD-lukningen for @grundtone-studio/studio — ikke kun build-time.
+  #
+  # 🔴 Gulvet stod på '>=4.1.2', hævet dertil for at undslippe en TIDLIGERE
+  # familie der var patched netop i 4.1.2. Da den nye familie ramte, pinnede
+  # gulvet derfor nøjagtig den version det skulle undslippe. Samme mønster som
+  # etude#58: et gulv skrevet mod ét advisory er ikke et værn mod det næste.
+  # Derfor er det nye gulv BUNDET (<5). En ubundet floor lader resolutionen
+  # drive op i en major hvor fix-gulvet ligger et andet sted — det var præcis
+  # sådan grundtone endte på 4.1.2 fra en floor skrevet til 3.x-linjen.
+  fast-uri: '>=4.1.3 <5'
+  # GHSA-c83g-rgw3-j3cx + GHSA-73wf-gq98-2v4g — high (x2): ubegrænset
+  # hukommelsesvækst (ingen cache-grænse) og uncaught crash / prototype-write
+  # via untrusted browserslist-stats.json. Begge patched i 4.28.7.
+  #
+  # Lockfilen holdt TO versioner: 4.28.8 (ren) og 4.28.2 (sårbar) via
+  # update-browserslist-db og stylehacks. Kun den sårbare blev fanget af
+  # prod-audit-gaten, og et bump af den rene ville derfor ikke have hjulpet.
+  browserslist: '>=4.28.7'
   # GHSA — high: PostCSS path traversal in previous-source-map auto-loading
   # (sourceMappingURL) → arbitrary .map file disclosure; patched in 8.5.18.
   # Pulled in via @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite. Stable
