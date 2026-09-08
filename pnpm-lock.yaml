@@ -110,8 +110,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(@opentelemetry/api@1.9.1)(h3@1.15.11)(hono@4.13.7)
       '@klanghaus/permissions-client':
-        specifier: 0.3.0-local.0
-        version: 0.3.0-local.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))
+        specifier: ^0.3.0
+        version: 0.3.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))
       '@noble/hashes':
         specifier: ^2.2.0
         version: 2.2.0
@@ -1306,8 +1306,8 @@ packages:
       h3: ^1.13.0
       hono: ^4.0.0
 
-  '@klanghaus/permissions-client@0.3.0-local.0':
-    resolution: {integrity: sha512-9Kao+ffDe1WY3dZXfO9U+YqBcW9HEg6ofrrIY4AD05hKuDlamXhPFIDXx64Asnwt5MgiNx6x6k1aMaZJdhCiGQ==, tarball: https://npm.pkg.github.com/download/@klanghaus/permissions-client/0.3.0-local.0/70ea6f63bf2cf712388e47c4c8569e64e0a8fcdb}
+  '@klanghaus/permissions-client@0.3.0':
+    resolution: {integrity: sha512-oaThVW7eZa4LQQKFnk5SQ9URtCBEpPqtE6Fa+PCOlKiBgbERdzYNiAA3XCl6zIAnzRXu5/qQcNiCCwxhKhwFWw==, tarball: https://npm.pkg.github.com/download/@klanghaus/permissions-client/0.3.0/3b01f9443f17a2f3f930370061c703cdd442cb78}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@bufbuild/protobuf': ^1.10.0
@@ -8755,7 +8755,7 @@ snapshots:
       hono: 4.13.7
       jose: 6.2.3
 
-  '@klanghaus/permissions-client@0.3.0-local.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))':
+  '@klanghaus/permissions-client@0.3.0(@bufbuild/protobuf@1.10.1)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.1))':
     dependencies:
       '@bufbuild/protobuf': 1.10.1
       '@connectrpc/connect': 1.7.0(@bufbuild/protobuf@1.10.1)
