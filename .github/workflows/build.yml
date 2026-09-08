@@ -63,7 +63,7 @@ jobs:
       tag: ${{ steps.tag.outputs.value }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # 🔴 Ikke valgfri. Default-dybden er 1, og saa findes PR'ens base-sha
           # ikke i klonen — `git diff` i gate-trinnet ville fejle eller give et
@@ -138,12 +138,12 @@ jobs:
       # intet at bygge og intet at logge ind for. Uden `if:` her ville
       # "spring over"-grenen stadig koste buildx-opsaetning + registry-login,
       # og saa er besparelsen kun halv.
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         if: steps.gate.outputs.relevant == 'true'
 
       - name: Log in to ghcr.io
         if: steps.gate.outputs.relevant == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -151,7 +151,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -211,7 +211,7 @@ jobs:
       - name: Build image for the PR (--load, ingen push)
         id: prbuild
         if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: false
@@ -231,7 +231,7 @@ jobs:
       - name: Build and push
         id: push
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: true
@@ -564,7 +564,7 @@ jobs:
       # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
       # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
       # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             docker-compose.production.yml
@@ -572,7 +572,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Sync compose + Caddyfile to host
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
@@ -582,7 +582,7 @@ jobs:
           overwrite: true
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -667,7 +667,7 @@ jobs:
 
     steps:
       - name: Snapshot before deploy
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -683,7 +683,7 @@ jobs:
       # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
       # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
       # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             docker-compose.production.yml
@@ -691,7 +691,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Sync compose + Caddyfile to host
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -701,7 +701,7 @@ jobs:
           overwrite: true
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
