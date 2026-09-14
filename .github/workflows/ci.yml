@@ -244,3 +244,25 @@ jobs:
         run: ./.github/scripts/cosign-sig-ref.test.sh
       - name: Cosign identity script guard
         run: ./.github/scripts/cosign-identity.test.sh
+
+      # 🔴 Tag-order guard (riff ap1qcpe7zg3j8ex5ton6d4i1): no image tag may be
+      # published before the digest is signed and verified. The test runs the
+      # guard on the real build.yml and on mutants that recreate the race
+      # window; each mutant must fail for its own reason.
+      # PyYAML: the runner's if present, otherwise a hash-locked install into
+      # a venv (a venv avoids PEP 668 on the system Python). The step prints
+      # which path it took, so the first run measures the runner.
+      - name: Tag-order guard (tags only after sign + verify)
+        run: |
+          set -euo pipefail
+          if python3 -c "import yaml" 2>/dev/null; then
+            PY=python3
+            echo "PyYAML: runner's own"
+          else
+            python3 -m venv "$RUNNER_TEMP/pyyaml"
+            "$RUNNER_TEMP/pyyaml/bin/pip" install --quiet --require-hashes -r .github/scripts/pyyaml-requirements.txt
+            PY="$RUNNER_TEMP/pyyaml/bin/python"
+            echo "PyYAML: hash-locked venv install"
+          fi
+          echo "python $("$PY" -c 'import sys;print(sys.version.split()[0])') · PyYAML $("$PY" -c 'import yaml;print(yaml.__version__)')"
+          PYTHON="$PY" ./.github/scripts/assert-tags-after-verify.test.sh

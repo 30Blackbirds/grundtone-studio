@@ -228,14 +228,26 @@ jobs:
           secrets: |
             node_auth_token=${{ secrets.GITHUB_TOKEN }}
 
+      # 🔴 PUSH BY DIGEST — NO TAGS HERE (riff ap1qcpe7zg3j8ex5ton6d4i1).
+      # Pushing with `tags:` moved every mutable tag (latest, branch, sha-,
+      # semver) onto a digest that was not yet signed. Measured by [sikkerhed]
+      # over three runs: the window between push and sign is ~45-61 s, and
+      # the PR cell that reads :latest failed inside it. The digest is now
+      # pushed untagged; tags are created only in "Tag the signed and verified
+      # digest", after sign + verify. The order is enforced structurally by
+      # .github/scripts/assert-tags-after-verify.py (run in ci.yml).
+      - name: Resolve the lowercase image name
+        id: img
+        if: github.event_name != 'pull_request'
+        run: echo "name=${REGISTRY}/$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         id: push
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=${{ steps.img.outputs.name }},push-by-digest=true,name-canonical=true,push=true
           # 🔴 Labels EKSPLICIT, ikke kun metadata-actions defaults (beslutning
           # AJ): revision-labelet er det ene af tre ben i runtime-assertion #8
           # (healthz.revision == OCI-label == git-ref). Hviler det paa en
@@ -276,8 +288,9 @@ jobs:
       # loader ikke builds i daemonen, så `docker run :main` puller) — tre
       # runder "fejlede" på v0.2.11's gamle artefakt mens de reelle builds
       # aldrig blev målt. Digest-pin = artefakten deploy-jobbene reelt puller;
-      # fejler smoken, fejler jobbet, og ingen deploy sker (prod pinner
-      # semver/sha-tags, aldrig :main, så et upåvist :main-tag er harmløst).
+      # fejler smoken, fejler jobbet, og ingen deploy sker.
+      # Since riff ap1qcpe7zg3j8ex5ton6d4i1 no tag exists yet at this point:
+      # a digest that fails the smoke is never tagged at all.
       - name: Boot-smoke the pushed image
         if: github.event_name != 'pull_request'
         run: |
@@ -454,6 +467,60 @@ jobs:
             exit 1
           fi
           echo "✓ negativ kontrol: image UDEN signatur afvist"
+
+      # ── Tags are published LAST, onto the digest that was signed ─────────
+      #
+      # 🔴 Cure A from [sikkerhed]'s ruling on riff ap1qcpe7zg3j8ex5ton6d4i1:
+      # push digest -> boot-smoke -> sign -> verify -> THEN tags. No mutable
+      # tag may point at a digest that is not yet signed and verified. If any
+      # step above fails (or the run is cancelled), this step does not run and
+      # no tag moves. Retry, sleep and loosening the PR cell were rejected.
+      #
+      # `--prefer-index=false` is load-bearing. Measured 2026-09-14 (buildx
+      # 0.33.0 against a local registry): without it, `imagetools create`
+      # from a single manifest writes a NEW index (pushed 455756e… -> tag
+      # 610b544…), so the tag would again point at an unsigned object. With
+      # it, the tag is a carbon copy (455756e… -> 455756e…). The read-back
+      # below fails the job if a buildx version behaves differently.
+      - name: Tag the signed and verified digest
+        id: tags
+        if: github.event_name != 'pull_request'
+        env:
+          NAME: ${{ steps.img.outputs.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          SIGNED: ${{ steps.sign.outputs.image }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NAME" ] || [ -z "$DIGEST" ]; then
+            echo "::error::no image name or pushed digest — nothing to tag"
+            exit 1
+          fi
+          # Tag exactly the object that was signed, not a re-derived one.
+          if [ "$SIGNED" != "$NAME@$DIGEST" ]; then
+            echo "::error::signed image ($SIGNED) is not the pushed digest ($NAME@$DIGEST) — refusing to tag"
+            exit 1
+          fi
+          args=()
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            case "$t" in
+              "$NAME":*) args+=(-t "$t") ;;
+              *) echo "::error::tag '$t' is not in $NAME — refusing to tag"; exit 1 ;;
+            esac
+          done <<< "$TAGS"
+          [ "${#args[@]}" -gt 0 ] || { echo "::error::metadata produced no tags"; exit 1; }
+          docker buildx imagetools create --prefer-index=false "${args[@]}" "$NAME@$DIGEST"
+          # Read every tag back: each must resolve to the signed digest.
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            got=$(docker buildx imagetools inspect "$t" --format '{{.Manifest.Digest}}')
+            if [ "$got" != "$DIGEST" ]; then
+              echo "::error::$t resolves to $got, not the signed digest $DIGEST"
+              exit 1
+            fi
+            echo "✓ $t -> $DIGEST"
+          done <<< "$TAGS"
 
       # ── PR-sti: bevis at cosign-BINAEREN fejler LUKKET ───────────────────
       #
