@@ -7,14 +7,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // here we stub a global so the helper's throws carry a statusCode.
 
 const projectRows: Array<{ id: string; organizationId: string }> = []
-// relation → allow, per "<resource>::<action>" key.
-const allow: Record<string, boolean> = {}
+// "<resource>::<action>" → true (allowed), false/absent (denied) or
+// 'unavailable' (the PDP could not answer).
+const allow: Record<string, boolean | 'unavailable'> = {}
+const verdictFor = (key: string) =>
+  allow[key] === 'unavailable' ? 'unavailable' : allow[key] ? 'allowed' : 'denied'
 
-vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage?: string }) => {
-  const err = new Error(opts.statusMessage ?? '') as Error & { statusCode: number }
-  err.statusCode = opts.statusCode
-  return err
-})
+// Spread form (as mockH3's createError) so `data.code` survives into assertions.
+vi.stubGlobal(
+  'createError',
+  (opts: { statusCode: number; statusMessage?: string; data?: unknown }) =>
+    Object.assign(new Error(opts.statusMessage ?? ''), opts),
+)
 
 vi.mock('../db', () => ({
   db: {
@@ -36,10 +40,10 @@ vi.mock('./org-lookup', () => ({
 
 vi.mock('./pdp', () => ({
   checkProject: vi.fn(async (_e: unknown, projectId: string, action: string) =>
-    Boolean(allow[`project:${projectId}::${action}`]),
+    verdictFor(`project:${projectId}::${action}`),
   ),
   checkOrg: vi.fn(async (_e: unknown, orgId: string, relation: string) =>
-    Boolean(allow[`organization:${orgId}::${relation}`]),
+    verdictFor(`organization:${orgId}::${relation}`),
   ),
 }))
 
@@ -105,6 +109,23 @@ describe('requireProjectAccess — PDP-backed', () => {
     const access = await requireProjectAccess(eventWithAuth(), PROJECT_ID, 'admin')
     expect(access.role).toBe('admin')
   })
+
+  it('503 pdp_unavailable — not 403 — when the PDP cannot answer the gate check', async () => {
+    projectRows.push({ id: PROJECT_ID, organizationId: ORG_ID })
+    allow[`project:${PROJECT_ID}::can_edit`] = 'unavailable'
+    await expect(requireProjectAccess(eventWithAuth(), PROJECT_ID, 'editor')).rejects.toMatchObject(
+      { statusCode: 503, data: { code: 'pdp_unavailable' } },
+    )
+  })
+
+  it('503 when the gate passes but role resolution cannot be answered (never a guessed role)', async () => {
+    projectRows.push({ id: PROJECT_ID, organizationId: ORG_ID })
+    allow[`project:${PROJECT_ID}::can_view`] = true
+    allow[`project:${PROJECT_ID}::can_admin`] = 'unavailable'
+    await expect(requireProjectAccess(eventWithAuth(), PROJECT_ID, 'viewer')).rejects.toMatchObject(
+      { statusCode: 503, data: { code: 'pdp_unavailable' } },
+    )
+  })
 })
 
 describe('requireOrgRole — PDP-backed', () => {
@@ -128,6 +149,14 @@ describe('requireOrgRole — PDP-backed', () => {
     const access = await requireOrgRole(eventWithAuth(), ORG_ID, 'member')
     expect(access.role).toBe('admin')
     expect(access.organizationId).toBe(ORG_ID)
+  })
+
+  it('503 pdp_unavailable — not 403 — when an org check cannot be answered', async () => {
+    allow[`organization:${ORG_ID}::owner`] = 'unavailable'
+    await expect(requireOrgRole(eventWithAuth(), ORG_ID, 'member')).rejects.toMatchObject({
+      statusCode: 503,
+      data: { code: 'pdp_unavailable' },
+    })
   })
 })
 

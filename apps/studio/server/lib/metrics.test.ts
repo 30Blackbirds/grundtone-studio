@@ -3,6 +3,7 @@ import {
   recordQuotaFailOpen,
   recordQuotaDenial,
   recordCdnGraceCut,
+  recordPdpUnavailable,
   registerBillingMetrics,
 } from './metrics'
 
@@ -17,6 +18,8 @@ describe('billing metrics (fire-and-forget)', () => {
       recordQuotaFailOpen('studio.projects', 'cold_cache')
       recordQuotaDenial('studio.projects')
       recordCdnGraceCut()
+      recordPdpUnavailable('Unavailable')
+      recordPdpUnavailable('transport')
     }).not.toThrow()
   })
 
