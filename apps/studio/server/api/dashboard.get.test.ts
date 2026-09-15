@@ -106,7 +106,7 @@ describe('GET /api/dashboard — activity feed', () => {
     })
     expect(find(activity!.where, 'notInArray')).toEqual({
       col: tables.auditLog.action,
-      vals: ['config.draft_saved'],
+      vals: ['config.draft_saved', 'asset.font_uploaded', 'asset.logo_uploaded'],
     })
   })
 

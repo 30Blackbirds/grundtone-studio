@@ -53,9 +53,13 @@ let lastQueriedInviteId: string | null = null
 
 const dbMock = {
   select: () => ({
-    from: () => ({
+    from: (table: { _?: { name?: string } } | undefined) => ({
       where: (predicate: { value?: string } | null) => {
         const queriedId = predicate?.value ?? null
+        // The audit step reads the project's org after the membership write.
+        if (table?._?.name === 'project') {
+          return Promise.resolve(projects.filter((p) => p.id === queriedId))
+        }
         lastQueriedInviteId = queriedId
         return Promise.resolve(invites.filter((inv) => inv.id === queriedId))
       },
@@ -83,9 +87,21 @@ const dbMock = {
 }
 vi.mock('~~/server/db', () => ({ db: dbMock }))
 vi.mock('~~/server/db/schema', () => ({
+  project: { _: { name: 'project' }, id: 'id', organizationId: 'organizationId', name: 'name' },
   projectInvitation: { _: { name: 'project_invitation' }, id: 'id' },
   projectMember: { _: { name: 'project_member' }, projectId: 'projectId', userId: 'userId' },
 }))
+const auditEvents: Array<{ action: string; payload: Record<string, unknown> }> = []
+vi.mock('~~/server/lib/audit', () => ({
+  recordAuditEvent: (_event: unknown, payload: { action: string }) => {
+    auditEvents.push({ action: payload.action, payload })
+    return Promise.resolve()
+  },
+}))
+const projects = [
+  { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', organizationId: 'org-acme', name: 'Acme Brand' },
+]
+
 vi.mock('~~/server/lib/pdp', () => ({
   grantProjectRole: vi.fn(async (_e: unknown, projectId: string, subject: string, role: string) => {
     grants.push({ projectId, subject, role })
@@ -124,6 +140,7 @@ beforeEach(() => {
   memberInserts.length = 0
   inviteStatusUpdates.length = 0
   grants.length = 0
+  auditEvents.length = 0
   lastQueriedInviteId = null
 })
 
@@ -255,5 +272,56 @@ describe('POST /api/invitations/project/[invitationId]/accept', () => {
       statusCode: 403,
       statusMessage: 'Invitation is for a different email',
     })
+  })
+  it('audits exactly one project.member.added, in the project org, after the grant and write', async () => {
+    invites.push(freshInvite())
+    await handler(
+      fakeEvent({ params: { invitationId: VALID_INVITE_ID }, ...authedAs('invitee@example.com') }),
+    )
+
+    expect(grants).toHaveLength(1)
+    expect(memberInserts).toHaveLength(1)
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].payload).toMatchObject({
+      organizationId: 'org-acme',
+      action: 'project.member.added',
+      targetType: 'project',
+      targetId: PROJECT_ID,
+      targetLabel: 'Acme Brand',
+      after: { role: 'editor', via: 'invitation', invitationId: VALID_INVITE_ID },
+    })
+  })
+
+  it('audits nothing when the accept is rejected (409 / 403 / 410)', async () => {
+    invites.push(freshInvite({ status: 'accepted' }))
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 })
+
+    invites.length = 0
+    invites.push(freshInvite())
+    await expect(
+      handler(
+        fakeEvent({ params: { invitationId: VALID_INVITE_ID }, ...authedAs('someone@else.com') }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 })
+
+    invites.length = 0
+    invites.push(freshInvite({ expiresAt: new Date(Date.now() - 1000) }))
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: VALID_INVITE_ID },
+          ...authedAs('invitee@example.com'),
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 410 })
+
+    expect(auditEvents).toHaveLength(0)
   })
 })

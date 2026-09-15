@@ -704,6 +704,11 @@
       "config.published": "Published configuration",
       "config.activated": "Activated version",
       "config.draft_saved": "Saved draft configuration",
+      "project.member.invited": "Invited project member",
+      "project.member.invite_cancelled": "Cancelled project invitation",
+      "project.member.invite_declined": "Declined project invitation",
+      "asset.font_uploaded": "Uploaded font",
+      "asset.logo_uploaded": "Uploaded logo",
       "organization.updated": "Updated organization"
     },
     "loadOlder": "Load older",
