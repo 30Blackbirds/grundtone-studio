@@ -4,6 +4,7 @@ import { db } from '~~/server/db'
 import { fontLicenceAttestation } from '~~/server/db/schema'
 import { FONT_LICENCE_VERSION } from '~~/lib/legal'
 import { fontFileName, validateFontUpload } from '~~/server/lib/asset-upload'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 import { FONT_WEIGHTS } from '~~/server/lib/tokens'
@@ -107,5 +108,16 @@ export default defineEventHandler(async (event) => {
     cacheControl: 'no-store',
   })
 
+  // Audited after the attestation and the file are both stored (riff
+  // mfhvuk8515gubxh30puab9ch). The attestation row stays the legal record; the
+  // event only says who uploaded which file, never its bytes.
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'asset.font_uploaded',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { slot: query.data.slot, family: query.data.family, weight: query.data.weight, file },
+  })
   return { file, weight: query.data.weight }
 })

@@ -704,6 +704,11 @@
       "config.published": "Publicerede konfiguration",
       "config.activated": "Aktiverede version",
       "config.draft_saved": "Gemte kladde-konfiguration",
+      "project.member.invited": "Inviterede projektmedlem",
+      "project.member.invite_cancelled": "Annullerede projektinvitation",
+      "project.member.invite_declined": "Afviste projektinvitation",
+      "asset.font_uploaded": "Uploadede skrifttype",
+      "asset.logo_uploaded": "Uploadede logo",
       "organization.updated": "Opdaterede organisation"
     },
     "loadOlder": "Indlæs ældre",

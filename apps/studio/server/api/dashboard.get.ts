@@ -7,11 +7,16 @@ import { listCallerOrgs, lookupOrgById } from '~~/server/lib/org-lookup'
 
 const ACTIVITY_LIMIT = 8
 
-// Actions kept out of the dashboard's short activity feed. Draft saves are
-// audited (riff m2axh5obv4ce5a0hr4hm2xvk) and stay visible on the audit page,
-// but one row per save would push publishes and member changes out of an
-// 8-row feed. Filtered in SQL so the limit still returns 8 meaningful rows.
-export const FEED_EXCLUDED_ACTIONS: readonly AuditAction[] = ['config.draft_saved']
+// Actions kept out of the dashboard's short activity feed. Draft saves (riff
+// m2axh5obv4ce5a0hr4hm2xvk) and asset uploads (riff mfhvuk8515gubxh30puab9ch)
+// are high-frequency editing steps: they are audited and stay visible on the
+// audit page, but one row per step would push publishes and member changes out
+// of an 8-row feed. Filtered in SQL so the limit still returns 8 meaningful rows.
+export const FEED_EXCLUDED_ACTIONS: readonly AuditAction[] = [
+  'config.draft_saved',
+  'asset.font_uploaded',
+  'asset.logo_uploaded',
+]
 
 defineRouteMeta({
   openAPI: {
