@@ -19,13 +19,16 @@ import { DEFAULT_TOKENS } from '~~/server/lib/tokens'
 // cell here would skip and the job would stay green without measuring
 // anything. The throw below turns that silent skip into a red run.
 //
-// It is armed only when turbo started this process (turbo sets TURBO_HASH for
-// its tasks): that is the only path where the variable can be filtered away.
-// sonar.yml runs vitest directly, without a database, and must skip these
-// cells rather than fail to load the file. Measured 2026-09-15: arming on CI
-// alone turned grundtone-studio's SonarQube red (riff cjbjm73hjpwgh2c3eja8jry9).
+// Unconditional on purpose: ANY CI path that runs this file without a
+// database fails loudly, whatever started the process. A path that has no
+// database must not run the file at all, and must say so by name —
+// `test:coverage` (sonar.yml's step) passes `--exclude '**/*.race.test.ts'`.
+// Measured 2026-09-15: without that exclusion the file failed to load in
+// SonarQube; conditioning the guard on how the process was started instead
+// would have made these cells skip silently on every non-turbo path
+// (riff cjbjm73hjpwgh2c3eja8jry9).
 const DATABASE_URL = process.env.DATABASE_URL
-if (!DATABASE_URL && process.env.CI && process.env.TURBO_HASH) {
+if (!DATABASE_URL && process.env.CI) {
   throw new Error(
     'DATABASE_URL is not visible to the test process in CI: turbo strict env mode filters it unless turbo.json passes it to the test task',
   )
