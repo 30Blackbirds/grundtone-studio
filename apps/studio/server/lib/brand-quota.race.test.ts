@@ -13,13 +13,19 @@ import { DEFAULT_TOKENS } from '~~/server/lib/tokens'
 // leave the process are mocked: auth, entitlements, object storage, CDN purge
 // and the audit writer.
 //
-// CI provides Postgres (ci.yml Test job). turbo runs in strict env mode, so
-// DATABASE_URL reaches this process only because turbo.json lists it for the
-// test task; without that line every cell here would skip and the job would
-// stay green without measuring anything. The throw below turns that silent
-// skip into a red run in CI.
+// CI provides Postgres to ci.yml's Test job, which runs the suite through
+// turbo. turbo runs in strict env mode, so DATABASE_URL reaches this process
+// only because turbo.json lists it for the test task; without that line every
+// cell here would skip and the job would stay green without measuring
+// anything. The throw below turns that silent skip into a red run.
+//
+// It is armed only when turbo started this process (turbo sets TURBO_HASH for
+// its tasks): that is the only path where the variable can be filtered away.
+// sonar.yml runs vitest directly, without a database, and must skip these
+// cells rather than fail to load the file. Measured 2026-09-15: arming on CI
+// alone turned grundtone-studio's SonarQube red (riff cjbjm73hjpwgh2c3eja8jry9).
 const DATABASE_URL = process.env.DATABASE_URL
-if (!DATABASE_URL && process.env.CI) {
+if (!DATABASE_URL && process.env.CI && process.env.TURBO_HASH) {
   throw new Error(
     'DATABASE_URL is not visible to the test process in CI: turbo strict env mode filters it unless turbo.json passes it to the test task',
   )
