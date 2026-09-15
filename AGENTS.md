@@ -16,11 +16,11 @@ Standard commands are already documented — see root `package.json` scripts, th
 
 ### Node / pnpm
 
-- Node **24** is required (`.nvmrc` → `24.13.0`, `engine-strict=true`). The image's default
+- Node **24** is required (`.nvmrc` → `24.21.0`, `engine-strict=true`). The image's default
   `/exec-daemon/node` is **v22** and wins in non-interactive shells, which makes `pnpm install` fail
   the engine check. Activate nvm first: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use`
   (the update script already does this; interactive login shells get Node 24 automatically because
-  the nvm `default` alias is pinned to `24.13.0`).
+  the nvm `default` alias is pinned to `24.21.0`).
 - pnpm `10.14.0` is provided via corepack.
 
 ### Private `@klanghaus/*` packages — the main gotcha
