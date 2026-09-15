@@ -81,3 +81,26 @@ export function recordCdnGraceCut(): void {
     /* fire-and-forget */
   }
 }
+
+// ─── Authorization availability (riff iub38z651y7nr21bovn0683w) ───────────
+// Deliberately a SEPARATE meter: the billing series above are a locked
+// contract, and this series is not billing. It counts PDP read checks that
+// could not be answered (fail-closed 503), so an outage is visible as an
+// outage instead of hiding among ordinary 403s. `reason` is a Connect code
+// name or `transport` — a small closed set, no per-tenant attributes.
+let pdpUnavailable: Counter | undefined
+
+export function recordPdpUnavailable(reason: string): void {
+  try {
+    pdpUnavailable ??= metrics
+      .getMeter('grundtone-studio.authz')
+      .createCounter('klanghaus.studio.pdp.unavailable', {
+        unit: '{event}',
+        description:
+          'PDP-tjek kunne ikke besvares (udfald/transport) — fail-closed 503, ikke et afslag',
+      })
+    pdpUnavailable.add(1, { reason })
+  } catch {
+    /* fire-and-forget */
+  }
+}

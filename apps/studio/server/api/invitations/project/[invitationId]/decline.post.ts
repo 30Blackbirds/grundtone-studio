@@ -1,7 +1,8 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
 import { eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
-import { projectInvitation } from '~~/server/db/schema'
+import { project, projectInvitation } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 
 defineRouteMeta({
   openAPI: {
@@ -42,5 +43,20 @@ export default defineEventHandler(async (event) => {
     .set({ status: 'declined' })
     .where(eq(projectInvitation.id, invite.id))
 
+  // Audited only after the status write succeeded (riff mfhvuk8515gubxh30puab9ch).
+  const [proj] = await db
+    .select({ organizationId: project.organizationId, name: project.name })
+    .from(project)
+    .where(eq(project.id, invite.projectId))
+  if (proj) {
+    await recordAuditEvent(event, {
+      organizationId: proj.organizationId,
+      action: 'project.member.invite_declined',
+      targetType: 'project',
+      targetId: invite.projectId,
+      targetLabel: proj.name,
+      after: { role: invite.role, invitationId: invite.id },
+    })
+  }
   return { declined: true }
 })

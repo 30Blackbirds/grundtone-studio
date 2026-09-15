@@ -85,6 +85,14 @@ vi.mock('~~/server/lib/tokens', () => ({
   DEFAULT_TOKENS: { colors: { primary: '#4F46E5' } },
 }))
 
+const auditEvents: Array<{ action: string; payload: Record<string, unknown> }> = []
+vi.mock('~~/server/lib/audit', () => ({
+  recordAuditEvent: (_event: unknown, payload: { action: string }) => {
+    auditEvents.push({ action: payload.action, payload })
+    return Promise.resolve()
+  },
+}))
+
 const requireProjectAccess = vi.fn()
 vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
@@ -101,6 +109,7 @@ beforeEach(() => {
   spies.inserts.length = 0
   spies.updates.length = 0
   drafts.length = 0
+  auditEvents.length = 0
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -134,6 +143,16 @@ describe('POST /api/projects/[projectId]/config', () => {
       status: 'draft',
     })
     expect(spies.updates).toHaveLength(0)
+
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].payload).toMatchObject({
+      organizationId: ORG.id,
+      action: 'config.draft_saved',
+      targetType: 'project',
+      targetId: PROJECT.id,
+      targetLabel: PROJECT.name,
+      after: { version: 1, created: true, changedPathCount: 1, changedPaths: ['colors.primary'] },
+    })
   })
 
   it('updates the existing draft instead of creating a new one', async () => {
@@ -150,6 +169,30 @@ describe('POST /api/projects/[projectId]/config', () => {
     expect(spies.updates).toHaveLength(1)
     expect(spies.updates[0].set).toMatchObject({ tokensJson: tokens })
     expect(spies.inserts).toHaveLength(0)
+
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].payload).toMatchObject({
+      action: 'config.draft_saved',
+      after: { created: false, changedPathCount: 1, changedPaths: ['colors.primary'] },
+    })
+    // Paths only: neither the old nor the new token value is written to the log.
+    const serialized = JSON.stringify(auditEvents[0].payload)
+    expect(serialized).not.toContain('#10B981')
+    expect(serialized).not.toContain('#000000')
+  })
+
+  it('caps the audited paths but keeps the true count', async () => {
+    const many = {
+      spacing: Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`s${i}`, `${i}px`])),
+    }
+    await postHandler(fakeEvent({ params: { projectId: PROJECT.id }, body: many }))
+
+    const after = auditEvents[0].payload.after as {
+      changedPathCount: number
+      changedPaths: string[]
+    }
+    expect(after.changedPathCount).toBe(60)
+    expect(after.changedPaths).toHaveLength(50)
   })
 
   it('400s when tokens fail validation', async () => {
@@ -162,6 +205,7 @@ describe('POST /api/projects/[projectId]/config', () => {
     await expect(
       postHandler(fakeEvent({ params: { projectId: PROJECT.id }, body: tokens })),
     ).rejects.toMatchObject({ statusCode: 400, message: 'bad input' })
+    expect(auditEvents).toHaveLength(0)
   })
 
   it('rejects on insufficient role (editor required)', async () => {
@@ -171,6 +215,7 @@ describe('POST /api/projects/[projectId]/config', () => {
     await expect(
       postHandler(fakeEvent({ params: { projectId: PROJECT.id }, body: tokens })),
     ).rejects.toMatchObject({ statusCode: 403 })
+    expect(auditEvents).toHaveLength(0)
   })
 })
 

@@ -204,6 +204,17 @@ vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
 }))
 
+// ─── brand quota — the cap itself is tested in server/lib/brand-quota.test.ts ──
+// and its concurrency in brand-quota.race.test.ts; here we pin WHERE publish
+// calls it.
+const assertBrandCapacity = vi.fn()
+const claimBrandSlot = vi.fn()
+vi.mock('~~/server/lib/brand-quota', () => ({
+  assertBrandCapacity: (...args: unknown[]) => assertBrandCapacity(...args),
+  claimBrandSlot: (...args: unknown[]) => claimBrandSlot(...args),
+}))
+const SOLO_CLAIM = { organizationId: ORG.id, entitlements: null, hardCap: true }
+
 const handler = (await import('./publish.post')).default as unknown as (
   event: unknown,
 ) => Promise<unknown>
@@ -217,6 +228,10 @@ beforeEach(() => {
   attestationUpdates.length = 0
   draft.length = 0
   published.length = 0
+  assertBrandCapacity.mockReset()
+  assertBrandCapacity.mockResolvedValue(null)
+  claimBrandSlot.mockReset()
+  claimBrandSlot.mockResolvedValue(undefined)
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -240,6 +255,105 @@ describe('POST /api/projects/[projectId]/publish', () => {
       statusCode: 400,
       message: 'No draft to publish',
     })
+  })
+
+  it('refuses a new brand over the hard cap before promoting or writing anything', async () => {
+    draft.push({
+      id: 'draft-cap',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: { colors: { primary: '#4F46E5' } },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-09-15T10:00:00Z'),
+    })
+    assertBrandCapacity.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(handler(fakeEvent({ params: { projectId: PROJECT.id } }))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'brand_quota_exceeded' },
+    })
+
+    expect(assertBrandCapacity).toHaveBeenCalledWith(ORG.id, PROJECT.id)
+    expect(claimBrandSlot).not.toHaveBeenCalled()
+    expect(spies.updates).toHaveLength(0)
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(published).toHaveLength(0)
+  })
+
+  it('creates the brand inside the Phase A transaction on a first publish, before any blob write', async () => {
+    draft.push({
+      id: 'draft-first',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: { colors: { primary: '#4F46E5' } },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-09-15T10:00:00Z'),
+    })
+    assertBrandCapacity.mockResolvedValue(SOLO_CLAIM)
+    const atClaim: Array<{ updates: number; storage: number }> = []
+    claimBrandSlot.mockImplementation(() => {
+      atClaim.push({ updates: spies.updates.length, storage: spies.storage.length })
+      return Promise.resolve()
+    })
+
+    await handler(fakeEvent({ params: { projectId: PROJECT.id } }))
+
+    expect(claimBrandSlot).toHaveBeenCalledTimes(1)
+    const [tx, claim, row] = claimBrandSlot.mock.calls[0]
+    // The transaction handle, not the pool: check and promotion commit together.
+    expect(tx).not.toBe(dbMock)
+    expect(claim).toBe(SOLO_CLAIM)
+    expect(row).toEqual({
+      projectId: PROJECT.id,
+      configVersionId: 'draft-first',
+      activatedBy: SESSION.user.id,
+      activatedByEmail: SESSION.user.email,
+    })
+    // After the promotion in the same transaction, before any storage write.
+    expect(atClaim).toEqual([{ updates: 1, storage: 0 }])
+  })
+
+  it('fails a first publish whose claim is refused under the lock, before any blob write', async () => {
+    draft.push({
+      id: 'draft-lost-race',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: { colors: { primary: '#4F46E5' } },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-09-15T10:00:00Z'),
+    })
+    assertBrandCapacity.mockResolvedValue(SOLO_CLAIM)
+    claimBrandSlot.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(handler(fakeEvent({ params: { projectId: PROJECT.id } }))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'brand_quota_exceeded' },
+    })
+
+    // The mock transaction cannot roll back the promotion; the real rollback is
+    // pinned in brand-quota.race.test.ts. Here: nothing after Phase A ran.
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(spies.bunnyPurges).toHaveLength(0)
   })
 
   it('promotes the draft, writes 4 storage objects, flips active pointer, and emits audit + purge', async () => {
@@ -277,6 +391,8 @@ describe('POST /api/projects/[projectId]/publish', () => {
     // active_version pointer inserted (or upserted).
     expect(spies.inserts).toHaveLength(1)
     expect(spies.inserts[0].table).toBe('active_version')
+    // Already a brand (assertBrandCapacity → null): nothing to claim.
+    expect(claimBrandSlot).not.toHaveBeenCalled()
 
     // Audit emitted with the right action + version.
     expect(spies.audit).toHaveLength(1)

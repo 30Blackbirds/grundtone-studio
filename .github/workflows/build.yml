@@ -63,7 +63,7 @@ jobs:
       tag: ${{ steps.tag.outputs.value }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # 🔴 Ikke valgfri. Default-dybden er 1, og saa findes PR'ens base-sha
           # ikke i klonen — `git diff` i gate-trinnet ville fejle eller give et
@@ -138,12 +138,12 @@ jobs:
       # intet at bygge og intet at logge ind for. Uden `if:` her ville
       # "spring over"-grenen stadig koste buildx-opsaetning + registry-login,
       # og saa er besparelsen kun halv.
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         if: steps.gate.outputs.relevant == 'true'
 
       - name: Log in to ghcr.io
         if: steps.gate.outputs.relevant == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -151,7 +151,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -211,7 +211,7 @@ jobs:
       - name: Build image for the PR (--load, ingen push)
         id: prbuild
         if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: false
@@ -228,14 +228,26 @@ jobs:
           secrets: |
             node_auth_token=${{ secrets.GITHUB_TOKEN }}
 
+      # 🔴 PUSH BY DIGEST — NO TAGS HERE (riff ap1qcpe7zg3j8ex5ton6d4i1).
+      # Pushing with `tags:` moved every mutable tag (latest, branch, sha-,
+      # semver) onto a digest that was not yet signed. Measured by [sikkerhed]
+      # over three runs: the window between push and sign is ~45-61 s, and
+      # the PR cell that reads :latest failed inside it. The digest is now
+      # pushed untagged; tags are created only in "Tag the signed and verified
+      # digest", after sign + verify. The order is enforced structurally by
+      # .github/scripts/assert-tags-after-verify.py (run in ci.yml).
+      - name: Resolve the lowercase image name
+        id: img
+        if: github.event_name != 'pull_request'
+        run: echo "name=${REGISTRY}/$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         id: push
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=${{ steps.img.outputs.name }},push-by-digest=true,name-canonical=true,push=true
           # 🔴 Labels EKSPLICIT, ikke kun metadata-actions defaults (beslutning
           # AJ): revision-labelet er det ene af tre ben i runtime-assertion #8
           # (healthz.revision == OCI-label == git-ref). Hviler det paa en
@@ -276,8 +288,9 @@ jobs:
       # loader ikke builds i daemonen, så `docker run :main` puller) — tre
       # runder "fejlede" på v0.2.11's gamle artefakt mens de reelle builds
       # aldrig blev målt. Digest-pin = artefakten deploy-jobbene reelt puller;
-      # fejler smoken, fejler jobbet, og ingen deploy sker (prod pinner
-      # semver/sha-tags, aldrig :main, så et upåvist :main-tag er harmløst).
+      # fejler smoken, fejler jobbet, og ingen deploy sker.
+      # Since riff ap1qcpe7zg3j8ex5ton6d4i1 no tag exists yet at this point:
+      # a digest that fails the smoke is never tagged at all.
       - name: Boot-smoke the pushed image
         if: github.event_name != 'pull_request'
         run: |
@@ -298,15 +311,61 @@ jobs:
       # signatur paa noget flytbart attesterer det forkerte objekt. Efter
       # boot-smoken med vilje — et image der ikke booter skal ikke baere en
       # signatur.
-      - name: Install cosign
+      # ── 🔴 BEVIDST ASYMMETRI: SIGNÉR med 2.5.2, VERIFICÉR med 3.0.6 ─────
+      #
+      # RYD IKKE OP I DEN HER. To installs ser ud som en fejl og er det ikke.
+      # Begrundelsen, saa den ikke skal genopdages:
+      #
+      # Alle fire CVE'er i cosign 2.5.x ligger i VERIFIKATIONS-stien. En
+      # opgraderet verifikator er derfor hele sikkerhedsgevinsten. En
+      # opgraderet SIGNER giver nul gevinst — og koster: cosign 3.0.6 lagger
+      # signaturen et andet sted (sha256-<digest> uden .sig, hvor 2.x brugte
+      # sha256-<digest>.sig).
+      #
+      # MAALT af [auth]: cosign 2.5.2 kan IKKE verificere et 3.0.6-signeret
+      # image (exit 10, "no signatures found"). Positiv kontrol: 2.5.2 laeser
+      # .sig-naboen fint, og 3.0.6 laeser samme image fint — det er FORMATET,
+      # ikke opsaetningen. Hvert image signeret med 3.x er derfor ulaeseligt
+      # for enhver 2.x-verifikator nedstroems (VM'erne).
+      #
+      # Splitten er selv-begraensende: hvert efterfoelgende build signerer i
+      # 2.x-format igen, saa det ene 3.x-signerede image (86602ca6…) aeldes ud
+      # uden gen-signering. ([sikkerhed]s kald (ii), 2026-09-07.)
+      #
+      # Rakkefoelgen er ikke tilfaeldig: verifikatoren installeres SIDST, saa
+      # `cosign` paa PATH er 3.0.6. Signeren kaldes ved absolut sti.
+      - name: Install cosign for SIGNING (2.5.2 — bevidst gammel, se over)
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.5.2
+          install-dir: ${{ runner.temp }}/cosign-signer
+      - name: Install cosign for VERIFICATION (3.0.6)
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign the pushed digest
         id: sign
         if: github.event_name != 'pull_request'
         run: |
+          set -euo pipefail
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
-          cosign sign --yes "$IMAGE"
+          SIGNER="${{ runner.temp }}/cosign-signer/cosign"
+
+          # 🔴 Asymmetrien skal MAALES, ikke antages. Skifter installerens
+          # default, eller vender PATH-raekkefoelgen, ville vi tavst signere
+          # med 3.x igen — praecis det splitten findes for at undgaa.
+          SIGNER_V=$("$SIGNER" version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          case "$SIGNER_V" in
+            v2.*|2.*) echo "  signer: cosign $SIGNER_V ✓" ;;
+            *) echo "::error::signeren er cosign '$SIGNER_V', ikke 2.x — splitten er brudt og imaget ville blive ulaeseligt for 2.x-verifikatorer"; exit 1 ;;
+          esac
+          VERIFIER_V=$(cosign version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          case "$VERIFIER_V" in
+            v3.*|3.*) echo "  verifikator paa PATH: cosign $VERIFIER_V ✓" ;;
+            *) echo "::error::verifikatoren paa PATH er cosign '$VERIFIER_V', ikke 3.x — CVE-gevinsten udebliver"; exit 1 ;;
+          esac
+
+          "$SIGNER" sign --yes "$IMAGE"
           echo "signeret: $IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
@@ -339,6 +398,12 @@ jobs:
           set -euo pipefail
           [ -n "$IMAGE" ] || { echo "::error::intet image at verificere — signerings-steppet gav ingen output"; exit 1; }
 
+          # stdout i /dev/null: payloaden er stoejende, og identiteten staar
+          # den IKKE laenger i — cosign 3.0.6 skriver "optional":{} (tom),
+          # hvor 2.x bar Subject og Issuer. Den blev tidligere fanget her
+          # netop for at goere post-merge-beviset mere end "steppet blev
+          # groent"; den opgave er nu flyttet til cosign-identity.sh, som
+          # laeser certifikatet i ARTEFAKTET og virker i begge bundle-former.
           if ! cosign verify "$IMAGE" \
                 --certificate-identity-regexp "$PINNED" \
                 --certificate-oidc-issuer "$ISSUER" > /dev/null; then
@@ -346,6 +411,19 @@ jobs:
             exit 1
           fi
           echo "✓ signatur verificeret mod pinnet identitet"
+          # Identiteten udledes af signatur-ARTEFAKTET, ikke af verify-payloaden.
+          # MAALT paa run 34131844473: cosign 3.0.6's payload har
+          # "optional":{} — helt tom, hvor 2.x bar Subject og Issuer.
+          # Identiteten HAANDHAEVES fortsat af --certificate-identity-regexp,
+          # men den kunne ikke laenger AFLAESES. Scriptet laeser certifikatets
+          # SAN og daekker BEGGE bundle-former, saa linjen overlever et
+          # signer-versionsskift i begge retninger.
+          # Identiteten haandhaeves ovenfor af --certificate-identity-regexp;
+          # her UDLEDES den af certifikatet og kontrolleres mod det SAMME
+          # pinnede moenster — to uafhaengige veje til samme svar. Skriver
+          # ogsaa kilde-revision og ref, som er kryptografisk bundet til
+          # imaget og derfor kryds-bekraefter hvilken koersel der byggede det.
+          .github/scripts/cosign-identity.sh "$IMAGE" "$PINNED"
 
           # Negativ kontrol: samme image, forkert workflow-fil. Bestaar denne,
           # maaler verifikationen ingenting.
@@ -356,6 +434,151 @@ jobs:
             exit 1
           fi
           echo "✓ negativ kontrol: forkert identitet afvist"
+
+          # Negativ kontrol nr. 2, ANDEN akse: ikke "forkert signatur", men
+          # SLET INGEN. Det er den sti CVE-klassen i cosign 2.5.x fejlede
+          # fail-open paa — en parse-fejl paa noget der ikke er der.
+          #
+          # Maalet er vores EGET signatur-artefakt: cosign gemmer signaturen
+          # som et tag afledt af digest'et, og vi signerer aldrig signaturer.
+          # Det er derfor et objekt i vores eget registry som deterministisk
+          # er usigneret — ingen ekstern afhaengighed, ingen Docker Hub-rate-
+          # limit, og ingen tvivl om hvem der ejer det.
+          # 🔴 Signatur-tagget skifter format med cosign-versionen. MAALT paa
+          # run 34131844473: cosign 2.x lagde signaturen paa
+          # sha256-<digest>.sig, mens 3.0.6 laegger den paa sha256-<digest>
+          # UDEN suffiks. Vi hardkoder derfor ingen af delene, men proever
+          # begge og fejler HOEJLYDT hvis ingen findes.
+          UNSIGNED=$(.github/scripts/cosign-sig-ref.sh "${IMAGE%@*}" "${IMAGE#*@}")
+          echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
+          if OUT=$(cosign verify "$UNSIGNED" \
+                --certificate-identity-regexp "$PINNED" \
+                --certificate-oidc-issuer "$ISSUER" 2>&1); then
+            echo "::error::verifikationen ACCEPTEREDE et image UDEN signatur"
+            exit 1
+          fi
+          # 🔴 Et vilkaarligt exit != 0 er IKKE nok. En netvaerksfejl, et
+          # manglende image eller en tastefejl i referencen ville ogsaa give
+          # exit != 0 — og cellen ville bestaa paa den forkerte grund. Vi
+          # kraever derfor at cosign faktisk udtalte sig om SIGNATURER.
+          if ! printf '%s' "$OUT" | grep -qiE 'no (matching )?signatures|signature not found'; then
+            echo "::error::verify fejlede, men ikke fordi signaturen manglede — cellen maaler noget andet end den paastaar:"
+            printf '%s\n' "$OUT"
+            exit 1
+          fi
+          echo "✓ negativ kontrol: image UDEN signatur afvist"
+
+      # ── Tags are published LAST, onto the digest that was signed ─────────
+      #
+      # 🔴 Cure A from [sikkerhed]'s ruling on riff ap1qcpe7zg3j8ex5ton6d4i1:
+      # push digest -> boot-smoke -> sign -> verify -> THEN tags. No mutable
+      # tag may point at a digest that is not yet signed and verified. If any
+      # step above fails (or the run is cancelled), this step does not run and
+      # no tag moves. Retry, sleep and loosening the PR cell were rejected.
+      #
+      # `--prefer-index=false` is load-bearing. Measured 2026-09-14 (buildx
+      # 0.33.0 against a local registry): without it, `imagetools create`
+      # from a single manifest writes a NEW index (pushed 455756e… -> tag
+      # 610b544…), so the tag would again point at an unsigned object. With
+      # it, the tag is a carbon copy (455756e… -> 455756e…). The read-back
+      # below fails the job if a buildx version behaves differently.
+      - name: Tag the signed and verified digest
+        id: tags
+        if: github.event_name != 'pull_request'
+        env:
+          NAME: ${{ steps.img.outputs.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          SIGNED: ${{ steps.sign.outputs.image }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NAME" ] || [ -z "$DIGEST" ]; then
+            echo "::error::no image name or pushed digest — nothing to tag"
+            exit 1
+          fi
+          # Tag exactly the object that was signed, not a re-derived one.
+          if [ "$SIGNED" != "$NAME@$DIGEST" ]; then
+            echo "::error::signed image ($SIGNED) is not the pushed digest ($NAME@$DIGEST) — refusing to tag"
+            exit 1
+          fi
+          args=()
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            case "$t" in
+              "$NAME":*) args+=(-t "$t") ;;
+              *) echo "::error::tag '$t' is not in $NAME — refusing to tag"; exit 1 ;;
+            esac
+          done <<< "$TAGS"
+          [ "${#args[@]}" -gt 0 ] || { echo "::error::metadata produced no tags"; exit 1; }
+          docker buildx imagetools create --prefer-index=false "${args[@]}" "$NAME@$DIGEST"
+          # Read every tag back: each must resolve to the signed digest.
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            got=$(docker buildx imagetools inspect "$t" --format '{{.Manifest.Digest}}')
+            if [ "$got" != "$DIGEST" ]; then
+              echo "::error::$t resolves to $got, not the signed digest $DIGEST"
+              exit 1
+            fi
+            echo "✓ $t -> $DIGEST"
+          done <<< "$TAGS"
+
+      # ── PR-sti: bevis at cosign-BINAEREN fejler LUKKET ───────────────────
+      #
+      # Signerings- og verifikationstrinnene ovenfor er PR-udelukkede, og det
+      # er korrekt: keyless binder identiteten til OIDC-tokenet, og en PR's
+      # token er refs/pull/N/merge — som det pinnede regexp med vilje afviser.
+      # Man KAN ikke signere PR-image't med main-identiteten.
+      #
+      # Men uden dette trin ville et cosign-bump foerst bevises ved foerste
+      # push til main EFTER merge, og et skipped trin taeller som opfyldt hos
+      # GitHub. Denne fils egen doktrin, tolv linjer over triggeren, siger at
+      # et bevis der foerst opstaar efter merge ikke er en barriere. Saa her
+      # bevises det ene der KAN bevises paa en PR: at binaeren fejler LUKKET
+      # naar der intet er at verificere. Det daekker ikke signerings-stien.
+      - name: Install cosign (PR)
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Cosign fails closed on an unsigned reference (PR)
+        if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
+        env:
+          ISSUER: https://token.actions.githubusercontent.com
+          PINNED: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+        run: |
+          set -euo pipefail
+          NAME="${REGISTRY}/$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+
+          # Samme maal-konstruktion som celle 4: signatur-artefaktet for et
+          # image vi HAR signeret. Vi signerer aldrig signaturer, saa det er
+          # deterministisk usigneret — i vores eget registry, uden Docker
+          # Hub-rate-limit. Her tages det fra :latest, fordi PR'en ikke selv
+          # pusher noget.
+          DIGEST=$(docker buildx imagetools inspect "$NAME:latest" --format '{{.Manifest.Digest}}') || {
+            echo "::error::kunne ikke slaa $NAME:latest op — cellen kan ikke maale noget, og et tavst spring ville se ud som success"
+            exit 1
+          }
+          # Samme to-kandidat-probe som celle 4: signatur-tagget skifter format
+          # med cosign-versionen (2.x: sha256-<digest>.sig · 3.0.6:
+          # sha256-<digest> uden suffiks). Hardkoder vi ét af dem, fejler
+          # cellen naar formatet skifter — praecis som den gjorde paa
+          # run 34131844473.
+          UNSIGNED=$(.github/scripts/cosign-sig-ref.sh "$NAME" "$DIGEST")
+          echo "  signatur-artefakt (usigneret maal): $UNSIGNED"
+
+          if OUT=$(cosign verify "$UNSIGNED" \
+                --certificate-identity-regexp "$PINNED" \
+                --certificate-oidc-issuer "$ISSUER" 2>&1); then
+            echo "::error::cosign ACCEPTEREDE en reference uden signatur — binaeren fejler AABEN"
+            exit 1
+          fi
+          # Samme krav som celle 4: et vilkaarligt exit != 0 er ikke nok. En
+          # netvaerksfejl ville ogsaa "bestaa" cellen, og en negativ kontrol
+          # der er groen fordi instrumentet er i stykker, maaler ingenting.
+          if ! printf '%s' "$OUT" | grep -qiE 'no (matching )?signatures|signature not found'; then
+            echo "::error::verify fejlede, men ikke fordi signaturen manglede — cellen maaler noget andet end den paastaar:"
+            printf '%s\n' "$OUT"
+            exit 1
+          fi
+          echo "✓ cosign $(cosign version --json 2>/dev/null | grep -oE '\"gitVersion\": *\"[^\"]+' | cut -d'"' -f4 || echo '?') fejler lukket paa en usigneret reference"
 
       # ── PR-sti: smoken skal binde sig til DET image vi lige byggede ──────
       #
@@ -408,7 +631,7 @@ jobs:
       # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
       # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
       # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             docker-compose.production.yml
@@ -416,7 +639,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Sync compose + Caddyfile to host
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
@@ -426,7 +649,7 @@ jobs:
           overwrite: true
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -511,7 +734,7 @@ jobs:
 
     steps:
       - name: Snapshot before deploy
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -527,7 +750,7 @@ jobs:
       # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
       # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
       # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             docker-compose.production.yml
@@ -535,7 +758,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Sync compose + Caddyfile to host
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -545,7 +768,7 @@ jobs:
           overwrite: true
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

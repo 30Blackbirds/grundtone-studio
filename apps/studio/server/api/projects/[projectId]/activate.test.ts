@@ -26,7 +26,9 @@ vi.mock('drizzle-orm', () => ({
   eq: () => null,
 }))
 
+const txMock = { handle: 'transaction' }
 const dbMock = {
+  transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(txMock),
   select: () => ({
     from: () => ({
       where: () => Promise.resolve(versions.slice(0, 1)),
@@ -81,6 +83,15 @@ vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
 }))
 
+// ─── brand quota — the cap itself is tested in server/lib/brand-quota.test.ts ──
+const assertBrandCapacity = vi.fn()
+const claimBrandSlot = vi.fn()
+vi.mock('~~/server/lib/brand-quota', () => ({
+  assertBrandCapacity: (...args: unknown[]) => assertBrandCapacity(...args),
+  claimBrandSlot: (...args: unknown[]) => claimBrandSlot(...args),
+}))
+const SOLO_CLAIM = { organizationId: ORG.id, entitlements: null, hardCap: true }
+
 const handler = (await import('./activate.post')).default as unknown as (
   event: unknown,
 ) => Promise<unknown>
@@ -91,6 +102,10 @@ beforeEach(() => {
   spies.storage.length = 0
   spies.bunnyPurges.length = 0
   versions.length = 0
+  assertBrandCapacity.mockReset()
+  assertBrandCapacity.mockResolvedValue(null)
+  claimBrandSlot.mockReset()
+  claimBrandSlot.mockResolvedValue(undefined)
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -156,6 +171,8 @@ describe('POST /api/projects/[projectId]/activate', () => {
 
     expect(spies.inserts).toHaveLength(1)
     expect(spies.inserts[0].table).toBe('active_version')
+    // A rollback of an existing brand (assertBrandCapacity → null) claims nothing.
+    expect(claimBrandSlot).not.toHaveBeenCalled()
 
     expect(spies.audit).toHaveLength(1)
     expect(spies.audit[0].action).toBe('config.activated')
@@ -166,5 +183,99 @@ describe('POST /api/projects/[projectId]/activate', () => {
     })
 
     expect(spies.bunnyPurges).toEqual([PROJECT.id])
+  })
+  it('refuses when activating would create a new brand over the hard cap, writing nothing', async () => {
+    versions.push({
+      id: '11111111-1111-4111-8111-111111111106',
+      projectId: PROJECT.id,
+      version: 6,
+      status: 'published',
+      tokensJson: { colors: { primary: '#0EA5E9' } },
+    })
+    assertBrandCapacity.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(
+      handler(
+        fakeEvent({
+          params: { projectId: PROJECT.id },
+          body: { versionId: '11111111-1111-4111-8111-111111111106' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403, data: { code: 'brand_quota_exceeded' } })
+
+    expect(assertBrandCapacity).toHaveBeenCalledWith(ORG.id, PROJECT.id)
+    expect(claimBrandSlot).not.toHaveBeenCalled()
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(spies.bunnyPurges).toHaveLength(0)
+  })
+
+  it('creates the brand in a transaction before any blob write on a first activation', async () => {
+    versions.push({
+      id: '11111111-1111-4111-8111-111111111107',
+      projectId: PROJECT.id,
+      version: 7,
+      status: 'published',
+      tokensJson: { colors: { primary: '#0EA5E9' } },
+    })
+    assertBrandCapacity.mockResolvedValue(SOLO_CLAIM)
+    const storageAtClaim: number[] = []
+    claimBrandSlot.mockImplementation(() => {
+      storageAtClaim.push(spies.storage.length)
+      return Promise.resolve()
+    })
+
+    await handler(
+      fakeEvent({
+        params: { projectId: PROJECT.id },
+        body: { versionId: '11111111-1111-4111-8111-111111111107' },
+      }),
+    )
+
+    expect(claimBrandSlot).toHaveBeenCalledWith(txMock, SOLO_CLAIM, {
+      projectId: PROJECT.id,
+      configVersionId: '11111111-1111-4111-8111-111111111107',
+      activatedBy: SESSION.user.id,
+      activatedByEmail: SESSION.user.email,
+    })
+    expect(storageAtClaim).toEqual([0])
+    expect(spies.storage).toHaveLength(2)
+  })
+
+  it('fails a first activation whose claim is refused under the lock, writing nothing', async () => {
+    versions.push({
+      id: '11111111-1111-4111-8111-111111111108',
+      projectId: PROJECT.id,
+      version: 8,
+      status: 'published',
+      tokensJson: { colors: { primary: '#0EA5E9' } },
+    })
+    assertBrandCapacity.mockResolvedValue(SOLO_CLAIM)
+    claimBrandSlot.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(
+      handler(
+        fakeEvent({
+          params: { projectId: PROJECT.id },
+          body: { versionId: '11111111-1111-4111-8111-111111111108' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403, data: { code: 'brand_quota_exceeded' } })
+
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(spies.bunnyPurges).toHaveLength(0)
   })
 })

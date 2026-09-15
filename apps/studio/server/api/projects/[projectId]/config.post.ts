@@ -2,8 +2,14 @@ import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { and, desc, eq, max } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { configVersion } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { tokensSchema } from '~~/server/lib/tokens'
+import { diffTokens } from '~~/utils/token-diff'
+
+// Audit payload cap: a draft save can touch many tokens, and the audit row
+// should say WHICH paths changed, never their values (riff m2axh5obv4ce5a0hr4hm2xvk).
+const MAX_AUDITED_PATHS = 50
 
 defineRouteMeta({
   openAPI: {
@@ -38,6 +44,12 @@ export default defineEventHandler(async (event) => {
       .set({ tokensJson: parsed.data })
       .where(eq(configVersion.id, existing.id))
       .returning()
+    await auditDraftSaved(event, access, projectId, {
+      version: updated.version,
+      created: false,
+      previous: existing.tokensJson as Record<string, unknown>,
+      next: parsed.data,
+    })
     return updated
   }
 
@@ -56,5 +68,43 @@ export default defineEventHandler(async (event) => {
       publishedBy: access.userId,
     })
     .returning()
+  await auditDraftSaved(event, access, projectId, {
+    version: created.version,
+    created: true,
+    previous: {},
+    next: parsed.data,
+  })
   return created
 })
+
+/**
+ * Written only after the draft row is stored, so a rejected save (400 invalid
+ * tokens, 403 role) never produces an event. The actor comes from the request:
+ * a user session or `machine:{keyId}` for the token CLI.
+ */
+async function auditDraftSaved(
+  event: Parameters<typeof recordAuditEvent>[0],
+  access: { organization: { id: string }; project: { name: string } },
+  projectId: string,
+  change: {
+    version: number
+    created: boolean
+    previous: Record<string, unknown>
+    next: Record<string, unknown>
+  },
+) {
+  const paths = diffTokens(change.previous, change.next).map((c) => c.path)
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'config.draft_saved',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: {
+      version: change.version,
+      created: change.created,
+      changedPathCount: paths.length,
+      changedPaths: paths.slice(0, MAX_AUDITED_PATHS),
+    },
+  })
+}

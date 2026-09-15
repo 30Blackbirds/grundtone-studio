@@ -30,6 +30,14 @@ vi.mock('~~/server/lib/storage', () => ({
   },
 }))
 
+const auditEvents: Array<{ action: string; payload: Record<string, unknown> }> = []
+vi.mock('~~/server/lib/audit', () => ({
+  recordAuditEvent: (_event: unknown, payload: { action: string }) => {
+    auditEvents.push({ action: payload.action, payload })
+    return Promise.resolve()
+  },
+}))
+
 const requireProjectAccess = vi.fn()
 vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
@@ -62,6 +70,7 @@ function upload(query: Record<string, string>, body: Buffer = WOFF2) {
 beforeEach(() => {
   inserted.length = 0
   stored.length = 0
+  auditEvents.length = 0
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -132,5 +141,28 @@ describe('POST assets/font — licence attestation gate', () => {
     })
     // Erklæringen må gerne være skrevet (harmløst) — filen må ikke være det.
     expect(stored).toHaveLength(0)
+  })
+  it('audits exactly one asset.font_uploaded after the proof and the file are stored — never the bytes', async () => {
+    await upload(VALID_QUERY)
+
+    expect(inserted).toHaveLength(1)
+    expect(stored).toHaveLength(1)
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].payload).toMatchObject({
+      organizationId: ORG.id,
+      action: 'asset.font_uploaded',
+      targetId: PROJECT.id,
+      after: { slot: 'body', family: 'Asp Grotesk', weight: 400 },
+    })
+    expect(JSON.stringify(auditEvents[0].payload)).not.toContain('wOF2')
+  })
+
+  it('audits nothing when the upload is rejected', async () => {
+    const { licenceVersion: _v, ...withoutLicence } = VALID_QUERY
+    await expect(upload(withoutLicence)).rejects.toMatchObject({ statusCode: 400 })
+    await expect(upload(VALID_QUERY, Buffer.from('not a font'))).rejects.toMatchObject({
+      statusCode: 400,
+    })
+    expect(auditEvents).toHaveLength(0)
   })
 })

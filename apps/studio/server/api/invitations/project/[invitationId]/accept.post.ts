@@ -1,7 +1,8 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
 import { eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
-import { projectInvitation, projectMember } from '~~/server/db/schema'
+import { project, projectInvitation, projectMember } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { grantProjectRole } from '~~/server/lib/pdp'
 import { PROJECT_ROLES, type ProjectRole } from '~~/server/lib/project-access'
 
@@ -53,7 +54,7 @@ export default defineEventHandler(async (event) => {
   // surface the error and don't flip the invite, so the user can retry.
   await grantProjectRole(event, invite.projectId, actor.sub, role)
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     await tx
       .insert(projectMember)
       .values({
@@ -75,4 +76,23 @@ export default defineEventHandler(async (event) => {
 
     return { projectId: invite.projectId, role: invite.role }
   })
+
+  // Audited only after the PDP grant and the membership write both succeeded
+  // (riff mfhvuk8515gubxh30puab9ch). The invitation carries only the project id,
+  // so the org the event belongs to is read from the project.
+  const [proj] = await db
+    .select({ organizationId: project.organizationId, name: project.name })
+    .from(project)
+    .where(eq(project.id, invite.projectId))
+  if (proj) {
+    await recordAuditEvent(event, {
+      organizationId: proj.organizationId,
+      action: 'project.member.added',
+      targetType: 'project',
+      targetId: invite.projectId,
+      targetLabel: proj.name,
+      after: { role: invite.role, via: 'invitation', invitationId: invite.id },
+    })
+  }
+  return result
 })

@@ -4,16 +4,27 @@ import type { H3Event } from 'h3'
 // (auto-imports findes kun i Nuxt-runtime), og SIK-003's fail-closed-sti er
 // netop det, der skal kunne testes.
 import { createError } from 'h3'
-import { createPromiseClient } from '@connectrpc/connect'
+import { Code, ConnectError, createPromiseClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-node'
 import { PermissionsService } from '@klanghaus/permissions-client/connect'
+import { recordPdpUnavailable } from './metrics'
 
 // Central Permissions PDP client (Beslutning O/W). Studio asks the PDP for every
 // authz decision instead of querying membership tables locally. The PDP derives
 // the tenant from the JWT `org` claim — we never send a tenant in the body.
 //
-// Fail-closed: a missing actor, a transport error, or a thrown RPC all surface
-// as "denied". Callers in project-access.ts translate that into 401/403.
+// Three outcomes, never two (riff iub38z651y7nr21bovn0683w). A read helper
+// answers `allowed`, `denied` or `unavailable`:
+//   - denied      the PDP said no, there is no actor/session, or the PDP rejected
+//                 our identity (Unauthenticated / PermissionDenied, HTTP 401/403)
+//   - unavailable the question could not be answered: transport failure,
+//                 timeout, outage, misconfiguration
+// Both still fail CLOSED — callers never grant on `unavailable` — but they must
+// be distinguishable, otherwise an outage looks like "you have no access" to the
+// user, to support and to monitoring. Callers in project-access.ts map denied to
+// 401/403 and unavailable to 503 `pdp_unavailable`.
+
+export type PdpVerdict = 'allowed' | 'denied' | 'unavailable'
 
 // Project relations the PDP understands. The OpenFGA model implements
 // can_view/can_edit/can_admin as max(orgRole, projectRole); studio passes the
@@ -72,15 +83,45 @@ async function getToken(event: H3Event): Promise<string | null> {
   // browser-vendte AUTH_ISSUER (localhost:3002 er ikke nåbar fra containeren).
   const authUrl = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
   const cookieHeader = event.node.req.headers.cookie
-  if (!authUrl || !cookieHeader) return null
-  try {
-    const res = await $fetch<{ token?: string }>(`${authUrl}/api/auth/token`, {
-      headers: { cookie: cookieHeader },
-    })
-    return res.token ?? null
-  } catch {
-    return null
+  // No session to exchange → nothing to ask with → denied (null).
+  if (!cookieHeader) return null
+  // A missing auth address is misconfiguration, not a denial: throw so the
+  // caller classifies it as unavailable. Likewise a failed exchange throws.
+  if (!authUrl) throw new Error('AUTH_INTERNAL_URL or AUTH_ISSUER must be set')
+  const res = await $fetch<{ token?: string }>(`${authUrl}/api/auth/token`, {
+    headers: { cookie: cookieHeader },
+  })
+  return res.token ?? null
+}
+
+/**
+ * Classify a thrown read-path failure. Only an explicit identity rejection is a
+ * denial; everything else (Unavailable, DeadlineExceeded, Internal, Aborted,
+ * network errors, missing config) means the question went unanswered.
+ */
+export function classifyPdpFailure(err: unknown): 'denied' | 'unavailable' {
+  if (err instanceof ConnectError) {
+    return err.code === Code.Unauthenticated || err.code === Code.PermissionDenied
+      ? 'denied'
+      : 'unavailable'
   }
+  const e = err as { statusCode?: unknown; status?: unknown } | null
+  const status = e?.statusCode ?? e?.status
+  if (status === 401 || status === 403) return 'denied'
+  return 'unavailable'
+}
+
+function failureVerdict(err: unknown, helper: string): 'denied' | 'unavailable' {
+  const outcome = classifyPdpFailure(err)
+  if (outcome === 'unavailable') {
+    const reason = err instanceof ConnectError ? (Code[err.code] ?? 'connect') : 'transport'
+    recordPdpUnavailable(reason)
+    console.error(
+      `[pdp] ${helper} could not be answered (${reason}):`,
+      (err as Error)?.message ?? err,
+    )
+  }
+  return outcome
 }
 
 // ─── SIK-003: skrive-stier bruger en TJENESTE-identitet ─────────────────────
@@ -145,67 +186,67 @@ async function clientFor(event: H3Event) {
 }
 
 /**
- * Check whether the current actor may perform `action` on a project. Fail-closed:
- * returns false on missing actor / token / transport error.
+ * Check whether the current actor may perform `action` on a project.
+ * `unavailable` when the PDP could not answer; never `allowed` on failure.
  */
 export async function checkProject(
   event: H3Event,
   projectId: string,
   action: ProjectAction,
-): Promise<boolean> {
+): Promise<PdpVerdict> {
   const actor = getActor(event)
-  if (!actor) return false
+  if (!actor) return 'denied'
   try {
     const client = await clientFor(event)
-    if (!client) return false
+    if (!client) return 'denied'
     const res = await client.check({
       subject: actor.sub,
       action,
       resource: projectResource(projectId),
     })
-    return res.allow
-  } catch {
-    return false
+    return res.allow ? 'allowed' : 'denied'
+  } catch (err) {
+    return failureVerdict(err, 'checkProject')
   }
 }
 
 /**
- * Check whether the current actor holds `relation` (or higher, per the model's
- * role hierarchy) on an organization. Fail-closed.
+ * Check whether the current actor holds `relation` on an organization.
+ * `unavailable` when the PDP could not answer; never `allowed` on failure.
  */
 export async function checkOrg(
   event: H3Event,
   orgId: string,
   relation: OrgRelation,
-): Promise<boolean> {
+): Promise<PdpVerdict> {
   const actor = getActor(event)
-  if (!actor) return false
+  if (!actor) return 'denied'
   try {
     const client = await clientFor(event)
-    if (!client) return false
+    if (!client) return 'denied'
     const res = await client.check({
       subject: actor.sub,
       action: relation,
       resource: orgResource(orgId),
     })
-    return res.allow
-  } catch {
-    return false
+    return res.allow ? 'allowed' : 'denied'
+  } catch (err) {
+    return failureVerdict(err, 'checkOrg')
   }
 }
 
 /**
- * Batch project checks in one round-trip. Returns a map projectId→allow in the
- * same order. Any failure fails the whole batch closed (all false).
+ * Batch project checks in one round-trip. Returns projectId→verdict. A failure
+ * marks the whole batch with the failure verdict (never `allowed`).
  */
 export async function batchCheckProjects(
   event: H3Event,
   projectIds: string[],
   action: ProjectAction,
-): Promise<Record<string, boolean>> {
+): Promise<Record<string, PdpVerdict>> {
   const actor = getActor(event)
-  const result: Record<string, boolean> = {}
-  for (const id of projectIds) result[id] = false
+  const result: Record<string, PdpVerdict> = {}
+  for (const id of projectIds) result[id] = 'denied'
   if (!actor || projectIds.length === 0) return result
   try {
     const client = await clientFor(event)
@@ -219,35 +260,13 @@ export async function batchCheckProjects(
     })
     res.results.forEach((r, i) => {
       const id = projectIds[i]
-      if (id) result[id] = r.allow
+      if (id) result[id] = r.allow ? 'allowed' : 'denied'
     })
     return result
-  } catch {
+  } catch (err) {
+    const outcome = failureVerdict(err, 'batchCheckProjects')
+    for (const id of projectIds) result[id] = outcome
     return result
-  }
-}
-
-/**
- * List the project ids the current actor has `action` access to within the
- * JWT-scoped tenant. Returns [] on failure.
- */
-export async function listAccessibleProjects(
-  event: H3Event,
-  action: ProjectAction,
-): Promise<string[]> {
-  const actor = getActor(event)
-  if (!actor) return []
-  try {
-    const client = await clientFor(event)
-    if (!client) return []
-    const res = await client.listMyAccess({
-      subject: actor.sub,
-      resourceType: 'project',
-      action,
-    })
-    return res.resources
-  } catch {
-    return []
   }
 }
 

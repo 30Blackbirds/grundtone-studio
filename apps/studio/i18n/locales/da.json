@@ -189,7 +189,9 @@
     "sriHeading": "Produktion: pin en version + brug Sub-Resource Integrity",
     "sriBody": "For langlivede produktions-deploys: pin til en immutable version-URL og tilføj en SRI-hash. Den tilsvarende hash serveres på samme path med .sri-suffix.",
     "modeHeading": "Light / dark mode",
-    "modeBody": "SDK'en anvender det tema der matcher det valgte mode. Brug 'auto' for at følge styresystemets præference."
+    "modeBody": "SDK'en anvender det tema der matcher det valgte mode. Brug 'auto' for at følge styresystemets præference.",
+    "ssrHeading": "Server-renderede apps: link stylesheetet",
+    "ssrBody": "I Nuxt, Next.js og andre server-renderede frameworks lægger du linket til tokens.css i det server-renderede head, som i Nuxt- og Next.js-fanerne. Så er brandet på plads før første visning, uden JavaScript. Klient-pluginet anvender først brandet, når JavaScript har kørt, så brug det til single-page apps."
   },
   "auth": {
     "email": "Email",
@@ -703,6 +705,12 @@
       "api_key.revoked": "Tilbagekaldte API-nøgle",
       "config.published": "Publicerede konfiguration",
       "config.activated": "Aktiverede version",
+      "config.draft_saved": "Gemte kladde-konfiguration",
+      "project.member.invited": "Inviterede projektmedlem",
+      "project.member.invite_cancelled": "Annullerede projektinvitation",
+      "project.member.invite_declined": "Afviste projektinvitation",
+      "asset.font_uploaded": "Uploadede skrifttype",
+      "asset.logo_uploaded": "Uploadede logo",
       "organization.updated": "Opdaterede organisation"
     },
     "loadOlder": "Indlæs ældre",
@@ -868,7 +876,9 @@
     "body": "Free giver dig to projekter — nok til at se dit brand gå live overalt. Med Solo får du tre aktive brands, e-mail-skabeloner i samme tokens og API-adgang — fra €29/md. Stadig ubegrænsede medlemmer — vi tæller brands, ikke mennesker.",
     "cta": "Se planer →",
     "meter": "{used}/{limit} projekter brugt",
-    "later": "Måske senere"
+    "later": "Måske senere",
+    "brandHeading": "Du har nået din plans aktive brands.",
+    "brandBody": "Din plan har {limit} aktive brands, og at publicere dette projekt ville tilføje ét mere. Opgradér til en plan med flere brands for at publicere det."
   },
   "plans": {
     "introBadge": "Introduktionspriser",
