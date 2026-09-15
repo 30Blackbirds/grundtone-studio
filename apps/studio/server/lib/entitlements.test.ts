@@ -4,6 +4,7 @@ import {
   getStudioEntitlements,
   clearEntitlementsCache,
   type Entitlements,
+  evaluateBrandQuota,
 } from './entitlements'
 
 function ent(overrides: Partial<Entitlements> = {}): Entitlements {
@@ -67,6 +68,50 @@ describe('evaluateProjectQuota (kontrakt §1 + §4)', () => {
 
   it('fails open on canceled (portal-without-default-plan edge, account ruling)', () => {
     expect(evaluateProjectQuota(ent({ planState: 'canceled' }), 2)).toEqual({ allowed: true })
+  })
+})
+
+describe('evaluateBrandQuota (riff bfxmm7xktk6xkfanh5eennva)', () => {
+  const solo = (over: Record<string, unknown> = {}) =>
+    ent({ planKey: 'studio_solo', limits: { 'studio.brands': 3 }, ...over })
+
+  it('blocks a hard-cap plan at the limit and allows below it', () => {
+    expect(evaluateBrandQuota(solo(), 2, true)).toEqual({ allowed: true })
+    expect(evaluateBrandQuota(solo(), 3, true)).toEqual({
+      allowed: false,
+      reason: 'brand_quota_exceeded',
+      limit: 3,
+    })
+  })
+
+  it('never blocks a plan with overage, even over its included brands (control)', () => {
+    const studio = ent({ planKey: 'studio_studio', limits: { 'studio.brands': 10 } })
+    expect(evaluateBrandQuota(studio, 10, false)).toEqual({ allowed: true })
+    expect(evaluateBrandQuota(studio, 25, false)).toEqual({ allowed: true })
+  })
+
+  it('treats an absent studio.brands key as unlimited on a hard-cap plan', () => {
+    expect(evaluateBrandQuota(solo({ limits: {} }), 99, true)).toEqual({ allowed: true })
+  })
+
+  it('fails open when entitlements are unavailable', () => {
+    expect(evaluateBrandQuota(null, 99, true)).toEqual({ allowed: true })
+  })
+
+  it('blocks suspended and expired grace regardless of hard cap', () => {
+    const past = new Date(Date.now() - 60_000).toISOString()
+    expect(evaluateBrandQuota(solo({ planState: 'suspended' }), 0, false)).toEqual({
+      allowed: false,
+      reason: 'suspended',
+    })
+    expect(evaluateBrandQuota(solo({ planState: 'grace', graceUntil: past }), 0, true)).toEqual({
+      allowed: false,
+      reason: 'suspended',
+    })
+  })
+
+  it('stays open on canceled (same account ruling as the project quota)', () => {
+    expect(evaluateBrandQuota(solo({ planState: 'canceled' }), 3, true)).toEqual({ allowed: true })
   })
 })
 

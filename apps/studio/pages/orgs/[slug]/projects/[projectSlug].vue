@@ -63,6 +63,9 @@
   const saving = ref(false)
   const publishing = ref(false)
   const error = ref<string | null>(null)
+  // Active-brand cap (riff bfxmm7xktk6xkfanh5eennva): a plan limit, not a
+  // failure — rendered like the project quota on the org page, not as an error.
+  const brandLimit = ref<number | null>(null)
   const toast = useToast()
 
   async function saveDraft(opts: { silent?: boolean } = {}) {
@@ -89,13 +92,19 @@
     if (!project.value?.id) return
     publishing.value = true
     error.value = null
+    brandLimit.value = null
     try {
       if (isDirty.value) await saveDraft({ silent: true })
       await $fetch(`/api/projects/${project.value.id}/publish`, { method: 'POST' })
       await refreshConfig()
       toast.success(t('toasts.published'))
     } catch (err) {
-      error.value = (err as Error).message
+      const data = (err as { data?: { data?: { code?: string; limit?: number } } }).data?.data
+      if (data?.code === 'brand_quota_exceeded') {
+        brandLimit.value = data.limit ?? 0
+      } else {
+        error.value = (err as Error).message
+      }
     } finally {
       publishing.value = false
     }
@@ -161,6 +170,22 @@
     </header>
 
     <GTAlert v-if="error" variant="error" :heading="error" class="mb-4" />
+    <GTAlert
+      v-if="brandLimit !== null"
+      variant="info"
+      :heading="t('quota.brandHeading')"
+      class="mb-4"
+    >
+      <p class="m-0 mb-3">{{ t('quota.brandBody', { limit: brandLimit }) }}</p>
+      <div class="flex gap-3 items-center">
+        <GTButton size="sm" @click="navigateTo(`/plans?org=${slug}`)">
+          {{ t('quota.cta') }}
+        </GTButton>
+        <GTButton variant="unstyled" size="sm" @click="brandLimit = null">
+          {{ t('quota.later') }}
+        </GTButton>
+      </div>
+    </GTAlert>
 
     <GTTabs
       v-if="project"
