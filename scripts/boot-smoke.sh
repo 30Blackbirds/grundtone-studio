@@ -16,7 +16,8 @@
 # Kontrakt:
 #   stdout  = NØJAGTIG det image-ID der blev kørt, intet andet
 #   stderr  = al diagnostik
-#   exit    = 0 kun hvis healthz svarer OG /login giver 200
+#   exit    = 0 only if healthz answers, /login returns 200, and the SDK
+#             contract files are served (see the /client block below)
 #
 # Brug:  scripts/boot-smoke.sh <image-ref>
 #        BOOT_SMOKE_PORT=3987 scripts/boot-smoke.sh <image-ref>
@@ -84,6 +85,33 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login")
 [ "$code" = '200' ] \
   || { log "✗ /login returned $code in boot-smoke"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1; }
 log "✓ /login 200 in boot-smoke"
+
+# The SDK is served from this image (KH-988): the Bunny pull zone uses studio as
+# its origin, so a bundle missing here is a bundle missing on the CDN. A status
+# code alone is not enough, because a catch-all can also answer 200. Each file
+# must carry its own content type, and the versioned bundle must hash to the SRI
+# the same image serves next to it.
+sdk_get() { curl -s -o "$2" -w '%{http_code} %{content_type}' "http://127.0.0.1:$PORT$1"; }
+SDK_TMP=$(mktemp -d)
+for spec in 'v1.js application/javascript' 'v1.0.0.js application/javascript' 'v1.0.0.js.sri text/plain'; do
+  file=${spec%% *}; want=${spec#* }
+  got=$(sdk_get "/client/$file" "$SDK_TMP/$file")
+  case "$got" in
+    "200 $want"*) log "✓ /client/$file $got in boot-smoke" ;;
+    *) log "✗ /client/$file returned '$got', want '200 $want'"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1 ;;
+  esac
+done
+sri=$(tr -d '\n' < "$SDK_TMP/v1.0.0.js.sri")
+calc="sha384-$(openssl dgst -sha384 -binary "$SDK_TMP/v1.0.0.js" | openssl base64 -A)"
+[ "$sri" = "$calc" ] \
+  || { log "✗ /client/v1.0.0.js hashes to $calc, but /client/v1.0.0.js.sri says '$sri'"; exit 1; }
+log "✓ /client/v1.0.0.js matches its served SRI"
+# Negative control: an unknown version must not be served.
+code=$(sdk_get /client/v9.js /dev/null)
+[ "${code%% *}" = '404' ] \
+  || { log "✗ /client/v9.js returned '$code', want 404 — a catch-all answers for the SDK paths"; exit 1; }
+log "✓ /client/v9.js 404 in boot-smoke"
+rm -rf "$SDK_TMP"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren
 # faktisk kørte. Kalderen sammenligner det med det, den byggede.

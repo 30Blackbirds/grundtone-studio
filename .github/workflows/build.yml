@@ -111,7 +111,11 @@ jobs:
           #
           # build.yml og boot-smoke.sh selv er med, saa aendringer i selve
           # byggedefinitionen og i kontrollen ogsaa proeves.
-          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json)$'
+          #
+          # The SDK route and its contract constant are included because the
+          # boot-smoke asserts the SDK files the image serves; the CDN pulls
+          # them from that image (KH-988).
+          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts)$'
           # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:
           # en fejlende `git diff` i en kommando-substitution afbryder trinnet
           # (exit 129) og goer jobbet ROEDT. Det er fail-CLOSED, ikke fail-open
