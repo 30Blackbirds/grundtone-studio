@@ -703,6 +703,7 @@
       "api_key.revoked": "Revoked API key",
       "config.published": "Published configuration",
       "config.activated": "Activated version",
+      "config.draft_saved": "Saved draft configuration",
       "organization.updated": "Updated organization"
     },
     "loadOlder": "Load older",

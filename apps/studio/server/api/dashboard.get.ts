@@ -1,10 +1,17 @@
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, auditLog, configVersion, project } from '~~/server/db/schema'
+import type { AuditAction } from '~~/server/lib/audit'
 import { assembleDashboard } from '~~/server/lib/dashboard'
 import { listCallerOrgs, lookupOrgById } from '~~/server/lib/org-lookup'
 
 const ACTIVITY_LIMIT = 8
+
+// Actions kept out of the dashboard's short activity feed. Draft saves are
+// audited (riff m2axh5obv4ce5a0hr4hm2xvk) and stay visible on the audit page,
+// but one row per save would push publishes and member changes out of an
+// 8-row feed. Filtered in SQL so the limit still returns 8 meaningful rows.
+export const FEED_EXCLUDED_ACTIONS: readonly AuditAction[] = ['config.draft_saved']
 
 defineRouteMeta({
   openAPI: {
@@ -88,7 +95,12 @@ export default defineEventHandler(async (event) => {
           createdAt: auditLog.createdAt,
         })
         .from(auditLog)
-        .where(inArray(auditLog.organizationId, auditableOrgIds))
+        .where(
+          and(
+            inArray(auditLog.organizationId, auditableOrgIds),
+            notInArray(auditLog.action, [...FEED_EXCLUDED_ACTIONS]),
+          ),
+        )
         .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
         .limit(ACTIVITY_LIMIT)
     : []
