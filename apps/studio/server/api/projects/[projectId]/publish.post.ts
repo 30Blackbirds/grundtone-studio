@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, max, notInArray } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion, fontLicenceAttestation } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
-import { assertBrandCapacity } from '~~/server/lib/brand-quota'
+import { assertBrandCapacity, claimBrandSlot } from '~~/server/lib/brand-quota'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { copyObject, paths, putObject } from '~~/server/lib/storage'
@@ -16,7 +16,10 @@ import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
 //
 //   A. Promote draft → published in DB. Reserves the version number even
 //      if subsequent steps fail, so the next publish picks N+1 (no path
-//      collision in immutable storage).
+//      collision in immutable storage). For a project's FIRST version this
+//      transaction also creates the brand (claimBrandSlot): the cap is
+//      re-checked under a per-organization lock and the active_version row is
+//      written here, so a refused publish rolls back with nothing reserved.
 //   B. Upload versioned archive blobs (immutable, long-cache).
 //   C. Overwrite current.* pointer blobs (what customers' CDN reads).
 //   D. Flip active_version pointer (what Studio's UI reads).
@@ -24,6 +27,10 @@ import { tokensSchema, type Tokens } from '~~/server/lib/tokens'
 // Failure between phases leaves an "orphaned" published row + no pointer
 // update; customers keep seeing the previous version on the CDN. A periodic
 // reaper can drop status='published' rows with no active_version reference.
+// The one exception is a first version: its pointer already exists after A,
+// so if B or C fail the brand counts against the cap with nothing on the CDN
+// until the next publish succeeds. That is the price of never letting two
+// concurrent first publishes share one remaining brand slot.
 
 defineRouteMeta({
   openAPI: {
@@ -52,9 +59,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No draft to publish' })
   }
 
-  // Active-brand cap: a project's first publish creates a brand. Checked before
-  // Phase A so a refused publish reserves no version and writes no blobs.
-  await assertBrandCapacity(access.organization.id, projectId)
+  // Active-brand cap: a project's first publish creates a brand. This unlocked
+  // check refuses early; Phase A repeats it under the lock (null = already a brand).
+  const brandClaim = await assertBrandCapacity(access.organization.id, projectId)
 
   const validated = tokensSchema.parse(draft.tokensJson)
   const tokens = validated as Tokens
@@ -82,6 +89,14 @@ export default defineEventHandler(async (event) => {
       })
       .where(eq(configVersion.id, draft.id))
       .returning()
+    if (brandClaim) {
+      await claimBrandSlot(tx, brandClaim, {
+        projectId,
+        configVersionId: updated.id,
+        activatedBy: access.userId,
+        activatedByEmail: event.context.auth?.email ?? null,
+      })
+    }
     return updated
   })
 
