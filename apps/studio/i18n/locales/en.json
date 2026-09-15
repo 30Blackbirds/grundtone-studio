@@ -189,7 +189,9 @@
     "sriHeading": "Production: pin a version + use Sub-Resource Integrity",
     "sriBody": "For long-lived production deploys, pin to an immutable version URL and add an SRI hash. The corresponding hash is served at the same path with a .sri suffix.",
     "modeHeading": "Light / dark mode",
-    "modeBody": "The SDK applies the theme matching the chosen mode. Use 'auto' to follow the OS preference."
+    "modeBody": "The SDK applies the theme matching the chosen mode. Use 'auto' to follow the OS preference.",
+    "ssrHeading": "Server-rendered apps: link the stylesheet",
+    "ssrBody": "In Nuxt, Next.js and other server-rendered frameworks, put the tokens.css link in the server-rendered head, as in the Nuxt and Next.js tabs. The brand is then in place before first paint, without JavaScript. The client plugin applies the brand only after JavaScript has run, so use it for single-page apps."
   },
   "auth": {
     "email": "Email",

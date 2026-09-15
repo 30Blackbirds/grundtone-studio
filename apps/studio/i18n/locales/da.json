@@ -189,7 +189,9 @@
     "sriHeading": "Produktion: pin en version + brug Sub-Resource Integrity",
     "sriBody": "For langlivede produktions-deploys: pin til en immutable version-URL og tilføj en SRI-hash. Den tilsvarende hash serveres på samme path med .sri-suffix.",
     "modeHeading": "Light / dark mode",
-    "modeBody": "SDK'en anvender det tema der matcher det valgte mode. Brug 'auto' for at følge styresystemets præference."
+    "modeBody": "SDK'en anvender det tema der matcher det valgte mode. Brug 'auto' for at følge styresystemets præference.",
+    "ssrHeading": "Server-renderede apps: link stylesheetet",
+    "ssrBody": "I Nuxt, Next.js og andre server-renderede frameworks lægger du linket til tokens.css i det server-renderede head, som i Nuxt- og Next.js-fanerne. Så er brandet på plads før første visning, uden JavaScript. Klient-pluginet anvender først brandet, når JavaScript har kørt, så brug det til single-page apps."
   },
   "auth": {
     "email": "Email",

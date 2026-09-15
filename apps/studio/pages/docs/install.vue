@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { installSnippets, type InstallSnippetId } from '~~/utils/install-snippets'
+
   definePageMeta({ layout: 'auth' })
   const { t } = useI18n()
 
@@ -6,65 +8,16 @@
   const cdnBase = computed(() => runtimeConfig.public.cdnBase || 'https://cdn.grundtone.com')
   const sampleKey = 'pk_live_<your-key>'
 
-  // Concatenate `<` + `/script>` so the literal closing tag doesn't appear in
-  // this SFC's <script> block (which would terminate it). Same reason \/script
-  // would normally be used, but ESLint's no-useless-escape flags the backslash.
-  const closeScript = '<' + '/script>'
+  // The snippets live in utils/install-snippets.ts so the recommendation (SSR
+  // frameworks link tokens.css in the server-rendered head) is unit-tested.
+  const snippets = computed(() => installSnippets({ cdnBase: cdnBase.value, sampleKey }))
 
-  const snippets = computed(() => ({
-    scriptTag: `<script src="${cdnBase.value}/client/v1.js"
-        data-api-key="${sampleKey}">${closeScript}
-<link rel="stylesheet"
-      href="${cdnBase.value}/k/${sampleKey}/tokens.css" />`,
-    vue: `// main.ts
-import { createApp } from 'vue'
-import { grundtone } from '@grundtone/saas-client'
-import App from './App.vue'
-
-createApp(App)
-  .use(grundtone, { apiKey: '${sampleKey}' })
-  .mount('#app')`,
-    nuxt: `// plugins/grundtone.client.ts
-import { grundtone } from '@grundtone/saas-client'
-
-export default defineNuxtPlugin((nuxtApp) => {
-  nuxtApp.vueApp.use(grundtone, {
-    apiKey: useRuntimeConfig().public.grundtoneApiKey,
-  })
-})`,
-    react: `// src/main.tsx (or _app.tsx for Next.js)
-import { loadByApiKey } from '@grundtone/saas-client'
-
-loadByApiKey({ apiKey: '${sampleKey}' })
-  .catch((err) => console.warn('grundtone init failed', err))
-
-// then render your app — components inherit the CSS variables
-// from :root automatically`,
-    svelte: `// src/app.ts
-import { loadByApiKey } from '@grundtone/saas-client'
-
-loadByApiKey({ apiKey: '${sampleKey}' })`,
-  }))
-
-  const sriSnippet = computed(
-    () => `<script
-  src="${cdnBase.value}/client/v1.0.0.js"
-  integrity="sha384-<hash from cdn.grundtone.com/client/v1.0.0.js.sri>"
-  crossorigin="anonymous"
-  data-api-key="${sampleKey}">${closeScript}`,
-  )
-
-  const modeSnippet = `app.use(grundtone, {
-  apiKey: '${sampleKey}',
-  mode: 'auto',  // 'light' | 'dark' | 'auto' (follows prefers-color-scheme)
-})`
-
-  type SnippetId = 'scriptTag' | 'vue' | 'nuxt' | 'react' | 'svelte'
-  const tabs: Array<{ id: SnippetId; label: string; language: string }> = [
+  const tabs: Array<{ id: InstallSnippetId; label: string; language: string }> = [
     { id: 'scriptTag', label: t('integrationGuide.scriptTag'), language: 'html' },
     { id: 'vue', label: 'Vue 3', language: 'ts' },
-    { id: 'nuxt', label: 'Nuxt 3', language: 'ts' },
-    { id: 'react', label: 'React / Next.js', language: 'tsx' },
+    { id: 'nuxt', label: 'Nuxt', language: 'vue' },
+    { id: 'next', label: 'Next.js', language: 'tsx' },
+    { id: 'react', label: 'React (SPA)', language: 'tsx' },
     { id: 'svelte', label: 'Svelte', language: 'ts' },
   ]
 </script>
@@ -83,6 +36,10 @@ loadByApiKey({ apiKey: '${sampleKey}' })`,
       }}</NuxtLink>
     </GTAlert>
 
+    <GTAlert variant="info" :heading="t('integrationGuide.ssrHeading')">
+      {{ t('integrationGuide.ssrBody') }}
+    </GTAlert>
+
     <GTTabs :tabs="tabs.map((tab) => ({ id: tab.id, label: tab.label }))">
       <GTTabPanel v-for="tab in tabs" :id="tab.id" :key="tab.id">
         <CodeSnippet :code="snippets[tab.id]" :language="tab.language" />
@@ -92,13 +49,13 @@ loadByApiKey({ apiKey: '${sampleKey}' })`,
     <section class="flex flex-col gap-3">
       <h2 class="font-heading text-2xl mt-6 mb-1">{{ t('integrationGuide.sriHeading') }}</h2>
       <p>{{ t('integrationGuide.sriBody') }}</p>
-      <CodeSnippet :code="sriSnippet" language="html" />
+      <CodeSnippet :code="snippets.sri" language="html" />
     </section>
 
     <section class="flex flex-col gap-3">
       <h2 class="font-heading text-2xl mt-6 mb-1">{{ t('integrationGuide.modeHeading') }}</h2>
       <p>{{ t('integrationGuide.modeBody') }}</p>
-      <CodeSnippet :code="modeSnippet" language="ts" />
+      <CodeSnippet :code="snippets.mode" language="ts" />
     </section>
   </article>
 </template>
