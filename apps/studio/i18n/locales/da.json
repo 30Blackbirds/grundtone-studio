@@ -703,6 +703,7 @@
       "api_key.revoked": "Tilbagekaldte API-nøgle",
       "config.published": "Publicerede konfiguration",
       "config.activated": "Aktiverede version",
+      "config.draft_saved": "Gemte kladde-konfiguration",
       "organization.updated": "Opdaterede organisation"
     },
     "loadOlder": "Indlæs ældre",

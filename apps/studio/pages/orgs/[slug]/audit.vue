@@ -39,6 +39,7 @@
     'api_key.revoked',
     'config.published',
     'config.activated',
+    'config.draft_saved',
   ] as const
 
   const actionFilter = ref<(typeof ACTION_FILTERS)[number]>('all')

@@ -20,6 +20,7 @@ export type AuditAction =
   | 'config.published'
   | 'config.activated'
   | 'organization.updated'
+  | 'config.draft_saved'
 
 export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'member.invited',
@@ -37,6 +38,7 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'config.published',
   'config.activated',
   'organization.updated',
+  'config.draft_saved',
 ]
 
 export interface AuditEventInput {
