@@ -46,6 +46,13 @@
       pendingActivateId.value = null
       toast.success(t('toasts.versionActivated'))
       emit('activated')
+    } catch (err) {
+      // Active-brand cap (riff bfxmm7xktk6xkfanh5eennva): shown as a plan limit.
+      // Every other failure is rethrown, so its handling is unchanged.
+      const data = (err as { data?: { data?: { code?: string; limit?: number } } }).data?.data
+      if (data?.code !== 'brand_quota_exceeded') throw err
+      pendingActivateId.value = null
+      toast.info(t('quota.brandBody', { limit: data.limit ?? 0 }))
     } finally {
       activatingId.value = null
     }

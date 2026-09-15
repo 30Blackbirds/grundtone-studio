@@ -43,6 +43,17 @@ export interface OrgRef {
   slug: string
 }
 
+// The PDP could not answer. Still fail-closed — nothing is granted — but a 503
+// with a stable code, so an outage is not reported to the user (or to support
+// and monitoring) as "you have no access" (riff iub38z651y7nr21bovn0683w).
+function pdpUnavailable(): never {
+  throw createError({
+    statusCode: 503,
+    statusMessage: 'Permission service unavailable',
+    data: { code: 'pdp_unavailable' },
+  })
+}
+
 export interface ProjectAccess {
   userId: string
   project: typeof project.$inferSelect
@@ -64,9 +75,11 @@ export async function resolveProjectRole(
   event: H3Event,
   projectId: string,
 ): Promise<ProjectRole | null> {
-  if (await checkProject(event, projectId, 'can_admin')) return 'admin'
-  if (await checkProject(event, projectId, 'can_edit')) return 'editor'
-  if (await checkProject(event, projectId, 'can_view')) return 'viewer'
+  for (const role of ['admin', 'editor', 'viewer'] as const) {
+    const verdict = await checkProject(event, projectId, PROJECT_ACTION[role])
+    if (verdict === 'unavailable') pdpUnavailable()
+    if (verdict === 'allowed') return role
+  }
   return null
 }
 
@@ -86,8 +99,9 @@ export async function requireProjectAccess(
   if (!proj) throw createError({ statusCode: 404, statusMessage: 'Project not found' })
 
   // One Check at the required bar — the PDP applies the role hierarchy.
-  const allowed = await checkProject(event, projectId, PROJECT_ACTION[min])
-  if (!allowed) {
+  const verdict = await checkProject(event, projectId, PROJECT_ACTION[min])
+  if (verdict === 'unavailable') pdpUnavailable()
+  if (verdict !== 'allowed') {
     throw createError({ statusCode: 403, statusMessage: `Requires project:${min}` })
   }
 
@@ -142,7 +156,9 @@ export async function requireOrgRole(
 async function resolveOrgRole(event: H3Event, orgId: string): Promise<OrgRole | null> {
   // Probe from the top so the highest-held role wins, matching ORG_ROLE_RANK.
   for (const role of ['owner', 'manager', 'admin', 'member', 'billing'] as const) {
-    if (await checkOrg(event, orgId, role)) return role
+    const verdict = await checkOrg(event, orgId, role)
+    if (verdict === 'unavailable') pdpUnavailable()
+    if (verdict === 'allowed') return role
   }
   return null
 }

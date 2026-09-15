@@ -138,8 +138,24 @@ export function evaluateProjectQuota(
   entitlements: Entitlements | null,
   currentCount: number,
 ): QuotaVerdict {
-  if (!entitlements) return { allowed: true }
+  const lifecycle = lifecycleVerdict(entitlements)
+  if (lifecycle) return lifecycle
+  // lifecycleVerdict returns null only for a present, non-blocking entitlement.
+  const limit = entitlements!.limits['studio.projects']
+  if (limit === undefined) return { allowed: true }
+  if (currentCount < limit) return { allowed: true }
+  return { allowed: false, reason: 'quota_exceeded', limit }
+}
 
+/**
+ * The plan-state part of contract §4, shared by every quota so they cannot
+ * drift apart: null entitlements = fail-open, suspended and expired grace =
+ * blocked, canceled = open. Returns null when the quota's own limit decides.
+ */
+function lifecycleVerdict(
+  entitlements: Entitlements | null,
+): { allowed: true } | { allowed: false; reason: 'suspended' } | null {
+  if (!entitlements) return { allowed: true }
   if (entitlements.planState === 'suspended') return { allowed: false, reason: 'suspended' }
   if (entitlements.planState === 'canceled') return { allowed: true }
   if (
@@ -149,9 +165,34 @@ export function evaluateProjectQuota(
   ) {
     return { allowed: false, reason: 'suspended' }
   }
+  return null
+}
 
-  const limit = entitlements.limits['studio.projects']
+export type BrandQuotaVerdict =
+  | { allowed: true }
+  | { allowed: false; reason: 'brand_quota_exceeded'; limit: number }
+  | { allowed: false; reason: 'suspended' }
+
+/**
+ * Active-brand quota (riff bfxmm7xktk6xkfanh5eennva). A brand is a project
+ * with an active version, so this is evaluated only when a project is about to
+ * get its FIRST active version.
+ *
+ * The limit comes from account (`studio.brands`), but only plans whose catalog
+ * entry is a hard cap are blocked at the limit: plans with overage (Studio,
+ * Scale) may exceed it and are billed per extra brand (tier doc, Allan-locked
+ * 2026-08-02). `hardCap` is therefore an input, not derived here.
+ */
+export function evaluateBrandQuota(
+  entitlements: Entitlements | null,
+  activeBrandCount: number,
+  hardCap: boolean,
+): BrandQuotaVerdict {
+  const lifecycle = lifecycleVerdict(entitlements)
+  if (lifecycle) return lifecycle
+  if (!hardCap) return { allowed: true }
+  const limit = entitlements!.limits['studio.brands']
   if (limit === undefined) return { allowed: true }
-  if (currentCount < limit) return { allowed: true }
-  return { allowed: false, reason: 'quota_exceeded', limit }
+  if (activeBrandCount < limit) return { allowed: true }
+  return { allowed: false, reason: 'brand_quota_exceeded', limit }
 }

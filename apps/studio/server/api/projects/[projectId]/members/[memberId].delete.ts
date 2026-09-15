@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectMember } from '~~/server/db/schema'
 import { revokeProjectRole } from '~~/server/lib/pdp'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { PROJECT_ROLES, requireProjectAccess, type ProjectRole } from '~~/server/lib/project-access'
 
 defineRouteMeta({
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'projectId and memberId required' })
   }
 
-  await requireProjectAccess(event, projectId, 'admin')
+  const access = await requireProjectAccess(event, projectId, 'admin')
 
   const [deleted] = await db
     .delete(projectMember)
@@ -29,6 +30,7 @@ export default defineEventHandler(async (event) => {
       id: projectMember.id,
       userId: projectMember.userId,
       role: projectMember.role,
+      memberEmail: projectMember.memberEmail,
     })
 
   if (!deleted) throw createError({ statusCode: 404, statusMessage: 'Member not found' })
@@ -39,5 +41,15 @@ export default defineEventHandler(async (event) => {
     await revokeProjectRole(event, projectId, deleted.userId, deleted.role as ProjectRole)
   }
 
+  // Audited after the row is deleted AND the PDP grant is revoked. If the revoke
+  // throws, the request fails and no event is written (riff mfhvuk8515gubxh30puab9ch).
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'project.member.removed',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { role: deleted.role, memberEmail: deleted.memberEmail, memberUserId: deleted.userId },
+  })
   return { id: deleted.id }
 })

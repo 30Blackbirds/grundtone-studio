@@ -42,9 +42,11 @@ vi.mock('drizzle-orm', () => ({ eq: (_col: unknown, value: string) => ({ value }
 
 const dbMock = {
   select: () => ({
-    from: () => ({
+    from: (table: { _?: { name?: string } } | undefined) => ({
       where: (predicate: { value?: string } | null) =>
-        Promise.resolve(invites.filter((inv) => inv.id === (predicate?.value ?? null))),
+        table?._?.name === 'project'
+          ? Promise.resolve(projects.filter((p) => p.id === (predicate?.value ?? null)))
+          : Promise.resolve(invites.filter((inv) => inv.id === (predicate?.value ?? null))),
     }),
   }),
   update: () => ({
@@ -58,8 +60,17 @@ const dbMock = {
 }
 vi.mock('~~/server/db', () => ({ db: dbMock }))
 vi.mock('~~/server/db/schema', () => ({
+  project: { _: { name: 'project' }, id: 'id', organizationId: 'organizationId', name: 'name' },
   projectInvitation: { _: { name: 'project_invitation' }, id: 'id' },
 }))
+const auditEvents: Array<{ action: string; payload: Record<string, unknown> }> = []
+vi.mock('~~/server/lib/audit', () => ({
+  recordAuditEvent: (_event: unknown, payload: { action: string }) => {
+    auditEvents.push({ action: payload.action, payload })
+    return Promise.resolve()
+  },
+}))
+const projects = [{ id: 'p1', organizationId: 'org-acme', name: 'Acme Brand' }]
 
 const handler = (await import('./decline.post')).default as unknown as (
   event: unknown,
@@ -83,6 +94,7 @@ function freshInvite(overrides: Partial<InviteRow> = {}): InviteRow {
 beforeEach(() => {
   invites.length = 0
   statusUpdates.length = 0
+  auditEvents.length = 0
 })
 
 describe('POST /api/invitations/project/[invitationId]/decline', () => {
@@ -159,5 +171,49 @@ describe('POST /api/invitations/project/[invitationId]/decline', () => {
       statusCode: 403,
       statusMessage: 'Invitation is for a different email',
     })
+  })
+  it('audits exactly one project.member.invite_declined after the status write', async () => {
+    invites.push(freshInvite())
+    await handler(
+      fakeEvent({
+        params: { invitationId: INVITE_ID },
+        auth: { sub: 'u1', tenant: 'o1', email: 'invitee@example.com' },
+      }),
+    )
+
+    expect(statusUpdates).toEqual([{ status: 'declined' }])
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].payload).toMatchObject({
+      organizationId: 'org-acme',
+      action: 'project.member.invite_declined',
+      targetId: 'p1',
+      targetLabel: 'Acme Brand',
+      after: { role: 'editor', invitationId: INVITE_ID },
+    })
+  })
+
+  it('audits nothing when the decline is rejected (403 / 409)', async () => {
+    invites.push(freshInvite())
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: INVITE_ID },
+          auth: { sub: 'u1', tenant: 'o1', email: 'someone@else.com' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 })
+
+    invites.length = 0
+    invites.push(freshInvite({ status: 'accepted' }))
+    await expect(
+      handler(
+        fakeEvent({
+          params: { invitationId: INVITE_ID },
+          auth: { sub: 'u1', tenant: 'o1', email: 'invitee@example.com' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 })
+
+    expect(auditEvents).toHaveLength(0)
   })
 })
