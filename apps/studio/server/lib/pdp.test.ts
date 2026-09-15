@@ -11,6 +11,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const created: Array<{ token: string | null }> = []
 let lastCheckSubject: string | null = null
+// Per-test PDP behaviour: return a response, or throw to simulate a failure.
+let checkImpl: () => Promise<{ allow: boolean }> = async () => ({ allow: true })
+let batchImpl: () => Promise<{ results: Array<{ allow: boolean }> }> = async () => ({
+  results: [{ allow: true }],
+})
+const unavailableReasons: string[] = []
 
 vi.mock('@connectrpc/connect-node', () => ({
   createConnectTransport: (opts: { interceptors: Array<(n: unknown) => unknown> }) => {
@@ -32,16 +38,24 @@ vi.mock('@connectrpc/connect-node', () => ({
   },
 }))
 
-vi.mock('@connectrpc/connect', () => ({
+// The REAL ConnectError and Code are kept: classification must be tested
+// against the error type the transport actually throws, not a look-alike.
+vi.mock('@connectrpc/connect', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@connectrpc/connect')>()),
   createPromiseClient: () => ({
     grantRole: vi.fn(async () => ({})),
     revokeRole: vi.fn(async () => ({})),
     writeTuple: vi.fn(async () => ({})),
     check: vi.fn(async (req: { subject: string }) => {
       lastCheckSubject = req.subject
-      return { allow: true }
+      return checkImpl()
     }),
+    batchCheck: vi.fn(async () => batchImpl()),
   }),
+}))
+
+vi.mock('./metrics', () => ({
+  recordPdpUnavailable: (reason: string) => unavailableReasons.push(reason),
 }))
 
 vi.mock('@klanghaus/permissions-client/connect', () => ({ PermissionsService: {} }))
@@ -100,6 +114,105 @@ describe('PDP-klienten skelner mellem skrive- og laese-stier', () => {
   it('laesninger virker fortsat uden tjeneste-tokenet', async () => {
     delete process.env.PDP_S2S_TOKEN
     const { checkProject } = await import('./pdp')
-    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe(true)
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('allowed')
+  })
+})
+
+// Top-level await: the real error type and codes the classifier is tested against.
+const { ConnectError, Code } =
+  await vi.importActual<typeof import('@connectrpc/connect')>('@connectrpc/connect')
+
+describe('read helpers distinguish an outage from a denial (riff iub38z651y7nr21bovn0683w)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    created.length = 0
+    unavailableReasons.length = 0
+    process.env.PERMISSIONS_URL = 'http://pdp.test'
+    process.env.PDP_S2S_TOKEN = 'SERVICE_TOKEN'
+    checkImpl = async () => ({ allow: true })
+    batchImpl = async () => ({ results: [{ allow: true }] })
+  })
+
+  it('PDP answers yes → allowed; PDP answers no → denied (control)', async () => {
+    const { checkProject } = await import('./pdp')
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('allowed')
+    checkImpl = async () => ({ allow: false })
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('denied')
+    expect(unavailableReasons).toEqual([])
+  })
+
+  it('PDP unreachable (Code.Unavailable) → unavailable, counted — NOT denied', async () => {
+    checkImpl = async () => {
+      throw new ConnectError('connect ECONNREFUSED', Code.Unavailable)
+    }
+    const { checkProject } = await import('./pdp')
+    await expect(checkProject(fakeEvent(), 'p1', 'can_edit')).resolves.toBe('unavailable')
+    expect(unavailableReasons).toEqual(['Unavailable'])
+  })
+
+  it('timeout and internal errors are unavailable too', async () => {
+    const { checkOrg } = await import('./pdp')
+    checkImpl = async () => {
+      throw new ConnectError('deadline', Code.DeadlineExceeded)
+    }
+    await expect(checkOrg(fakeEvent(), 'o1', 'member')).resolves.toBe('unavailable')
+    checkImpl = async () => {
+      throw new ConnectError('boom', Code.Internal)
+    }
+    await expect(checkOrg(fakeEvent(), 'o1', 'member')).resolves.toBe('unavailable')
+    expect(unavailableReasons).toEqual(['DeadlineExceeded', 'Internal'])
+  })
+
+  it('a non-Connect transport error is unavailable', async () => {
+    checkImpl = async () => {
+      throw new TypeError('fetch failed')
+    }
+    const { checkProject } = await import('./pdp')
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('unavailable')
+    expect(unavailableReasons).toEqual(['transport'])
+  })
+
+  it('an identity rejection is a denial, not an outage', async () => {
+    const { checkProject } = await import('./pdp')
+    checkImpl = async () => {
+      throw new ConnectError('bad token', Code.Unauthenticated)
+    }
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('denied')
+    checkImpl = async () => {
+      throw new ConnectError('not yours', Code.PermissionDenied)
+    }
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('denied')
+    expect(unavailableReasons).toEqual([])
+  })
+
+  it('missing PERMISSIONS_URL is misconfiguration → unavailable', async () => {
+    delete process.env.PERMISSIONS_URL
+    const { checkProject } = await import('./pdp')
+    await expect(checkProject(fakeEvent(), 'p1', 'can_view')).resolves.toBe('unavailable')
+  })
+
+  it('no actor → denied without asking the PDP', async () => {
+    const { checkProject } = await import('./pdp')
+    const noActor = { context: {}, node: { req: { headers: {} } } } as never
+    await expect(checkProject(noActor, 'p1', 'can_view')).resolves.toBe('denied')
+    expect(unavailableReasons).toEqual([])
+  })
+
+  it('a failed batch marks every project unavailable, never allowed', async () => {
+    batchImpl = async () => {
+      throw new ConnectError('down', Code.Unavailable)
+    }
+    const { batchCheckProjects } = await import('./pdp')
+    await expect(batchCheckProjects(fakeEvent(), ['p1', 'p2'], 'can_view')).resolves.toEqual({
+      p1: 'unavailable',
+      p2: 'unavailable',
+    })
+  })
+
+  it('classifyPdpFailure treats HTTP 401/403 from the token exchange as denied', async () => {
+    const { classifyPdpFailure } = await import('./pdp')
+    expect(classifyPdpFailure({ statusCode: 401 })).toBe('denied')
+    expect(classifyPdpFailure({ status: 403 })).toBe('denied')
+    expect(classifyPdpFailure({ statusCode: 502 })).toBe('unavailable')
   })
 })

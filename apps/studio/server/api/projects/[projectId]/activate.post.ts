@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { assertBrandCapacity, claimBrandSlot } from '~~/server/lib/brand-quota'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject, getObjectAsString } from '~~/server/lib/storage'
@@ -44,6 +45,23 @@ export default defineEventHandler(async (event) => {
     )
   if (!version) {
     throw createError({ statusCode: 404, statusMessage: 'Published version not found' })
+  }
+
+  // Active-brand cap: only relevant if this project has no active version yet
+  // (null for a rollback). A first activation creates the brand before any blob
+  // write: the cap is re-checked under a per-organization lock and the
+  // active_version row is written in that transaction. The upsert below then
+  // refreshes the same row once the blobs are in place.
+  const brandClaim = await assertBrandCapacity(access.organization.id, projectId)
+  if (brandClaim) {
+    await db.transaction((tx) =>
+      claimBrandSlot(tx, brandClaim, {
+        projectId,
+        configVersionId: version.id,
+        activatedBy: access.userId,
+        activatedByEmail: event.context.auth?.email ?? null,
+      }),
+    )
   }
 
   // Rebuild "current" pointer files from the historical version's tokens.

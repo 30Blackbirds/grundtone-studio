@@ -10,6 +10,14 @@ packages:
 # Note: migrated here from package.json's pnpm.overrides because pnpm 10
 # ignores that field (warns: "no longer read by pnpm").
 overrides:
+  # Advisory floors (riff actj21jzq6b9kdkhylgfogvs, 2026-09-14). The selectors
+  # match only the vulnerable range, so other majors are left alone; remove
+  # once upstream ranges resolve past them on their own.
+  #   svgo    GHSA-w27v-7q3p-w38r (high), GHSA-4vpr-x523-8j87 — raised in place on the existing `svgo` key below
+  #   js-yaml GHSA-2883-xcg3-v3hh (high)
+  #   colord  GHSA-2wm5-q62r-hmrv
+  js-yaml@<3.15.2: ^3.15.2
+  colord@<2.9.4: ^2.9.4
   # 🔴 Dedupliker vue til ÉN version. Ikke kosmetik: Nitro skriver
   # multi-versions-pakker som symlinks ind i .output/server/node_modules/.nitro/,
   # og med to vue'er opstaar der en RING (vue <-> @vue/server-renderer). Docker-
@@ -83,10 +91,11 @@ overrides:
   # @nuxtjs/i18n > @intlify/unplugin-vue-i18n > vite > sass. Remove when sass
   # drops the immutable dep or bumps it.
   immutable: '>=5.1.8'
-  # GHSA — high: SVGO removeScripts plugin leaves some executable scripts
-  # intact; patched in 4.0.2. Pulled in via @sentry/nuxt > nuxt > cssnano >
-  # postcss-svgo. Build-time SVG optimization only.
-  svgo: '>=4.0.2'
+  # svgo, pulled in via @sentry/nuxt > nuxt > cssnano > postcss-svgo
+  # (build-time SVG optimization only). 4.0.2 fixed the removeScripts advisory;
+  # 4.1.0 fixes GHSA-w27v-7q3p-w38r (high) and GHSA-4vpr-x523-8j87. Brings
+  # css-select 6 and css-what 7 with it.
+  svgo: ^4.1.0
   # GHSA — high (x4): fast-uri SSRF (malformet IPv6, gentaget hostname) og host
   # confusion (sprunget IDN-kanonisering, percent-kodet scheme). Alle fire er
   # patched i 4.1.3: GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf,

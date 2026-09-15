@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectInvitation } from '~~/server/db/schema'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { PROJECT_ROLES, requireProjectAccess } from '~~/server/lib/project-access'
 import { email } from '~~/server/lib/email'
 import { localeFromEvent, projectInviteEmail } from '~~/server/lib/email-templates'
@@ -67,6 +68,23 @@ export default defineEventHandler(async (event) => {
           expiresAt,
         })
         .returning()
+
+  // Audited right after the invitation row is stored, before the invite email
+  // is sent: if sending fails, the invitation still exists and must be traceable
+  // (riff mfhvuk8515gubxh30puab9ch). A refreshed pending invite is marked.
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'project.member.invited',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: {
+      inviteeEmail: parsed.data.email,
+      role: parsed.data.role,
+      reinvited: Boolean(existing),
+      invitationId: row.id,
+    },
+  })
 
   // Studio's own public URL (BETTER_AUTH_URL is gone — studio no longer runs
   // auth). The invite link lands on studio's accept page.

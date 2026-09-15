@@ -189,7 +189,9 @@
     "sriHeading": "Production: pin a version + use Sub-Resource Integrity",
     "sriBody": "For long-lived production deploys, pin to an immutable version URL and add an SRI hash. The corresponding hash is served at the same path with a .sri suffix.",
     "modeHeading": "Light / dark mode",
-    "modeBody": "The SDK applies the theme matching the chosen mode. Use 'auto' to follow the OS preference."
+    "modeBody": "The SDK applies the theme matching the chosen mode. Use 'auto' to follow the OS preference.",
+    "ssrHeading": "Server-rendered apps: link the stylesheet",
+    "ssrBody": "In Nuxt, Next.js and other server-rendered frameworks, put the tokens.css link in the server-rendered head, as in the Nuxt and Next.js tabs. The brand is then in place before first paint, without JavaScript. The client plugin applies the brand only after JavaScript has run, so use it for single-page apps."
   },
   "auth": {
     "email": "Email",
@@ -703,6 +705,12 @@
       "api_key.revoked": "Revoked API key",
       "config.published": "Published configuration",
       "config.activated": "Activated version",
+      "config.draft_saved": "Saved draft configuration",
+      "project.member.invited": "Invited project member",
+      "project.member.invite_cancelled": "Cancelled project invitation",
+      "project.member.invite_declined": "Declined project invitation",
+      "asset.font_uploaded": "Uploaded font",
+      "asset.logo_uploaded": "Uploaded logo",
       "organization.updated": "Updated organization"
     },
     "loadOlder": "Load older",
@@ -868,7 +876,9 @@
     "body": "Free gives you two projects — enough to see your brand go live everywhere. Solo unlocks three active brands, email templates themed by the same tokens, and API access — from €29/mo. Members stay unlimited — we count brands, not people.",
     "cta": "See plans →",
     "meter": "{used}/{limit} projects used",
-    "later": "Maybe later"
+    "later": "Maybe later",
+    "brandHeading": "You have reached your plan’s active brands.",
+    "brandBody": "Your plan includes {limit} active brands, and publishing this project would add another. Upgrade to a plan with more brands to publish it."
   },
   "plans": {
     "introBadge": "Introductory pricing",

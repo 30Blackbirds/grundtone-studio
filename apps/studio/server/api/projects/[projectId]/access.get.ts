@@ -26,10 +26,21 @@ export default defineEventHandler(async (event) => {
     batchCheckProjects(event, [projectId], 'can_view'),
   ])
 
+  // Any unanswered check → 503, not role:null. The client keeps its UI gates
+  // closed either way; the difference is that an outage is reported as one
+  // (riff iub38z651y7nr21bovn0683w).
+  if ([admin, edit, view].some((r) => r[projectId] === 'unavailable')) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Permission service unavailable',
+      data: { code: 'pdp_unavailable' },
+    })
+  }
+
   let role: ProjectRole | null = null
-  if (admin[projectId]) role = 'admin'
-  else if (edit[projectId]) role = 'editor'
-  else if (view[projectId]) role = 'viewer'
+  if (admin[projectId] === 'allowed') role = 'admin'
+  else if (edit[projectId] === 'allowed') role = 'editor'
+  else if (view[projectId] === 'allowed') role = 'viewer'
 
   return { role }
 })

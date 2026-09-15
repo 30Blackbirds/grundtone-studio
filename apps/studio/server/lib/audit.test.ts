@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 // The helper writes to one table and optionally reads the H3 session. We stub
 // both, capturing every insert so the test can assert the row shape.
@@ -27,7 +29,7 @@ vi.mock('h3', () => ({
   ) => event?.node?.req?.headers?.[name.toLowerCase()] ?? null,
 }))
 
-const { recordAuditEvent } = await import('./audit')
+const { recordAuditEvent, AUDIT_ACTIONS } = await import('./audit')
 
 const ORG_ID = 'org-1'
 const ACTOR = { sub: 'user-1', tenant: ORG_ID, email: 'allan@example.com' }
@@ -140,5 +142,24 @@ describe('recordAuditEvent', () => {
       actorUserId: 'pre-known',
       actorEmail: 'pre-known@example.com',
     })
+  })
+})
+
+describe('AUDIT_ACTIONS labels', () => {
+  // The audit page and the dashboard render t(`audit.actions.<action>`). An
+  // action without a label would show its raw key, so every entry needs both.
+  const locale = (code: string) =>
+    JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL(`../../i18n/locales/${code}.json`, import.meta.url)),
+        'utf8',
+      ),
+    ) as { audit: { actions: Record<string, string> } }
+
+  it.each(['en', 'da'])('has an audit.actions label in %s for every action', (code) => {
+    const labels = locale(code).audit.actions
+    const missing = AUDIT_ACTIONS.filter((a) => !labels[a])
+    expect(AUDIT_ACTIONS.length).toBeGreaterThan(0)
+    expect(missing).toEqual([])
   })
 })

@@ -1,5 +1,6 @@
 import { createError, defineEventHandler, getRouterParam, readRawBody } from 'h3'
 import { validateLogoUpload } from '~~/server/lib/asset-upload'
+import { recordAuditEvent } from '~~/server/lib/audit'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { paths, putObject } from '~~/server/lib/storage'
 
@@ -21,7 +22,7 @@ export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
   if (!projectId) throw createError({ statusCode: 400, statusMessage: 'projectId required' })
 
-  await requireProjectAccess(event, projectId, 'editor')
+  const access = await requireProjectAccess(event, projectId, 'editor')
 
   const raw = await readRawBody(event, false)
   if (!raw || raw.length === 0) {
@@ -43,5 +44,14 @@ export default defineEventHandler(async (event) => {
     cacheControl: 'no-store',
   })
 
+  // Audited after the file is stored (riff mfhvuk8515gubxh30puab9ch); never its bytes.
+  await recordAuditEvent(event, {
+    organizationId: access.organization.id,
+    action: 'asset.logo_uploaded',
+    targetType: 'project',
+    targetId: projectId,
+    targetLabel: access.project.name,
+    after: { file, type: validated.type },
+  })
   return { file, type: validated.type }
 })
