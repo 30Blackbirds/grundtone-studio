@@ -1,37 +1,50 @@
 import { createError } from 'h3'
-import { eq, inArray } from 'drizzle-orm'
-import { db } from '~~/server/db'
+import { eq, inArray, sql } from 'drizzle-orm'
+import { db, type Db } from '~~/server/db'
 import { activeVersion, project } from '~~/server/db/schema'
 import { PLAN_CATALOG } from '~~/lib/plan-catalog'
-import { evaluateBrandQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
+import {
+  evaluateBrandQuota,
+  getStudioEntitlements,
+  type BrandQuotaVerdict,
+  type Entitlements,
+} from '~~/server/lib/entitlements'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+/** What a caller needs to create a brand once its own transaction is open. */
+export interface BrandClaim {
+  organizationId: string
+  entitlements: Entitlements | null
+  hardCap: boolean
+}
+
 /**
- * Server-side enforcement of the active-brand cap (riff bfxmm7xktk6xkfanh5eennva).
+ * Server-side enforcement of the active-brand cap (riffs bfxmm7xktk6xkfanh5eennva,
+ * cjbjm73hjpwgh2c3eja8jry9).
  *
  * A project counts as a brand once it has an `active_version` row, and only two
- * routes write that row: publish and activate. Both call this BEFORE any DB or
- * storage write, so a refused call changes nothing.
+ * routes write that row: publish and activate. Enforcement has two steps:
  *
- * - Project already active → not a new brand → always allowed (republish and
- *   rollback at the cap keep working).
+ * 1. `assertBrandCapacity` runs before any write and refuses early without a
+ *    lock. It returns null when the project is already a brand (republish and
+ *    rollback at the cap keep working), otherwise the context for step 2.
+ * 2. `claimBrandSlot` runs inside the caller's transaction. It repeats the check
+ *    under a per-organization advisory lock and writes the `active_version` row
+ *    in that same transaction, so the check and the brand commit together.
+ *    Step 1 alone is not enough: two first publishes can both pass it before
+ *    either writes.
+ *
  * - Entitlements unavailable → fail-open (contract §4, quotas), counted.
  * - Plan not marked `hardCap` in the catalog, or unknown → allowed; overage
  *   plans are billed, not blocked.
- *
- * Known gap: the check and the later `active_version` write are not atomic, so
- * two concurrent first publishes in the same org can both pass at limit-1.
  */
 export async function assertBrandCapacity(
   organizationId: string,
   projectId: string,
-): Promise<void> {
-  const [alreadyActive] = await db
-    .select({ projectId: activeVersion.projectId })
-    .from(activeVersion)
-    .where(eq(activeVersion.projectId, projectId))
-    .limit(1)
-  if (alreadyActive) return
+): Promise<BrandClaim | null> {
+  if (await isActive(db, projectId)) return null
 
   const entitlements = await getStudioEntitlements(organizationId)
   if (entitlements === null && process.env.ACCOUNT_URL) {
@@ -39,21 +52,62 @@ export async function assertBrandCapacity(
   }
 
   const hardCap = PLAN_CATALOG.find((p) => p.key === entitlements?.planKey)?.hardCap ?? false
-  const needsCount = hardCap && entitlements?.limits['studio.brands'] !== undefined
-  const activeBrands = needsCount
-    ? await db.$count(
-        activeVersion,
-        inArray(
-          activeVersion.projectId,
-          db
-            .select({ id: project.id })
-            .from(project)
-            .where(eq(project.organizationId, organizationId)),
-        ),
-      )
-    : 0
+  const claim: BrandClaim = { organizationId, entitlements, hardCap }
+  assertAllowed(claim, needsCount(claim) ? await countActiveBrands(db, organizationId) : 0)
+  return claim
+}
 
-  const verdict = evaluateBrandQuota(entitlements, activeBrands, hardCap)
+/**
+ * Creates the brand inside `tx`: takes the organization's brand lock (held
+ * until `tx` ends), re-checks the cap, and inserts the `active_version` row.
+ * Throws the same 403 as `assertBrandCapacity` when the cap was reached in the
+ * meantime, which rolls back everything the caller wrote in `tx`.
+ */
+export async function claimBrandSlot(
+  tx: Tx,
+  claim: BrandClaim,
+  row: typeof activeVersion.$inferInsert,
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`studio.brands:${claim.organizationId}`}, 0))`,
+  )
+  // A concurrent first publish of this same project may have created the brand
+  // while we waited for the lock; counting it again would refuse our own brand.
+  if (await isActive(tx, row.projectId)) return
+
+  assertAllowed(claim, needsCount(claim) ? await countActiveBrands(tx, claim.organizationId) : 0)
+  await tx.insert(activeVersion).values(row)
+}
+
+async function isActive(q: Db | Tx, projectId: string): Promise<boolean> {
+  const [row] = await q
+    .select({ projectId: activeVersion.projectId })
+    .from(activeVersion)
+    .where(eq(activeVersion.projectId, projectId))
+    .limit(1)
+  return Boolean(row)
+}
+
+function needsCount(claim: BrandClaim): boolean {
+  return claim.hardCap && claim.entitlements?.limits['studio.brands'] !== undefined
+}
+
+function countActiveBrands(q: Db | Tx, organizationId: string): Promise<number> {
+  return q.$count(
+    activeVersion,
+    inArray(
+      activeVersion.projectId,
+      q.select({ id: project.id }).from(project).where(eq(project.organizationId, organizationId)),
+    ),
+  )
+}
+
+function assertAllowed(claim: BrandClaim, activeBrands: number): void {
+  const verdict: BrandQuotaVerdict = evaluateBrandQuota(
+    claim.entitlements,
+    activeBrands,
+    claim.hardCap,
+  )
   if (verdict.allowed) return
 
   if (verdict.reason === 'brand_quota_exceeded') recordQuotaDenial('studio.brands')
@@ -66,7 +120,7 @@ export async function assertBrandCapacity(
     data: {
       code: verdict.reason,
       limit: verdict.reason === 'brand_quota_exceeded' ? verdict.limit : undefined,
-      planKey: entitlements?.planKey,
+      planKey: claim.entitlements?.planKey,
     },
   })
 }
