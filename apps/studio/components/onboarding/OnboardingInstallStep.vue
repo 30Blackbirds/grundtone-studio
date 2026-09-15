@@ -27,7 +27,11 @@
       state.value.apiKey = keyRes.plaintext
       status.value = 'ready'
     } catch (err) {
-      errorMessage.value = (err as Error).message ?? t('onboarding.install.error')
+      const data = (err as { data?: { data?: { code?: string; limit?: number } } }).data?.data
+      errorMessage.value =
+        data?.code === 'brand_quota_exceeded'
+          ? t('quota.brandBody', { limit: data.limit ?? 0 })
+          : ((err as Error).message ?? t('onboarding.install.error'))
       status.value = 'error'
     }
   }

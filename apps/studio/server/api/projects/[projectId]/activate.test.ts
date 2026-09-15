@@ -81,6 +81,12 @@ vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
 }))
 
+// ─── brand quota — the cap itself is tested in server/lib/brand-quota.test.ts ──
+const assertBrandCapacity = vi.fn()
+vi.mock('~~/server/lib/brand-quota', () => ({
+  assertBrandCapacity: (...args: unknown[]) => assertBrandCapacity(...args),
+}))
+
 const handler = (await import('./activate.post')).default as unknown as (
   event: unknown,
 ) => Promise<unknown>
@@ -91,6 +97,8 @@ beforeEach(() => {
   spies.storage.length = 0
   spies.bunnyPurges.length = 0
   versions.length = 0
+  assertBrandCapacity.mockReset()
+  assertBrandCapacity.mockResolvedValue(undefined)
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -166,5 +174,35 @@ describe('POST /api/projects/[projectId]/activate', () => {
     })
 
     expect(spies.bunnyPurges).toEqual([PROJECT.id])
+  })
+  it('refuses when activating would create a new brand over the hard cap, writing nothing', async () => {
+    versions.push({
+      id: '11111111-1111-4111-8111-111111111106',
+      projectId: PROJECT.id,
+      version: 6,
+      status: 'published',
+      tokensJson: { colors: { primary: '#0EA5E9' } },
+    })
+    assertBrandCapacity.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(
+      handler(
+        fakeEvent({
+          params: { projectId: PROJECT.id },
+          body: { versionId: '11111111-1111-4111-8111-111111111106' },
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403, data: { code: 'brand_quota_exceeded' } })
+
+    expect(assertBrandCapacity).toHaveBeenCalledWith(ORG.id, PROJECT.id)
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(spies.bunnyPurges).toHaveLength(0)
   })
 })

@@ -204,6 +204,12 @@ vi.mock('~~/server/lib/project-access', () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
 }))
 
+// ─── brand quota — the cap itself is tested in server/lib/brand-quota.test.ts ──
+const assertBrandCapacity = vi.fn()
+vi.mock('~~/server/lib/brand-quota', () => ({
+  assertBrandCapacity: (...args: unknown[]) => assertBrandCapacity(...args),
+}))
+
 const handler = (await import('./publish.post')).default as unknown as (
   event: unknown,
 ) => Promise<unknown>
@@ -217,6 +223,8 @@ beforeEach(() => {
   attestationUpdates.length = 0
   draft.length = 0
   published.length = 0
+  assertBrandCapacity.mockReset()
+  assertBrandCapacity.mockResolvedValue(undefined)
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -240,6 +248,37 @@ describe('POST /api/projects/[projectId]/publish', () => {
       statusCode: 400,
       message: 'No draft to publish',
     })
+  })
+
+  it('refuses a new brand over the hard cap before promoting or writing anything', async () => {
+    draft.push({
+      id: 'draft-cap',
+      projectId: PROJECT.id,
+      version: 0,
+      status: 'draft',
+      tokensJson: { colors: { primary: '#4F46E5' } },
+      publishedAt: null,
+      publishedBy: null,
+      createdAt: new Date('2026-09-15T10:00:00Z'),
+    })
+    assertBrandCapacity.mockRejectedValue(
+      Object.assign(new Error('Active brand limit reached for this plan'), {
+        statusCode: 403,
+        data: { code: 'brand_quota_exceeded', limit: 3, planKey: 'studio_solo' },
+      }),
+    )
+
+    await expect(handler(fakeEvent({ params: { projectId: PROJECT.id } }))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'brand_quota_exceeded' },
+    })
+
+    expect(assertBrandCapacity).toHaveBeenCalledWith(ORG.id, PROJECT.id)
+    expect(spies.updates).toHaveLength(0)
+    expect(spies.storage).toHaveLength(0)
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.audit).toHaveLength(0)
+    expect(published).toHaveLength(0)
   })
 
   it('promotes the draft, writes 4 storage objects, flips active pointer, and emits audit + purge', async () => {

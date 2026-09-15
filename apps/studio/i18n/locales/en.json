@@ -868,7 +868,9 @@
     "body": "Free gives you two projects — enough to see your brand go live everywhere. Solo unlocks three active brands, email templates themed by the same tokens, and API access — from €29/mo. Members stay unlimited — we count brands, not people.",
     "cta": "See plans →",
     "meter": "{used}/{limit} projects used",
-    "later": "Maybe later"
+    "later": "Maybe later",
+    "brandHeading": "You have reached your plan’s active brands.",
+    "brandBody": "Your plan includes {limit} active brands, and publishing this project would add another. Upgrade to a plan with more brands to publish it."
   },
   "plans": {
     "introBadge": "Introductory pricing",

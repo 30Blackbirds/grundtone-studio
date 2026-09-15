@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, isNull, max, notInArray } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { activeVersion, configVersion, fontLicenceAttestation } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { assertBrandCapacity } from '~~/server/lib/brand-quota'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { copyObject, paths, putObject } from '~~/server/lib/storage'
@@ -50,6 +51,10 @@ export default defineEventHandler(async (event) => {
   if (!draft) {
     throw createError({ statusCode: 400, statusMessage: 'No draft to publish' })
   }
+
+  // Active-brand cap: a project's first publish creates a brand. Checked before
+  // Phase A so a refused publish reserves no version and writes no blobs.
+  await assertBrandCapacity(access.organization.id, projectId)
 
   const validated = tokensSchema.parse(draft.tokensJson)
   const tokens = validated as Tokens

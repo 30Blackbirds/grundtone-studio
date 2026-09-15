@@ -868,7 +868,9 @@
     "body": "Free giver dig to projekter — nok til at se dit brand gå live overalt. Med Solo får du tre aktive brands, e-mail-skabeloner i samme tokens og API-adgang — fra €29/md. Stadig ubegrænsede medlemmer — vi tæller brands, ikke mennesker.",
     "cta": "Se planer →",
     "meter": "{used}/{limit} projekter brugt",
-    "later": "Måske senere"
+    "later": "Måske senere",
+    "brandHeading": "Du har nået din plans aktive brands.",
+    "brandBody": "Din plan har {limit} aktive brands, og at publicere dette projekt ville tilføje ét mere. Opgradér til en plan med flere brands for at publicere det."
   },
   "plans": {
     "introBadge": "Introduktionspriser",
