@@ -12,6 +12,8 @@
 // The link must stay a <link>: the @font-face URLs inside tokens.css are
 // relative and resolve against /k/{key}/, which an inlined <style> breaks.
 
+import { SDK_CONTRACT_MAJOR, SDK_CONTRACT_VERSION } from './sdk-contract'
+
 export interface InstallSnippetInput {
   cdnBase: string
   sampleKey: string
@@ -27,7 +29,7 @@ export function installSnippets({
   sampleKey,
 }: InstallSnippetInput): Record<InstallSnippetId, string> & { sri: string; mode: string } {
   return {
-    scriptTag: `<script src="${cdnBase}/client/v1.js"
+    scriptTag: `<script src="${cdnBase}/client/v${SDK_CONTRACT_MAJOR}.js"
         data-api-key="${sampleKey}"></script>
 <link rel="stylesheet"
       href="${cdnBase}/k/${sampleKey}/tokens.css" />`,
@@ -83,8 +85,8 @@ import { loadByApiKey } from '@grundtone/saas-client'
 
 loadByApiKey({ apiKey: '${sampleKey}' })`,
     sri: `<script
-  src="${cdnBase}/client/v1.0.0.js"
-  integrity="sha384-<hash from cdn.grundtone.com/client/v1.0.0.js.sri>"
+  src="${cdnBase}/client/v${SDK_CONTRACT_VERSION}.js"
+  integrity="sha384-<hash from ${cdnBase}/client/v${SDK_CONTRACT_VERSION}.js.sri>"
   crossorigin="anonymous"
   data-api-key="${sampleKey}"></script>`,
     mode: `app.use(grundtone, {

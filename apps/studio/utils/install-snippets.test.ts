@@ -40,6 +40,12 @@ describe('integration guide: SSR frameworks get the brand in the server-rendered
     expect(snippets.react).not.toMatch(/next\.?js|_app\.tsx/i)
   })
 
+  it('points the script tags at the URLs /client serves: v1.js latest, v1.0.0.js pinned with SRI', () => {
+    expect(snippets.scriptTag).toContain('<script src="https://cdn.example.test/client/v1.js"')
+    expect(snippets.sri).toContain('src="https://cdn.example.test/client/v1.0.0.js"')
+    expect(snippets.sri).toContain('https://cdn.example.test/client/v1.0.0.js.sri')
+  })
+
   it('keeps the tokens.css link a <link>, never inlined as <style> (relative font URLs)', () => {
     for (const id of ['nuxt', 'next', 'scriptTag'] as const) {
       expect(snippets[id]).toContain('tokens.css')
