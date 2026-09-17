@@ -1,7 +1,11 @@
 # syntax=docker/dockerfile:1.7
 #
 # ⚠️ The Node version here MUST match .nvmrc (24.21.0) and engines.node
-# (>=24.15.0), otherwise CI tests one runtime and production runs another.
+# (>=24.18.1), otherwise CI tests one runtime and production runs another.
+# Both FROM lines pin the multi-arch index digest (linux/amd64 + linux/arm64),
+# measured with `docker buildx imagetools inspect node:24.21.0-alpine`, so a
+# re-pushed tag cannot change the runtime under the same version. Bump the
+# version and the digest together.
 # The tag is pinned to the full version for that reason: on 2026-09-15 the
 # floating node:24-alpine gave v24.18.1 from a local cache and v24.21.0 after a
 # pull, so the image's Node depended on when it was built.
@@ -15,7 +19,7 @@
 # SAMTIDIG, og erstat corepack med en eksplicit pnpm-installation
 # (`RUN npm i -g pnpm@<version>` eller pnpm/action-setup-ækvivalent).
 # Et ensidigt Dockerfile-bump er ikke nok.
-FROM node:24.21.0-alpine AS base
+FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS base
 RUN corepack enable pnpm
 
 FROM base AS deps
@@ -90,7 +94,7 @@ RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*
  && cp -r "$HOOKABLE_SRC" /deploy/.output/server/node_modules/hookable \
  && test -f /deploy/.output/server/node_modules/hookable/package.json
 
-FROM node:24.21.0-alpine AS runner
+FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS runner
 
 # 🔴 Revision ind i IMAGET, ikke kun i workflowet. /api/healthz laeste allerede
 # NUXT_PUBLIC_APP_VERSION men ingen satte den — prod svarede "dev", og den
