@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   import { organization } from '~~/lib/auth-client'
   import {
     ASSIGNABLE_ORG_ROLES,

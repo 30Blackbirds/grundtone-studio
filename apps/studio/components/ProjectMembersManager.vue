@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   import { daysUntil } from '~~/utils/invite-expiry'
   import type { ProjectRole } from '~~/composables/useProjectRole'
 

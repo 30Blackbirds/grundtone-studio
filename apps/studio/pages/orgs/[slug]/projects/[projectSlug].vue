@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   import type { Tokens } from '~~/server/lib/tokens'
 
   definePageMeta({ layout: 'app' })
