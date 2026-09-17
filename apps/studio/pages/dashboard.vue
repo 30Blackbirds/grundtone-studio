@@ -74,7 +74,7 @@
 
 <template>
   <section class="p-6">
-    <header class="flex justify-between items-center mb-6">
+    <header class="dash-header flex justify-between items-center mb-6">
       <div>
         <h1 class="m-0">{{ t('dashboard.title') }}</h1>
         <p class="text-tertiary mt-1 text-sm m-0">{{ t('dashboard.subtitle') }}</p>
