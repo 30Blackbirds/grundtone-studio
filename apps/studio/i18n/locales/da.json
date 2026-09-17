@@ -396,6 +396,41 @@
       "removed": "fjernet"
     }
   },
+  "dtcgExport": {
+    "title": "Eksport (DTCG)",
+    "intro": "Hent projektets tokens i Design Tokens Community Groups format (2025.10) til brug i andre værktøjer. Tilgængelig på alle planer.",
+    "empty": "Intet at eksportere endnu. Gem en kladde eller publicér først.",
+    "sourceLabel": "Tokens der eksporteres",
+    "source": {
+      "active": "Publiceret (aktiv version)",
+      "draft": "Kladde"
+    },
+    "summary": "{exported} af {total} tokens eksporteret fra version {version}.",
+    "failed": "Eksporten kunne ikke klargøres",
+    "download": {
+      "base": "Tokens",
+      "dark": "Mørke farver",
+      "resolver": "Resolver (lys/mørk)"
+    },
+    "omittedHeading": "{n} tokens udeladt: DTCG kan ikke udtrykke dem",
+    "convertedSummary": "{n} værdier konverteret ved eksport",
+    "codes": {
+      "color_var": "en var()-reference har ingen fast farve",
+      "color_unsupported": "ikke en farve DTCG kan udtrykke",
+      "color_channel": "farven har en ugyldig kanal",
+      "color_alpha": "alpha-værdien ligger uden for 0–1",
+      "length_not_number": "ikke et tal",
+      "length_unitless": "en længde uden enhed (andet end 0)",
+      "length_unit": "DTCG understøtter kun px og rem",
+      "font_family_empty": "tom skrifttypefamilie",
+      "font_family_quote": "uafsluttet anførselstegn i skrifttypefamilien",
+      "invalid_name": "navnet er ikke et gyldigt DTCG-tokennavn",
+      "unit_converted": "konverteret til px",
+      "unitless_zero": "0 eksporteret som 0px",
+      "named_color": "farvenavn eksporteret som hex-værdi",
+      "hue_normalised": "farvetone lagt ind i 0–360"
+    }
+  },
   "tokens": {
     "colors": "Farver",
     "typography": "Typografi",

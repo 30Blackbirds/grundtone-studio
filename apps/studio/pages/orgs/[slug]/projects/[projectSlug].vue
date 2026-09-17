@@ -194,6 +194,7 @@
         { id: 'components', label: t('project.tabComponents') },
         { id: 'apiKeys', label: t('apiKeys.title') },
         { id: 'versions', label: t('versions.title') },
+        { id: 'export', label: t('dtcgExport.title') },
         { id: 'members', label: t('projectMembers.title') },
       ]"
     >
@@ -239,6 +240,15 @@
 
       <GTTabPanel id="versions">
         <VersionHistory :project-id="project.id" :can-manage="canEdit" @activated="refreshConfig" />
+      </GTTabPanel>
+
+      <GTTabPanel id="export">
+        <DtcgExport
+          :project-id="project.id"
+          :has-draft="Boolean(config?.draft)"
+          :has-active="Boolean(config?.active)"
+          :revision="`${config?.active?.id ?? ''}:${initialTokens}`"
+        />
       </GTTabPanel>
 
       <GTTabPanel id="members">
