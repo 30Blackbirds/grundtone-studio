@@ -4,7 +4,10 @@
 
   definePageMeta({ layout: 'app' })
 
-  const { t, d } = useI18n()
+  const { t, locale } = useI18n()
+
+  // One reference time per render, so every relative time on the page agrees.
+  const now = new Date()
 
   const { data: dash, refresh } = await useAsyncData<DashboardPayload>(
     'dashboard',
@@ -81,20 +84,23 @@
 
     <div class="dash-stats mb-6">
       <div class="dash-stat bg-surface-raised border rounded-lg">
-        <div class="dash-stat__value">{{ dash.orgs.length }}</div>
-        <div class="dash-stat__label text-tertiary">{{ t('dashboard.statOrgs') }}</div>
-      </div>
-      <div class="dash-stat bg-surface-raised border rounded-lg">
         <div class="dash-stat__value">{{ dash.projects.length }}</div>
         <div class="dash-stat__label text-tertiary">{{ t('dashboard.statProjects') }}</div>
+      </div>
+      <div class="dash-stat bg-surface-raised border rounded-lg">
+        <div class="dash-stat__value">{{ dash.orgs.length }}</div>
+        <div class="dash-stat__label text-tertiary">{{ t('dashboard.statOrgs') }}</div>
       </div>
       <div class="dash-stat bg-surface-raised border rounded-lg">
         <div class="dash-stat__value">{{ publishedCount }}</div>
         <div class="dash-stat__label text-tertiary">{{ t('dashboard.statPublished') }}</div>
       </div>
       <div class="dash-stat bg-surface-raised border rounded-lg">
-        <div class="dash-stat__value">
-          {{ lastPublishedAt ? d(new Date(lastPublishedAt), 'short') : '—' }}
+        <div
+          class="dash-stat__value"
+          :title="lastPublishedAt ? absoluteDate(new Date(lastPublishedAt), locale) : undefined"
+        >
+          {{ lastPublishedAt ? relativeTime(new Date(lastPublishedAt), now, locale) : '—' }}
         </div>
         <div class="dash-stat__label text-tertiary">{{ t('dashboard.statLastPublish') }}</div>
       </div>
@@ -122,10 +128,15 @@
             />
             <strong>{{ p.name }}</strong>
           </div>
-          <div class="flex items-center gap-2 mt-2">
-            <span class="text-tertiary text-sm">{{ p.orgName }}</span>
-            <span v-if="p.tokenCount !== null" class="text-tertiary text-sm">
-              {{ t('dashboard.tokenCount', { n: p.tokenCount }, p.tokenCount) }}
+          <!-- Org name stays with multi-org: same-named projects in two orgs must
+               be told apart ([designer] 2026-09-17). Own line, so the token count
+               and badge keep one row as in the prototype. -->
+          <div class="text-tertiary text-sm mt-1 truncate">{{ p.orgName }}</div>
+          <div class="flex items-center justify-between gap-2 mt-2">
+            <span class="text-tertiary text-sm">
+              <template v-if="p.tokenCount !== null">
+                {{ t('dashboard.tokenCount', { n: p.tokenCount }, p.tokenCount) }}
+              </template>
             </span>
             <GTBadge :variant="statusVariant(p.status)">
               {{ t(`dashboard.status.${p.status}`) }}
@@ -151,10 +162,21 @@
           :key="a.id"
           class="dash-activity__row flex items-center gap-3"
         >
-          <GTBadge variant="neutral">{{ t(auditActionKey(a.action)) }}</GTBadge>
-          <span v-if="a.targetLabel" class="text-sm">{{ a.targetLabel }}</span>
-          <span class="text-tertiary text-sm dash-activity__meta">
-            {{ a.actorEmail ?? '' }} · {{ d(new Date(a.createdAt), 'short') }}
+          <span
+            :class="['dash-activity__dot', `dash-activity__dot--${activityTone(a.action)}`]"
+            aria-hidden="true"
+          />
+          <span>
+            <template v-if="a.targetLabel">{{ a.targetLabel }} — </template>
+            <span class="text-secondary">{{ t(auditActionKey(a.action)) }}</span>
+          </span>
+          <!-- Quick overview: no actor here. The Revisionslog keeps the full
+               record (actor, target, exact time) unchanged ([designer]). -->
+          <span
+            class="text-tertiary dash-activity__meta"
+            :title="absoluteDate(new Date(a.createdAt), locale)"
+          >
+            {{ relativeTime(new Date(a.createdAt), now, locale) }}
           </span>
         </li>
       </ul>

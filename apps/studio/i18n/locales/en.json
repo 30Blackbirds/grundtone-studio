@@ -884,7 +884,7 @@
     "statOrgs": "Organizations",
     "statProjects": "Projects",
     "statPublished": "Published",
-    "statLastPublish": "Last publish",
+    "statLastPublish": "Since publish",
     "tokenCount": "{n} token | {n} tokens",
     "projectsHeading": "Projects",
     "activityHeading": "Recent activity",

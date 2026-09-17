@@ -209,6 +209,25 @@ main {
   font-size: var(--font-size-sm);
 }
 
+.dash-activity__dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dash-activity__dot--publish {
+  background-color: var(--color-primary);
+}
+
+.dash-activity__dot--member {
+  background-color: var(--color-success);
+}
+
+.dash-activity__dot--neutral {
+  background-color: var(--color-text-tertiary);
+}
+
 .dash-activity__row + .dash-activity__row {
   border-top: 1px solid var(--color-border-light, var(--color-border-medium));
 }
