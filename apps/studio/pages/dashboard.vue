@@ -101,7 +101,7 @@
     </div>
 
     <section class="mb-8">
-      <h2 class="text-sm uppercase text-tertiary tracking-wide mb-3">
+      <h2 class="dash-heading">
         {{ t('dashboard.projectsHeading') }}
       </h2>
       <div v-if="dash.projects.length" class="dash-grid">
@@ -124,6 +124,9 @@
           </div>
           <div class="flex items-center gap-2 mt-2">
             <span class="text-tertiary text-sm">{{ p.orgName }}</span>
+            <span v-if="p.tokenCount !== null" class="text-tertiary text-sm">
+              {{ t('dashboard.tokenCount', { n: p.tokenCount }, p.tokenCount) }}
+            </span>
             <GTBadge :variant="statusVariant(p.status)">
               {{ t(`dashboard.status.${p.status}`) }}
             </GTBadge>
@@ -139,14 +142,14 @@
     </section>
 
     <section v-if="dash.activity.length">
-      <h2 class="text-sm uppercase text-tertiary tracking-wide mb-3">
+      <h2 class="dash-heading">
         {{ t('dashboard.activityHeading') }}
       </h2>
-      <ul class="list-reset flex flex-col gap-1">
+      <ul class="dash-activity list-reset bg-surface-raised border rounded-lg">
         <li
           v-for="a in dash.activity"
           :key="a.id"
-          class="flex items-center gap-3 p-3 bg-surface-raised border rounded-lg"
+          class="dash-activity__row flex items-center gap-3"
         >
           <GTBadge variant="neutral">{{ t(auditActionKey(a.action)) }}</GTBadge>
           <span v-if="a.targetLabel" class="text-sm">{{ a.targetLabel }}</span>

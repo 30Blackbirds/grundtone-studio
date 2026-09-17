@@ -19,6 +19,8 @@ export interface DashboardProject {
   primaryColor: string | null
   status: 'published' | 'draft' | 'none'
   publishedAt: string | null
+  /** Leaf values in the published version's tokens; null when nothing is published. */
+  tokenCount: number | null
 }
 
 export interface DashboardActivity {
@@ -79,6 +81,11 @@ function primaryColorOf(tokens: Record<string, unknown>): string | null {
   return null
 }
 
+function countTokens(value: unknown): number {
+  if (value === null || typeof value !== 'object') return 1
+  return Object.values(value).reduce<number>((n, v) => n + countTokens(v), 0)
+}
+
 function iso(d: Date | string): string {
   return typeof d === 'string' ? d : d.toISOString()
 }
@@ -115,6 +122,7 @@ export function assembleDashboard(
         primaryColor: active ? primaryColorOf(active.tokensJson) : null,
         status,
         publishedAt: active?.publishedAt ? iso(active.publishedAt) : null,
+        tokenCount: active ? countTokens(active.tokensJson) : null,
       }
     })
 

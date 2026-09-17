@@ -885,6 +885,7 @@
     "statProjects": "Projekter",
     "statPublished": "Publicerede",
     "statLastPublish": "Seneste publish",
+    "tokenCount": "{n} token | {n} tokens",
     "projectsHeading": "Projekter",
     "activityHeading": "Seneste aktivitet",
     "noProjects": "Ingen projekter endnu.",

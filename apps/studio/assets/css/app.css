@@ -192,6 +192,27 @@ main {
   flex-shrink: 0;
 }
 
+/* Section headings as the R2 prototype (su__sech h2): normal case, 14px/600. */
+.dash-heading {
+  margin: 0 0 0.625rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Activity as ONE bordered list with row dividers (R2 su__act), not a box per event. */
+.dash-activity {
+  overflow: hidden;
+}
+
+.dash-activity__row {
+  padding: 0.625rem 0.875rem;
+  font-size: var(--font-size-sm);
+}
+
+.dash-activity__row + .dash-activity__row {
+  border-top: 1px solid var(--color-border-light, var(--color-border-medium));
+}
+
 .dash-activity__meta {
   margin-left: auto;
   white-space: nowrap;

@@ -885,6 +885,7 @@
     "statProjects": "Projects",
     "statPublished": "Published",
     "statLastPublish": "Last publish",
+    "tokenCount": "{n} token | {n} tokens",
     "projectsHeading": "Projects",
     "activityHeading": "Recent activity",
     "noProjects": "No projects yet.",
