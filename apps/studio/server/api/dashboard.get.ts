@@ -16,6 +16,8 @@ export const FEED_EXCLUDED_ACTIONS: readonly AuditAction[] = [
   'config.draft_saved',
   'asset.font_uploaded',
   'asset.logo_uploaded',
+  // Accountability entry, not project activity: it stays in the Revisionslog.
+  'audit.exported',
 ]
 
 defineRouteMeta({

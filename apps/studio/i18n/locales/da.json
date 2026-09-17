@@ -746,10 +746,13 @@
       "project.member.invite_declined": "Afviste projektinvitation",
       "asset.font_uploaded": "Uploadede skrifttype",
       "asset.logo_uploaded": "Uploadede logo",
+      "audit.exported": "Eksporterede revisionslog",
       "organization.updated": "Opdaterede organisation"
     },
     "loadOlder": "Indlæs ældre",
     "exportCsv": "Eksportér CSV",
+    "exportTooLarge": "Mere end 10.000 hændelser matcher. Indsnævr filteret for at eksportere.",
+    "exportFailed": "Eksporten mislykkedes. Prøv igen.",
     "timezoneNote": "Tider vist i {tz}",
     "noMatches": "Ingen rækker matcher søgningen.",
     "search": "Søg i loggen",

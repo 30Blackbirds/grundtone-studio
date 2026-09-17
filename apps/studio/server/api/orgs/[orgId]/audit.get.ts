@@ -1,9 +1,7 @@
 import { and, desc } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '~~/server/db'
 import { auditLog } from '~~/server/db/schema'
-import { AUDIT_ACTIONS } from '~~/server/lib/audit'
-import { auditConditions } from '~~/server/lib/audit-query'
+import { auditConditions, auditFilterSchema } from '~~/server/lib/audit-query'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
 const PAGE_SIZE = 50
@@ -13,28 +11,6 @@ const PAGE_SIZE = 50
 // millisecond — likely in bursty signup/publish flows. The cursor is the last
 // seen (createdAt, id); the next page asks for rows strictly less than that
 // tuple in the same ordering.
-const querySchema = z.object({
-  action: z
-    .string()
-    .optional()
-    .refine((v) => !v || (AUDIT_ACTIONS as readonly string[]).includes(v), 'unknown action'),
-  actor: z.string().optional(),
-  // Free-text search over the whole history (UX-audit finding 13: searching
-  // only loaded rows made "no hits" look like "never happened").
-  q: z.string().max(200).optional(),
-  // Actions whose label in the viewer's locale matches q, comma-separated.
-  qActions: z
-    .string()
-    .optional()
-    .transform((v) => (v ? v.split(',').filter(Boolean) : []))
-    .refine(
-      (list) => list.every((a) => (AUDIT_ACTIONS as readonly string[]).includes(a)),
-      'unknown action in qActions',
-    ),
-  after: z.iso.datetime().optional(),
-  before: z.iso.datetime().optional(),
-  beforeId: z.uuid().optional(),
-})
 
 defineRouteMeta({
   openAPI: {
@@ -54,7 +30,7 @@ export default defineEventHandler(async (event) => {
   // "only managers/owners can see member-management history".
   await requireOrgRole(event, orgId, 'manager')
 
-  const parsed = querySchema.safeParse(getQuery(event))
+  const parsed = auditFilterSchema.safeParse(getQuery(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
   }

@@ -1,5 +1,32 @@
 import { and, eq, gte, ilike, inArray, lt, or, type SQL } from 'drizzle-orm'
+import { z } from 'zod'
 import { auditLog } from '~~/server/db/schema'
+import { AUDIT_ACTIONS } from '~~/server/lib/audit'
+
+// Query parameters shared by the audit list and its export, so both apply
+// exactly the same filters.
+export const auditFilterSchema = z.object({
+  action: z
+    .string()
+    .optional()
+    .refine((v) => !v || (AUDIT_ACTIONS as readonly string[]).includes(v), 'unknown action'),
+  actor: z.string().optional(),
+  // Free-text search over the whole history (UX-audit finding 13: searching
+  // only loaded rows made "no hits" look like "never happened").
+  q: z.string().max(200).optional(),
+  // Actions whose label in the viewer's locale matches q, comma-separated.
+  qActions: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(',').filter(Boolean) : []))
+    .refine(
+      (list) => list.every((a) => (AUDIT_ACTIONS as readonly string[]).includes(a)),
+      'unknown action in qActions',
+    ),
+  after: z.iso.datetime().optional(),
+  before: z.iso.datetime().optional(),
+  beforeId: z.uuid().optional(),
+})
 
 export interface AuditFilters {
   orgId: string

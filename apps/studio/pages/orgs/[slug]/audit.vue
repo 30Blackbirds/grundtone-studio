@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
-  import { auditCsv, groupByDay } from '~~/utils/audit-export'
+  import { groupByDay } from '~~/utils/audit-export'
   import {
     actorLabel,
     auditObject,
@@ -54,6 +54,7 @@
     'project.member.invited',
     'project.member.added',
     'project.member.removed',
+    'audit.exported',
   ] as const
 
   const PERIODS: PeriodFilter[] = ['all', '7d', '30d', '90d']
@@ -109,20 +110,26 @@
     )
   }
 
+  // The same filters go to the list and to the export.
+  function filterParams(): URLSearchParams {
+    const qs = new URLSearchParams()
+    if (actionFilter.value !== 'all') qs.set('action', actionFilter.value)
+    if (actorFilter.value !== 'all') qs.set('actor', actorFilter.value)
+    const after = periodStart(periodFilter.value, new Date())
+    if (after) qs.set('after', after.toISOString())
+    if (debouncedSearch.value) {
+      qs.set('q', debouncedSearch.value)
+      const labelMatches = actionsMatchingLabel(debouncedSearch.value)
+      if (labelMatches.length) qs.set('qActions', labelMatches.join(','))
+    }
+    return qs
+  }
+
   async function loadPage(reset: boolean) {
     if (!activeOrg.value?.id || !canManageOrgMembers.value) return
     loading.value = true
     try {
-      const qs = new URLSearchParams()
-      if (actionFilter.value !== 'all') qs.set('action', actionFilter.value)
-      if (actorFilter.value !== 'all') qs.set('actor', actorFilter.value)
-      const after = periodStart(periodFilter.value, new Date())
-      if (after) qs.set('after', after.toISOString())
-      if (debouncedSearch.value) {
-        qs.set('q', debouncedSearch.value)
-        const labelMatches = actionsMatchingLabel(debouncedSearch.value)
-        if (labelMatches.length) qs.set('qActions', labelMatches.join(','))
-      }
+      const qs = filterParams()
       if (!reset && cursor.value) {
         qs.set('before', cursor.value.before)
         qs.set('beforeId', cursor.value.beforeId)
@@ -158,24 +165,37 @@
     return actorLabel({ actorName: name, actorEmail: row.actorEmail }) ?? t('audit.systemActor')
   }
 
-  function exportCsv() {
-    const csv = auditCsv(
-      rows.value.map((r) => ({
-        id: r.id,
-        createdAt: r.createdAt,
-        action: r.action,
-        actorEmail: r.actorEmail,
-        targetLabel: r.targetLabel,
-        ipAddress: r.ipAddress,
-      })),
-    )
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `audit-${activeOrg.value?.slug ?? 'org'}-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  // Server-side export of the WHOLE filtered history, not the loaded rows.
+  // The server refuses (413) instead of truncating above its row cap, and
+  // records the export in the audit log.
+  // useToast is Nuxt's auto-import (@grundtone/vue/src/composables), the same
+  // module instance GTToastContainer reads. An explicit import from
+  // '@grundtone/vue' resolves to dist/ and its toasts never render.
+  const toast = useToast()
+  const exporting = ref(false)
+  async function exportCsv() {
+    if (!activeOrg.value?.id) return
+    exporting.value = true
+    try {
+      const qs = filterParams()
+      const res = await fetch(
+        `/api/orgs/${activeOrg.value.id}/audit/export${qs.toString() ? '?' + qs.toString() : ''}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) {
+        toast.error(res.status === 413 ? t('audit.exportTooLarge') : t('audit.exportFailed'))
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-${activeOrg.value.slug}-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      exporting.value = false
+    }
   }
 </script>
 
@@ -221,7 +241,13 @@
           <GTButton variant="outlined" size="sm" :loading="loading" @click="loadPage(true)">
             {{ t('audit.refresh') }}
           </GTButton>
-          <GTButton v-if="rows.length" variant="outlined" size="sm" @click="exportCsv">
+          <GTButton
+            v-if="rows.length"
+            variant="outlined"
+            size="sm"
+            :loading="exporting"
+            @click="exportCsv"
+          >
             {{ t('audit.exportCsv') }}
           </GTButton>
         </div>

@@ -26,6 +26,7 @@ export type AuditAction =
   | 'project.member.invite_declined'
   | 'asset.font_uploaded'
   | 'asset.logo_uploaded'
+  | 'audit.exported'
 
 export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'member.invited',
@@ -49,6 +50,7 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'project.member.invite_declined',
   'asset.font_uploaded',
   'asset.logo_uploaded',
+  'audit.exported',
 ]
 
 export interface AuditEventInput {

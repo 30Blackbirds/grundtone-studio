@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { and } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
-import { auditConditions, escapeLike } from './audit-query'
+// audit-query imports server/lib/audit, which imports the db module; it needs a
+// URL at import time, and postgres.js does not connect until a query runs.
+process.env.DATABASE_URL ??= 'postgres://unused@127.0.0.1:1/unused'
+const { auditConditions, auditFilterSchema, escapeLike } = await import('./audit-query')
 
 // Same casing as server/db (drizzle({ casing: 'snake_case' })), so the SQL is
 // what production sends.
@@ -65,5 +68,22 @@ describe('auditConditions', () => {
     })
     expect(sql).toContain('"audit_log"."created_at" < $2')
     expect(sql).toContain('"audit_log"."id" < $4')
+  })
+})
+
+describe('auditFilterSchema', () => {
+  it('splits and validates qActions against the known actions', () => {
+    expect(
+      auditFilterSchema.parse({ q: 'x', qActions: 'config.published,api_key.created' }).qActions,
+    ).toEqual(['config.published', 'api_key.created'])
+    expect(auditFilterSchema.safeParse({ qActions: 'config.published,nope.nope' }).success).toBe(
+      false,
+    )
+  })
+
+  it('caps the search length and requires ISO dates', () => {
+    expect(auditFilterSchema.safeParse({ q: 'a'.repeat(201) }).success).toBe(false)
+    expect(auditFilterSchema.safeParse({ after: 'yesterday' }).success).toBe(false)
+    expect(auditFilterSchema.safeParse({ after: '2026-09-10T00:00:00Z' }).success).toBe(true)
   })
 })
