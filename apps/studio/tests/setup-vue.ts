@@ -4,6 +4,7 @@
 // relevant globals here. Loaded via vitest.config.ts → test.setupFiles.
 
 import { vi } from 'vitest'
+import { useToast } from '@grundtone/vue'
 import {
   computed,
   ref,
@@ -58,6 +59,12 @@ for (const [name, fn] of Object.entries(VUE_AUTO_IMPORTS)) {
 // per-file via their own vi.stubGlobal('useI18n', ...). Returns the key
 // verbatim so test assertions stay stable.
 vi.stubGlobal('useI18n', () => ({ t: (k: string) => k, d: (v: unknown) => String(v) }))
+
+// useToast is a Nuxt auto-import in the app (from @grundtone/vue's
+// src/composables, the instance GTToastContainer reads); app code must not
+// import it from the package entry (tests/toast-module-instance.test.ts). In
+// component tests there is no container, so the package function is enough.
+vi.stubGlobal('useToast', useToast)
 
 // defineRouteMeta is a Nitro build-time macro that attaches OpenAPI metadata to
 // a route. Nitro auto-imports + compiles it away in the real build, but server-
