@@ -127,7 +127,9 @@
     <!-- Secondary paths gathered under the form, centred ([designer] 2026-09-17):
          login link above, then forgot password, then sign up. -->
     <div class="flex flex-col items-center gap-2 mt-4 text-sm">
-      <NuxtLink to="/forgot-password">{{ t('auth.login.forgotPassword') }}</NuxtLink>
+      <NuxtLink to="/forgot-password" class="auth-card__standalone-link">
+        {{ t('auth.login.forgotPassword') }}
+      </NuxtLink>
       <p class="m-0 text-tertiary">
         {{ t('auth.login.noAccount') }}
         <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
