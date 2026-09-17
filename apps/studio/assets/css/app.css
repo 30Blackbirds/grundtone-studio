@@ -238,6 +238,7 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--color-surface);
 }
 
 .auth-shell__main {
@@ -249,8 +250,25 @@ main {
 
 .auth-card {
   width: 100%;
-  max-width: 28rem;
+  max-width: 21.25rem; /* 340px, R9 prototype au__card */
   margin: 2.5rem auto;
+  border-radius: 12px;
+}
+
+.auth-card__logo {
+  display: block;
+  margin: 0 auto 0.875rem;
+}
+
+.auth-card__title {
+  margin: 0 0 1.125rem;
+  text-align: center;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.auth-card a {
+  color: var(--color-primary);
 }
 
 /* A11y: standard visually-hidden (screen-reader-only) utility — grundtone

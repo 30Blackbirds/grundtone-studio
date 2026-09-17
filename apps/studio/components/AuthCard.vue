@@ -8,8 +8,10 @@
 </script>
 
 <template>
-  <div class="auth-card p-6 bg-surface-raised border rounded-lg">
-    <h1 class="mt-0">{{ title }}</h1>
+  <div class="auth-card p-6 bg-surface-raised border">
+    <!-- Self-hosted mark (see public/brand/VENDORED.md); decorative next to the title. -->
+    <img src="/brand/logo-32x32.png" width="32" height="32" alt="" class="auth-card__logo" />
+    <h1 class="auth-card__title">{{ title }}</h1>
     <slot />
   </div>
 </template>

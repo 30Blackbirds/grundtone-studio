@@ -124,7 +124,7 @@
     </GTAlert>
     <template v-else>
       <GTAlert v-if="magicError" variant="error" :heading="magicError" />
-      <GTButton variant="secondary" block :loading="magicPending" @click="sendMagicLink">
+      <GTButton variant="outlined" block :loading="magicPending" @click="sendMagicLink">
         {{ t('auth.login.magicLink.send') }}
       </GTButton>
     </template>
