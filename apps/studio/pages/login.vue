@@ -100,17 +100,12 @@
         required
         autocomplete="email"
       />
-      <div class="flex flex-col gap-1">
-        <GTPasswordInput
-          v-model="password"
-          :label="t('auth.password')"
-          required
-          autocomplete="current-password"
-        />
-        <NuxtLink to="/forgot-password" class="text-sm text-tertiary">
-          {{ t('auth.login.forgotPassword') }}
-        </NuxtLink>
-      </div>
+      <GTPasswordInput
+        v-model="password"
+        :label="t('auth.password')"
+        required
+        autocomplete="current-password"
+      />
       <GTAlert v-if="error" variant="error" :heading="error" :aria-label="t('auth.login.error')" />
       <GTButton type="submit" :loading="pending" block>{{ t('auth.login.submit') }}</GTButton>
     </form>
@@ -129,9 +124,14 @@
       </GTButton>
     </template>
 
-    <p class="mt-6 text-tertiary">
-      {{ t('auth.login.noAccount') }}
-      <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
-    </p>
+    <!-- Secondary paths gathered under the form, centred ([designer] 2026-09-17):
+         login link above, then forgot password, then sign up. -->
+    <div class="flex flex-col items-center gap-2 mt-4 text-sm">
+      <NuxtLink to="/forgot-password">{{ t('auth.login.forgotPassword') }}</NuxtLink>
+      <p class="m-0 text-tertiary">
+        {{ t('auth.login.noAccount') }}
+        <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
+      </p>
+    </div>
   </AuthCard>
 </template>

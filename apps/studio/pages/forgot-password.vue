@@ -63,7 +63,7 @@
       }}</GTButton>
     </form>
 
-    <p class="mt-6 text-tertiary">
+    <p class="mt-4 mb-0 text-sm text-tertiary text-center">
       <NuxtLink to="/login">{{ t('auth.forgotPassword.backToLogin') }}</NuxtLink>
     </p>
   </AuthCard>

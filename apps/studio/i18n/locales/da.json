@@ -198,7 +198,7 @@
     "password": "Adgangskode",
     "name": "Navn",
     "login": {
-      "title": "Log ind",
+      "title": "Log ind på Grundtone Studio",
       "submit": "Log ind",
       "noAccount": "Ingen konto?",
       "createAccount": "Opret en",
@@ -215,7 +215,7 @@
       }
     },
     "signup": {
-      "title": "Opret konto",
+      "title": "Opret konto i Grundtone Studio",
       "submit": "Opret konto",
       "haveAccount": "Har du allerede en konto?",
       "loginLink": "Log ind",

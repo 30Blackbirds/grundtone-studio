@@ -5,13 +5,15 @@
 <template>
   <div class="auth-shell">
     <GTSkipLink href="#main">{{ t('skip.toContent') }}</GTSkipLink>
-    <header class="flex justify-between items-center p-6 text-lg">
-      <NuxtLink to="/" class="brand-link">{{ t('app.name') }}</NuxtLink>
-      <LanguageSwitch />
-    </header>
-    <!-- Vertically centered viewport per the R9 prototype (au__vp). -->
+    <!-- Shell-less, as the R9 prototype: the card carries the mark and the
+         product name, so there is no header ([designer] 2026-09-17). The
+         language must stay selectable before login, so the switch sits as a
+         quiet control under the card. -->
     <main id="main" class="auth-shell__main">
       <slot />
+      <div class="auth-shell__lang">
+        <LanguageSwitch />
+      </div>
     </main>
     <AppFooter />
     <!-- Same toast host as the app shell (UX-audit finding 1): auth flows
