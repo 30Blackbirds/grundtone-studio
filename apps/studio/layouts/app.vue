@@ -29,6 +29,11 @@
   // ── Breadcrumb: org › (Projekter › project | section), as in the redesign
   // prototypes. Driven by the same org context the sidebar uses, so labels
   // are real names, not slugs.
+  //
+  // Links go in as `href`, not `to`: with `to`, GTBreadcrumb (@grundtone/vue
+  // 2.23.3) renders `router-link` as an <a> WITHOUT href in this app (measured
+  // 2026-09-17, also on main), so the crumbs were neither clickable nor
+  // focusable. `href` gives a plain working link (full page load).
   const breadcrumbItems = computed(() =>
     buildBreadcrumb({
       path: route.path,
@@ -37,7 +42,7 @@
       projectSlug: activeProjectSlug.value,
       projectName: projects.value?.find((p) => p.slug === activeProjectSlug.value)?.name,
       t,
-    }),
+    }).map(({ label, to }) => ({ label, href: to })),
   )
 </script>
 
@@ -67,7 +72,7 @@
                ingen core-release retter den af sig selv. Kilde-PR + sha pr.
                fil + ét-kalds-kontrol: public/brand/VENDORED.md. -->
           <img src="/brand/logo-32x32.png" width="22" height="22" alt="" class="brand-logo" />
-          {{ t('app.name') }}
+          <span class="brand-link__name">{{ t('app.name') }}</span>
         </NuxtLink>
         <OrgSwitcher class="app-shell__org-switcher" />
       </div>
@@ -76,7 +81,7 @@
     </header>
 
     <div v-if="breadcrumbItems.length" class="app-shell__breadcrumb border-b">
-      <GTBreadcrumb :items="breadcrumbItems" :aria-label="t('nav.breadcrumb')" />
+      <GTBreadcrumb :items="breadcrumbItems" :aria-label="t('nav.breadcrumb')" separator="›" />
     </div>
 
     <div class="app-shell__body">

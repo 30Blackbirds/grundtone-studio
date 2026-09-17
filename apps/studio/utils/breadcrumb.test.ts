@@ -20,7 +20,7 @@ describe('buildBreadcrumb', () => {
         projectName: 'KlangHaus Blog',
       }),
     ).toEqual([
-      { label: 'KlangHaus' },
+      { label: 'KlangHaus', to: '/orgs/klanghaus' },
       { label: 't:projects.title', to: '/orgs/klanghaus' },
       { label: 'KlangHaus Blog' },
     ])
@@ -48,7 +48,7 @@ describe('buildBreadcrumb', () => {
 
   it('org index: org › Projekter', () => {
     expect(buildBreadcrumb({ ...base, path: '/orgs/klanghaus' })).toEqual([
-      { label: 'KlangHaus' },
+      { label: 'KlangHaus', to: '/orgs/klanghaus' },
       { label: 't:projects.title' },
     ])
   })
@@ -63,6 +63,25 @@ describe('buildBreadcrumb', () => {
         projectName: null,
       }).map((i) => i.label),
     ).toEqual(['klanghaus', 't:projects.title', 'blog'])
+  })
+
+  // GTBreadcrumb marks every item without `to`/`href` as aria-current="page",
+  // so exactly one item (the last) may lack a link.
+  it('only the last item lacks a link, on every kind of page', () => {
+    const cases = [
+      { ...base, path: '/orgs/klanghaus/projects/blog', projectSlug: 'blog', projectName: 'Blog' },
+      { ...base, path: '/orgs/klanghaus' },
+      { ...base, path: '/orgs/klanghaus/members/m1' },
+      ...Object.keys(SECTION_LABELS).map((seg) => ({ ...base, path: `/orgs/klanghaus/${seg}` })),
+      { ...base, path: '/orgs/klanghaus/unknown' },
+    ]
+    for (const input of cases) {
+      const items = buildBreadcrumb(input)
+      expect(
+        items.filter((i) => !i.to),
+        input.path,
+      ).toEqual([items.at(-1)])
+    }
   })
 
   it('the current page is never a link', () => {
