@@ -751,9 +751,24 @@
     "loadOlder": "Load older",
     "exportCsv": "Export CSV",
     "timezoneNote": "Times shown in {tz}",
-    "actorSearch": "Search actor",
-    "actorSearchPlaceholder": "email (filters loaded rows)",
-    "noMatches": "No rows match the search."
+    "noMatches": "No rows match the search.",
+    "search": "Search the log",
+    "searchPlaceholder": "Actor, object, action or IP",
+    "filterByActor": "Actor",
+    "allActors": "All actors",
+    "filterByPeriod": "Period",
+    "period": {
+      "all": "All time",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days"
+    },
+    "columns": {
+      "actor": "Actor",
+      "action": "Action",
+      "object": "Object",
+      "time": "Time"
+    }
   },
   "invitation": {
     "title": "Invitation",

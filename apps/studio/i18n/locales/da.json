@@ -751,9 +751,24 @@
     "loadOlder": "Indlæs ældre",
     "exportCsv": "Eksportér CSV",
     "timezoneNote": "Tider vist i {tz}",
-    "actorSearch": "Søg aktør",
-    "actorSearchPlaceholder": "email (filtrerer indlæste rækker)",
-    "noMatches": "Ingen rækker matcher søgningen."
+    "noMatches": "Ingen rækker matcher søgningen.",
+    "search": "Søg i loggen",
+    "searchPlaceholder": "Aktør, objekt, handling eller IP",
+    "filterByActor": "Aktør",
+    "allActors": "Alle aktører",
+    "filterByPeriod": "Periode",
+    "period": {
+      "all": "Hele perioden",
+      "7d": "Sidste 7 dage",
+      "30d": "Sidste 30 dage",
+      "90d": "Sidste 90 dage"
+    },
+    "columns": {
+      "actor": "Aktør",
+      "action": "Handling",
+      "object": "Objekt",
+      "time": "Tid"
+    }
   },
   "invitation": {
     "title": "Invitation",

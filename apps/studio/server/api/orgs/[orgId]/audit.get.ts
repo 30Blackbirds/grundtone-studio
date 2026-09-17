@@ -1,8 +1,9 @@
-import { and, desc, eq, lt, or, type SQL } from 'drizzle-orm'
+import { and, desc } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '~~/server/db'
 import { auditLog } from '~~/server/db/schema'
 import { AUDIT_ACTIONS } from '~~/server/lib/audit'
+import { auditConditions } from '~~/server/lib/audit-query'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
 const PAGE_SIZE = 50
@@ -18,6 +19,19 @@ const querySchema = z.object({
     .optional()
     .refine((v) => !v || (AUDIT_ACTIONS as readonly string[]).includes(v), 'unknown action'),
   actor: z.string().optional(),
+  // Free-text search over the whole history (UX-audit finding 13: searching
+  // only loaded rows made "no hits" look like "never happened").
+  q: z.string().max(200).optional(),
+  // Actions whose label in the viewer's locale matches q, comma-separated.
+  qActions: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(',').filter(Boolean) : []))
+    .refine(
+      (list) => list.every((a) => (AUDIT_ACTIONS as readonly string[]).includes(a)),
+      'unknown action in qActions',
+    ),
+  after: z.iso.datetime().optional(),
   before: z.iso.datetime().optional(),
   beforeId: z.uuid().optional(),
 })
@@ -25,9 +39,9 @@ const querySchema = z.object({
 defineRouteMeta({
   openAPI: {
     summary:
-      'Cursor-pagineret audit-log for org (kun manager/owner); filtrerbar på action og actor.',
+      'Cursor-pagineret audit-log for org (kun manager/owner); filtrerbar på action, actor, fritekst (q) og periode (after).',
     description:
-      'Returnerer en cursor-pagineret audit-log for en org. Kræver manager- eller owner-rolle og kan filtreres på action og actor.',
+      'Returnerer en cursor-pagineret audit-log for en org. Kræver manager- eller owner-rolle og kan filtreres på action, actor, fritekst (q, over hele historikken) og periode (after).',
     tags: ['Org'],
   },
 })
@@ -44,24 +58,18 @@ export default defineEventHandler(async (event) => {
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message })
   }
-  const { action, actor, before, beforeId } = parsed.data
+  const { action, actor, q, qActions, after, before, beforeId } = parsed.data
 
-  const conds: SQL[] = [eq(auditLog.organizationId, orgId)]
-  if (action) conds.push(eq(auditLog.action, action))
-  if (actor) conds.push(eq(auditLog.actorUserId, actor))
-  if (before) {
-    const cutoff = new Date(before)
-    // Composite cursor: strictly older OR same-timestamp-but-smaller-id.
-    // beforeId is required to disambiguate ties; if the client omits it we
-    // fall back to plain `<` (first-page-with-only-timestamp scenario).
-    const cursor = beforeId
-      ? or(
-          lt(auditLog.createdAt, cutoff),
-          and(eq(auditLog.createdAt, cutoff), lt(auditLog.id, beforeId)),
-        )
-      : lt(auditLog.createdAt, cutoff)
-    if (cursor) conds.push(cursor)
-  }
+  const conds = auditConditions({
+    orgId,
+    action,
+    actor,
+    q,
+    qActions,
+    after: after ? new Date(after) : undefined,
+    before: before ? new Date(before) : undefined,
+    beforeId,
+  })
 
   const rows = await db
     .select()
