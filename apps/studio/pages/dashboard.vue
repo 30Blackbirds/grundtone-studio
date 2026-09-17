@@ -148,7 +148,7 @@
           :key="a.id"
           class="flex items-center gap-3 p-3 bg-surface-raised border rounded-lg"
         >
-          <GTBadge variant="neutral">{{ t(`audit.actions.${a.action}`) }}</GTBadge>
+          <GTBadge variant="neutral">{{ t(auditActionKey(a.action)) }}</GTBadge>
           <span v-if="a.targetLabel" class="text-sm">{{ a.targetLabel }}</span>
           <span class="text-tertiary text-sm dash-activity__meta">
             {{ a.actorEmail ?? '' }} · {{ d(new Date(a.createdAt), 'short') }}
