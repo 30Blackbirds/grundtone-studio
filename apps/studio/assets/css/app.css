@@ -278,6 +278,32 @@ main {
   flex-shrink: 0;
 }
 
+/* Nav items ([designer] 2026-09-17, measured in the redesign prototypes).
+   Active = a translucent wash of the primary colour (R5/R7/billing variant,
+   the fleet-wide active pattern). Hover = neutral surface-alt with no colour
+   or weight change, so hover can never be mistaken for the selected item.
+   Written here because @grundtone/design-system's utilities have no hover
+   variants. */
+.app-sidebar__link {
+  display: block;
+  padding: 0.5rem;
+  border-radius: 7px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.app-sidebar__link:hover {
+  background-color: var(--color-surface-alt);
+}
+
+.app-sidebar__link--active,
+.app-sidebar__link--active:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 .app-sidebar__user {
   position: relative;
   margin-top: auto;

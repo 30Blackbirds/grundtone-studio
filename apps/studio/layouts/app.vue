@@ -26,28 +26,19 @@
     if (e.key === 'Escape') closeDrawer()
   }
 
-  // ── Breadcrumb: Dashboard → org → (project | section). Driven by the same
-  // org context the sidebar uses, so labels are real names, not slugs.
-  const SECTION_LABELS: Record<string, string> = {
-    members: 'members.title',
-    audit: 'audit.title',
-    settings: 'orgSettings.title',
-  }
-  const breadcrumbItems = computed(() => {
-    if (!activeSlug.value) return []
-    const items: { label: string; to?: string }[] = [
-      { label: t('nav.dashboard'), to: '/dashboard' },
-      { label: activeOrg.value?.name ?? activeSlug.value, to: `/orgs/${activeSlug.value}` },
-    ]
-    if (activeProjectSlug.value) {
-      const project = projects.value?.find((p) => p.slug === activeProjectSlug.value)
-      items.push({ label: project?.name ?? activeProjectSlug.value })
-    } else {
-      const section = String(route.path.split('/')[3] ?? '')
-      if (SECTION_LABELS[section]) items.push({ label: t(SECTION_LABELS[section]) })
-    }
-    return items
-  })
+  // ── Breadcrumb: org › (Projekter › project | section), as in the redesign
+  // prototypes. Driven by the same org context the sidebar uses, so labels
+  // are real names, not slugs.
+  const breadcrumbItems = computed(() =>
+    buildBreadcrumb({
+      path: route.path,
+      orgSlug: activeSlug.value,
+      orgName: activeOrg.value?.name,
+      projectSlug: activeProjectSlug.value,
+      projectName: projects.value?.find((p) => p.slug === activeProjectSlug.value)?.name,
+      t,
+    }),
+  )
 </script>
 
 <template>
