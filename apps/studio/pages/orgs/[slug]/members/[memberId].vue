@@ -30,6 +30,7 @@
       })
       return res.data?.members ?? []
     },
+    { default: () => [], watch: [activeOrg] },
   )
 
   const member = computed(() => members.value?.find((m) => m.id === memberId.value) ?? null)
@@ -151,7 +152,7 @@
   <section class="p-6 max-w-4xl mx-auto flex flex-col gap-4">
     <!-- Breadcrumb lives in the app-shell (layouts/app.vue) — no page-local trail. -->
     <h1 class="m-0 mb-4 font-heading">
-      {{ member?.user?.name ?? member?.user?.email ?? t('memberDetail.loading') }}
+      {{ member?.user?.name || member?.user?.email || t('memberDetail.loading') }}
     </h1>
 
     <template v-if="member">
