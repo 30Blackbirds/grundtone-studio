@@ -238,19 +238,55 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--color-surface);
 }
 
 .auth-shell__main {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
 
+.auth-shell__lang {
+  margin-top: -1.5rem; /* sits close under the card's bottom margin */
+}
+
 .auth-card {
   width: 100%;
-  max-width: 28rem;
+  max-width: 21.25rem; /* 340px, R9 prototype au__card */
   margin: 2.5rem auto;
+  border-radius: 12px;
+}
+
+.auth-card__logo {
+  display: block;
+  margin: 0 auto 0.875rem;
+}
+
+.auth-card__title {
+  margin: 0 0 1.125rem;
+  text-align: center;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.auth-card a {
+  color: var(--color-primary);
+}
+
+/* [designer] 2026-09-17: a link alone on its own line is already a link by
+   position and colour, so no underline (as the prototype). A link inline in
+   a sentence ("No account? Sign up") keeps the underline: colour alone must
+   not be the only cue (WCAG 1.4.1). */
+.auth-card__standalone-link {
+  text-decoration: none;
+}
+
+.auth-card__standalone-link:hover,
+.auth-card__standalone-link:focus-visible {
+  text-decoration: underline;
 }
 
 /* A11y: standard visually-hidden (screen-reader-only) utility — grundtone

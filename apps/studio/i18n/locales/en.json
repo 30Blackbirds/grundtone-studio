@@ -198,7 +198,7 @@
     "password": "Password",
     "name": "Name",
     "login": {
-      "title": "Sign in",
+      "title": "Sign in to Grundtone Studio",
       "submit": "Sign in",
       "noAccount": "No account?",
       "createAccount": "Sign up",
@@ -215,7 +215,7 @@
       }
     },
     "signup": {
-      "title": "Sign up",
+      "title": "Create your Grundtone Studio account",
       "submit": "Sign up",
       "haveAccount": "Already have an account?",
       "loginLink": "Sign in",

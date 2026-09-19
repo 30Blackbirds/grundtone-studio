@@ -80,8 +80,10 @@
       </form>
     </template>
 
-    <p class="mt-6 text-tertiary">
-      <NuxtLink to="/login">{{ t('auth.forgotPassword.backToLogin') }}</NuxtLink>
+    <p class="mt-4 mb-0 text-sm text-tertiary text-center">
+      <NuxtLink to="/login" class="auth-card__standalone-link">
+        {{ t('auth.forgotPassword.backToLogin') }}
+      </NuxtLink>
     </p>
   </AuthCard>
 </template>

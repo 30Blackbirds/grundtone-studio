@@ -59,7 +59,7 @@
       <GTAlert v-if="error" variant="error" :heading="error" :aria-label="t('auth.signup.error')" />
       <GTButton type="submit" :loading="pending" block>{{ t('auth.signup.submit') }}</GTButton>
     </form>
-    <p class="mt-6 text-tertiary">
+    <p class="mt-4 mb-0 text-sm text-tertiary text-center">
       {{ t('auth.signup.haveAccount') }}
       <NuxtLink to="/login">{{ t('auth.signup.loginLink') }}</NuxtLink>
     </p>
