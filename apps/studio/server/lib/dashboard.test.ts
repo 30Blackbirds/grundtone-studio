@@ -96,4 +96,31 @@ describe('assembleDashboard', () => {
     expect(out.projects[0].publishedAt).toBeNull()
     expect(out.projects[0].status).toBe('published')
   })
+
+  it('counts the published tokens as leaf values across groups', () => {
+    const out = assembleDashboard(
+      [org('o1', 'acme')],
+      [
+        { id: 'p1', organizationId: 'o1', slug: 'a', name: 'A' },
+        { id: 'p2', organizationId: 'o1', slug: 'b', name: 'B' },
+      ],
+      [
+        {
+          projectId: 'p1',
+          publishedAt: null,
+          tokensJson: {
+            colors: { primary: '#0059b3', secondary: '#6c757d' },
+            typography: { fontFamily: { base: 'IBM Plex Sans', mono: 'IBM Plex Mono' } },
+            radius: { sm: '4px' },
+            spacing: {},
+          },
+        },
+      ],
+      [{ projectId: 'p2' }],
+      [],
+    )
+    expect(out.projects[0].tokenCount).toBe(5)
+    // No published version: the count would describe nothing a customer gets.
+    expect(out.projects[1].tokenCount).toBeNull()
+  })
 })

@@ -192,6 +192,58 @@ main {
   flex-shrink: 0;
 }
 
+/* [designer] 2026-09-17: on narrow screens "New organization" stacks under the
+   title instead of wrapping to two lines (it is a rare, deliberate action, so it
+   keeps its full label). Measured: the English label wraps at <= 486px, Danish
+   not at 490; 520px leaves room for longer strings and the Plex metrics. */
+@media (width <= 520px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}
+
+/* Section headings as the R2 prototype (su__sech h2): normal case, 14px/600. */
+.dash-heading {
+  margin: 0 0 0.625rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Activity as ONE bordered list with row dividers (R2 su__act), not a box per event. */
+.dash-activity {
+  overflow: hidden;
+}
+
+.dash-activity__row {
+  padding: 0.625rem 0.875rem;
+  font-size: var(--font-size-sm);
+}
+
+.dash-activity__dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dash-activity__dot--publish {
+  background-color: var(--color-primary);
+}
+
+.dash-activity__dot--member {
+  background-color: var(--color-success);
+}
+
+.dash-activity__dot--neutral {
+  background-color: var(--color-text-tertiary);
+}
+
+.dash-activity__row + .dash-activity__row {
+  border-top: 1px solid var(--color-border-light, var(--color-border-medium));
+}
+
 .dash-activity__meta {
   margin-left: auto;
   white-space: nowrap;
