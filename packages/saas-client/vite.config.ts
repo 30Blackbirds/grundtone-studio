@@ -12,8 +12,8 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
  *           integrity="sha384-<hash from v1.0.0.js.sri>"
  *           crossorigin="anonymous"></script>
  *
- * sri-release.yml uploads both the bundle and its .sri file so the CDN
- * serves matching pairs.
+ * The studio image serves both the bundle and its .sri file from the same
+ * dist (apps/studio/server/routes/client), so the CDN serves matching pairs.
  */
 function sriHashes(): Plugin {
   return {

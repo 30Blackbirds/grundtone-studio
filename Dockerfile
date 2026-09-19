@@ -121,6 +121,9 @@ COPY --from=builder --chown=app:app /deploy ./
 # Changelog files read by /api/changelog/[source] at runtime
 COPY --from=builder --chown=app:app /app/CHANGELOG.md ./CHANGELOG.md
 COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./packages/saas-client/CHANGELOG.md
+# SDK bundles served by /client/[file] — the CDN pull zone uses studio as its
+# origin, so this copy is what cdn.grundtone.com serves (KH-988)
+COPY --from=builder --chown=app:app /app/packages/saas-client/dist ./packages/saas-client/dist
 COPY --chown=app:app docker/entrypoint.sh ./entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh

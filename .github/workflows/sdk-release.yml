@@ -4,8 +4,12 @@ name: SDK release
 #   1. On main pushes with pending changesets → open / refresh a "Version
 #      Packages" PR that bumps version + writes changelog.
 #   2. When that PR merges (no pending changesets remain) → build the SDK
-#      bundles, upload to Bunny.net at versioned + major-alias paths, and
-#      tag the release.
+#      bundles and tag the release.
+#
+# The bundles are NOT uploaded anywhere from here. The studio image serves them
+# at /client/v1.js and /client/v1.0.0.js (Dockerfile + routes/client/[file]),
+# and the CDN pull zone uses studio as its origin, so a studio deploy is what
+# publishes a new SDK build (KH-988).
 
 on:
   push:
@@ -65,11 +69,3 @@ jobs:
           title: 'chore(deps): version SDK packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload SDK bundles to Bunny.net
-        if: steps.changesets.outputs.published == 'true'
-        env:
-          BUNNY_STORAGE_ZONE: ${{ secrets.BUNNY_STORAGE_ZONE }}
-          BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
-          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
-        run: bash scripts/upload-sdk-to-bunny.sh

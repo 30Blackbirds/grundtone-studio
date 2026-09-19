@@ -16,7 +16,8 @@
 # Kontrakt:
 #   stdout  = NØJAGTIG det image-ID der blev kørt, intet andet
 #   stderr  = al diagnostik
-#   exit    = 0 kun hvis healthz svarer OG /login giver 200
+#   exit    = 0 only if healthz answers, /login returns 200, and the SDK
+#             contract files are served (see the /client block below)
 #
 # Brug:  scripts/boot-smoke.sh <image-ref>
 #        BOOT_SMOKE_PORT=3987 scripts/boot-smoke.sh <image-ref>
@@ -84,6 +85,55 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login")
 [ "$code" = '200' ] \
   || { log "✗ /login returned $code in boot-smoke"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1; }
 log "✓ /login 200 in boot-smoke"
+
+# The SDK is served from this image (KH-988): the Bunny pull zone uses studio as
+# its origin, so a bundle missing here is a bundle missing on the CDN. A status
+# code alone is not enough, because a catch-all can also answer 200. Each file
+# must carry its own content type.
+#
+# The versioned URL is cached as immutable and pinned by customers with SRI, so
+# its bytes may never change without a contract bump. Each versioned bundle must
+# hash to the SRI the image serves next to it, AND that SRI must equal the one
+# committed for the contract. A drift means the SDK changed under a published
+# version.
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+CONTRACT_FILE="$ROOT/apps/studio/utils/sdk-contract.ts"
+contract=$(sed -n "s/^export const SDK_CONTRACT_VERSION = '\([0-9][0-9.]*\)'$/\1/p" "$CONTRACT_FILE")
+[ -n "$contract" ] && [ "$(printf '%s\n' "$contract" | wc -l | tr -d ' ')" = 1 ] \
+  || { log "✗ could not read exactly one SDK_CONTRACT_VERSION from $CONTRACT_FILE (got '$contract')"; exit 1; }
+major=${contract%%.*}
+log "SDK contract v$contract (major v$major)"
+
+sdk_get() { curl -s -o "$2" -w '%{http_code} %{content_type}' "http://127.0.0.1:$PORT$1"; }
+SDK_TMP=$(mktemp -d)
+for spec in "v$major.js application/javascript" \
+            "v$contract.js application/javascript" "v$contract.js.sri text/plain" \
+            "v$contract.mjs application/javascript" "v$contract.mjs.sri text/plain"; do
+  file=${spec%% *}; want=${spec#* }
+  got=$(sdk_get "/client/$file" "$SDK_TMP/$file")
+  case "$got" in
+    "200 $want"*) log "✓ /client/$file $got in boot-smoke" ;;
+    *) log "✗ /client/$file returned '$got', want '200 $want'"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1 ;;
+  esac
+done
+for ext in js mjs; do
+  file="v$contract.$ext"
+  sri=$(tr -d '\n' < "$SDK_TMP/$file.sri")
+  calc="sha384-$(openssl dgst -sha384 -binary "$SDK_TMP/$file" | openssl base64 -A)"
+  [ "$sri" = "$calc" ] \
+    || { log "✗ /client/$file hashes to $calc, but /client/$file.sri says '$sri'"; exit 1; }
+  committed_file="$ROOT/apps/studio/sdk-contract/$file.sri"
+  committed=$(tr -d '\n' < "$committed_file" 2>/dev/null || true)
+  [ "$sri" = "$committed" ] \
+    || { log "✗ /client/$file serves $sri, but $committed_file commits '$committed' — the SDK bytes changed without bumping SDK_CONTRACT_VERSION"; exit 1; }
+  log "✓ /client/$file matches its served and committed SRI"
+done
+# Negative control: an unknown version must not be served.
+code=$(sdk_get /client/v9.js /dev/null)
+[ "${code%% *}" = '404' ] \
+  || { log "✗ /client/v9.js returned '$code', want 404 — a catch-all answers for the SDK paths"; exit 1; }
+log "✓ /client/v9.js 404 in boot-smoke"
+rm -rf "$SDK_TMP"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren
 # faktisk kørte. Kalderen sammenligner det med det, den byggede.
