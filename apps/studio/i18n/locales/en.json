@@ -746,14 +746,32 @@
       "project.member.invite_declined": "Declined project invitation",
       "asset.font_uploaded": "Uploaded font",
       "asset.logo_uploaded": "Uploaded logo",
+      "audit.exported": "Exported audit log",
       "organization.updated": "Updated organization"
     },
     "loadOlder": "Load older",
     "exportCsv": "Export CSV",
+    "exportTooLarge": "More than 10,000 events match. Narrow the filter to export.",
+    "exportFailed": "The export failed. Try again.",
     "timezoneNote": "Times shown in {tz}",
-    "actorSearch": "Search actor",
-    "actorSearchPlaceholder": "email (filters loaded rows)",
-    "noMatches": "No rows match the search."
+    "noMatches": "No rows match the search.",
+    "search": "Search the log",
+    "searchPlaceholder": "Actor, object, action or IP",
+    "filterByActor": "Actor",
+    "allActors": "All actors",
+    "filterByPeriod": "Period",
+    "period": {
+      "all": "All time",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days"
+    },
+    "columns": {
+      "actor": "Actor",
+      "action": "Action",
+      "object": "Object",
+      "time": "Time"
+    }
   },
   "invitation": {
     "title": "Invitation",

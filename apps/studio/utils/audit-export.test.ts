@@ -56,4 +56,48 @@ describe('auditCsv', () => {
     // Nulls serialise as empty fields.
     expect(csv.split('\r\n')[1]!.endsWith(';')).toBe(true)
   })
+
+  it('neutralises spreadsheet formulas in any field (CSV injection)', () => {
+    const csv = auditCsv([
+      {
+        id: 'e3',
+        createdAt: '2026-07-29T10:00:00Z',
+        action: 'project.created',
+        actorEmail: '@attacker.dk',
+        targetLabel: '=HYPERLINK("http://x","click")',
+        ipAddress: null,
+      },
+      {
+        id: 'e4',
+        createdAt: '2026-07-29T10:00:00Z',
+        action: 'project.created',
+        actorEmail: null,
+        targetLabel: '+1',
+        ipAddress: null,
+      },
+      {
+        id: 'e5',
+        createdAt: '2026-07-29T10:00:00Z',
+        action: 'project.created',
+        actorEmail: null,
+        targetLabel: '-2',
+        ipAddress: null,
+      },
+      {
+        id: 'e6',
+        createdAt: '2026-07-29T10:00:00Z',
+        action: 'project.created',
+        actorEmail: null,
+        targetLabel: 'safe=1',
+        ipAddress: null,
+      },
+    ])
+    const lines = csv.split('\r\n')
+    expect(lines[1]).toContain(`;'@attacker.dk;`)
+    expect(lines[1]).toContain(`"'=HYPERLINK(""http://x"",""click"")"`)
+    expect(lines[2]).toContain(`;'+1;`)
+    expect(lines[3]).toContain(`;'-2;`)
+    // Only a LEADING formula character is neutralised.
+    expect(lines[4]).toContain(';safe=1;')
+  })
 })

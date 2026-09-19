@@ -31,8 +31,14 @@ export function groupByDay<T extends { createdAt: string }>(rows: T[]): DayGroup
   return groups
 }
 
+// A field starting with = + - @ (or tab/CR) is run as a formula by Excel and
+// LibreOffice. Target labels are user-controlled (project names, emails), so
+// such values get a leading apostrophe and export as text (OWASP CSV injection).
+const FORMULA_START = /^[=+\-@\t\r]/
+
 function csvField(value: string | null): string {
   if (value === null || value === '') return ''
+  if (FORMULA_START.test(value)) value = `'${value}`
   // Quote when the value contains the separator, quotes or newlines; double
   // embedded quotes per RFC 4180.
   if (/[";\n\r]/.test(value)) return `"${value.replaceAll('"', '""')}"`
