@@ -6,6 +6,9 @@ dist
 coverage
 pnpm-lock.yaml
 
+# Official DTCG schemas and test suite, kept byte-identical to upstream (SOURCE.md there).
+packages/dtcg/vendor/dtcg-community-group
+
 # Drizzle-generated migration snapshots — overwritten by codegen, hands off.
 apps/studio/server/db/migrations
 

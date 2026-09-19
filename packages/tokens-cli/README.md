@@ -39,11 +39,18 @@ grundtone-tokens get <projectId>                        # print draft + active t
 grundtone-tokens set <projectId> --set colors.primary=#0059b3
 grundtone-tokens set <projectId> --file tokens.json     # replace from a file
 grundtone-tokens publish <projectId>                    # publish the current draft
+grundtone-tokens export <projectId> --format dtcg --source active --out tokens/
 ```
 
 `set` without `--file` starts from the current draft, so `--set` tweaks one slot without resending
 the whole object. Tokens are validated server-side against the Studio token schema (400 with the
 field error on invalid input).
+
+`export` writes DTCG 2025.10 files: `<slug>.tokens.json`, plus `<slug>.dark.tokens.json` and
+`<slug>.resolver.json` when the project has dark colors. `--source` has no default, so you always
+say whether you want the draft or the published set. The server does the conversion (the same files
+as the Export tab in Studio) and the command prints what was left out or converted. See
+[`packages/dtcg`](../dtcg/README.md) for the mapping.
 
 ## Build / run
 

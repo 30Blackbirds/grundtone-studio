@@ -396,6 +396,41 @@
       "removed": "removed"
     }
   },
+  "dtcgExport": {
+    "title": "Export (DTCG)",
+    "intro": "Download this project's tokens in the Design Tokens Community Group format (2025.10), for use in other tools. Available on every plan.",
+    "empty": "Nothing to export yet. Save a draft or publish first.",
+    "sourceLabel": "Tokens to export",
+    "source": {
+      "active": "Published (active version)",
+      "draft": "Draft"
+    },
+    "summary": "{exported} of {total} tokens exported from version {version}.",
+    "failed": "Could not prepare the export",
+    "download": {
+      "base": "Tokens",
+      "dark": "Dark colors",
+      "resolver": "Resolver (light/dark)"
+    },
+    "omittedHeading": "{n} tokens left out: DTCG has no way to express them",
+    "convertedSummary": "{n} values converted on export",
+    "codes": {
+      "color_var": "a var() reference has no fixed color",
+      "color_unsupported": "not a color DTCG can express",
+      "color_channel": "the color has an invalid channel",
+      "color_alpha": "the alpha value is outside 0–1",
+      "length_not_number": "not a number",
+      "length_unitless": "a length without a unit (other than 0)",
+      "length_unit": "DTCG supports px and rem only",
+      "font_family_empty": "empty font family",
+      "font_family_quote": "unterminated quote in the font family",
+      "invalid_name": "the name is not a valid DTCG token name",
+      "unit_converted": "converted to px",
+      "unitless_zero": "0 exported as 0px",
+      "named_color": "named color exported as its hex value",
+      "hue_normalised": "hue wrapped into 0–360"
+    }
+  },
   "tokens": {
     "colors": "Colors",
     "typography": "Typography",

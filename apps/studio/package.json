@@ -34,6 +34,7 @@
     "@fontsource/public-sans": "^5.3.0",
     "@fontsource/source-sans-3": "^5.3.0",
     "@fontsource/work-sans": "^5.3.0",
+    "@grundtone-studio/dtcg": "workspace:*",
     "@grundtone/core": "^2.22.0",
     "@grundtone/nuxt": "^2.23.3",
     "@grundtone/vue": "^2.23.3",
