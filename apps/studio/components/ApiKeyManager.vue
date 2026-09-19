@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   const props = defineProps<{ projectId: string; canManage: boolean }>()
   const { t, d } = useI18n()
 

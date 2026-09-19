@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   import { organization, useSession } from '~~/lib/auth-client'
 
   const { t } = useI18n()

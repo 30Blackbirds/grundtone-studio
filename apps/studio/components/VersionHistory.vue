@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { useToast } from '@grundtone/vue'
   import { diffTokens, isColorPath } from '~~/utils/token-diff'
 
   const props = defineProps<{ projectId: string; canManage: boolean }>()
