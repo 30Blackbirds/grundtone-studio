@@ -53,6 +53,7 @@
       })
       return res.data?.members ?? []
     },
+    { default: () => [], watch: [activeOrg] },
   )
 
   const { data: pendingInvitations, refresh: refreshInvitations } = await useAsyncData(
@@ -65,6 +66,7 @@
       })
       return (res.data ?? []).filter((i) => i.status === 'pending')
     },
+    { default: () => [], watch: [activeOrg] },
   )
 
   const toast = useToast()
@@ -155,7 +157,7 @@
         class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
       >
         <div class="flex flex-col gap-1">
-          <strong>{{ m.user?.name ?? m.user?.email }}</strong>
+          <strong>{{ m.user?.name || m.user?.email }}</strong>
           <span class="text-tertiary text-sm">{{ m.user?.email }}</span>
         </div>
         <div class="flex items-center gap-3">

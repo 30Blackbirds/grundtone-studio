@@ -160,7 +160,7 @@
         <GTSelect
           v-model="actionFilter"
           :label="t('audit.filterByAction')"
-          :options="ACTION_FILTERS.map((a) => ({ value: a, label: t(`audit.actions.${a}`) }))"
+          :options="ACTION_FILTERS.map((a) => ({ value: a, label: t(auditActionKey(a)) }))"
         />
         <GTInput
           v-model="actorQuery"
@@ -190,7 +190,7 @@
               :key="row.id"
               class="grid grid-cols-[auto_1fr_auto] gap-4 items-center px-4 py-3 border-b last:border-b-0"
             >
-              <GTBadge variant="neutral">{{ t(`audit.actions.${row.action}`) }}</GTBadge>
+              <GTBadge variant="neutral">{{ t(auditActionKey(row.action)) }}</GTBadge>
               <div class="flex flex-col gap-0.5">
                 <span class="text-sm">
                   <strong>{{ row.actorEmail ?? t('audit.systemActor') }}</strong>

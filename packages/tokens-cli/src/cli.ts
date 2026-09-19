@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Command } from 'commander'
 import {
   applySets,
@@ -10,6 +10,13 @@ import {
   type ConfigFile,
   type ResolvedConfig,
 } from './config.js'
+import {
+  checkExportOptions,
+  exportPath,
+  filesToFetch,
+  reportLines,
+  type ExportReportResponse,
+} from './export.js'
 
 function loadConfigFile(): ConfigFile | null {
   try {
@@ -20,7 +27,7 @@ function loadConfigFile(): ConfigFile | null {
   }
 }
 
-async function api(cfg: ResolvedConfig, method: string, path: string, body?: unknown) {
+async function request(cfg: ResolvedConfig, method: string, path: string, body?: unknown) {
   const res = await fetch(`${cfg.apiBase}${path}`, {
     method,
     headers: {
@@ -33,6 +40,11 @@ async function api(cfg: ResolvedConfig, method: string, path: string, body?: unk
   if (!res.ok) {
     throw new Error(`${method} ${path} → HTTP ${res.status}${text ? `: ${text}` : ''}`)
   }
+  return text
+}
+
+async function api(cfg: ResolvedConfig, method: string, path: string, body?: unknown) {
+  const text = await request(cfg, method, path, body)
   return text ? JSON.parse(text) : null
 }
 
@@ -97,6 +109,30 @@ program
     const cfg = configFor(projectId, program.opts())
     const res = await api(cfg, 'POST', `/api/projects/${projectId}/publish`, {})
     console.log(`✓ published version ${res?.version ?? '?'} for project ${projectId}`)
+  })
+
+program
+  .command('export <projectId>')
+  .description('download the tokens as DTCG 2025.10 files (base, and dark + resolver if set)')
+  .requiredOption('--format <format>', 'export format (dtcg)')
+  .requiredOption('--source <source>', 'draft or active')
+  .option('--out <dir>', 'directory to write the files to', '.')
+  .action(async (projectId: string, opts: { format: string; source: string; out: string }) => {
+    const source = checkExportOptions(opts)
+    const cfg = configFor(projectId, program.opts())
+    const res = (await api(
+      cfg,
+      'GET',
+      exportPath(projectId, source, 'report'),
+    )) as ExportReportResponse
+    const outDir = resolve(opts.out)
+    mkdirSync(outDir, { recursive: true })
+    for (const file of filesToFetch(res)) {
+      const content = await request(cfg, 'GET', exportPath(projectId, source, file.part))
+      writeFileSync(join(outDir, file.name), content)
+      console.log(`✓ wrote ${join(outDir, file.name)}`)
+    }
+    for (const line of reportLines(res)) console.log(line)
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

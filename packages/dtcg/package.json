@@ -1,0 +1,22 @@
+{
+  "name": "@grundtone-studio/dtcg",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Studio tokens to and from the DTCG 2025.10 format, with no app dependencies",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/validate.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1"
+  }
+}

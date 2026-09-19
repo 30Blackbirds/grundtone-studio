@@ -74,6 +74,32 @@ klanghausPipeline(
 
   checksPrefix: 'jenkins/',
 
+  // 🔴 REQUIRED IN PARALLEL MODE. Without `tools:`, `toolchains:` or
+  //    `toolsNone:` the library stops every build in `checks`
+  //    (klanghausPipeline.groovy:356), and no `jenkins/*` context is published.
+  //    That was the state from #257 to riff hmatw17ycx9pfca2jakyae69.
+  //
+  // Not `toolsNone:`. Studio needs node 24: `.npmrc` has `engine-strict=true`
+  // and `engines.node` is `>=24.0.0`. The agent's default node is 22.23.2, so
+  // `pnpm install` would stop on the engine check, a red that says nothing
+  // about the code. `toolchains` puts the agent's /usr/local/node-24.20.0 first
+  // on PATH (klanghausToolchain.groovy, node contract); `tools` then asserts
+  // what actually runs.
+  //
+  // ⚠️ A DECLARED DIFFERENCE: Actions reads `.nvmrc` (24.13.0). The agent image
+  //    has one node 24, 24.20.0 (infra compose/prod/ci/agent/Dockerfile), so
+  //    the two sides run different patch versions until `.nvmrc` moves to
+  //    24.20.0 (blog did that in the same commit as its pin).
+  //    pnpm matches: both sides take `packageManager` (pnpm@10.14.0); blog's
+  //    green builds with a 10.0.0 pin show the agent honours that field.
+  toolchains: ['node': [exact: '24.20.0']],
+  tools: [
+    'node': [exact: '24.20.0', cmd: 'node --version'],
+    // `2>/dev/null | tail -1`: pnpm warns on stderr about the unset
+    // ${NODE_AUTH_TOKEN} in `.npmrc`, which would hide the version line.
+    'pnpm': [exact: '10.14.0', cmd: 'pnpm --version 2>/dev/null | tail -1'],
+  ],
+
   pnpmCache: true,
 
   checks: [

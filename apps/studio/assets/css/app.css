@@ -13,6 +13,24 @@ main {
   color: inherit;
 }
 
+/* [designer] 2026-09-17: on phones the wordmark and the org switcher fought
+   for the header (the name wrapped, the switcher was cut off). Below 480px only
+   the logo shows; the name stays in the accessibility tree as the link's name.
+   Deliberately not tied to the 900px drawer breakpoint: at 850px there is room. */
+@media (width <= 480px) {
+  .brand-link__name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 .list-reset {
   list-style: none;
   padding: 0;
@@ -174,6 +192,58 @@ main {
   flex-shrink: 0;
 }
 
+/* [designer] 2026-09-17: on narrow screens "New organization" stacks under the
+   title instead of wrapping to two lines (it is a rare, deliberate action, so it
+   keeps its full label). Measured: the English label wraps at <= 486px, Danish
+   not at 490; 520px leaves room for longer strings and the Plex metrics. */
+@media (width <= 520px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}
+
+/* Section headings as the R2 prototype (su__sech h2): normal case, 14px/600. */
+.dash-heading {
+  margin: 0 0 0.625rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Activity as ONE bordered list with row dividers (R2 su__act), not a box per event. */
+.dash-activity {
+  overflow: hidden;
+}
+
+.dash-activity__row {
+  padding: 0.625rem 0.875rem;
+  font-size: var(--font-size-sm);
+}
+
+.dash-activity__dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dash-activity__dot--publish {
+  background-color: var(--color-primary);
+}
+
+.dash-activity__dot--member {
+  background-color: var(--color-success);
+}
+
+.dash-activity__dot--neutral {
+  background-color: var(--color-text-tertiary);
+}
+
+.dash-activity__row + .dash-activity__row {
+  border-top: 1px solid var(--color-border-light, var(--color-border-medium));
+}
+
 .dash-activity__meta {
   margin-left: auto;
   white-space: nowrap;
@@ -220,19 +290,55 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--color-surface);
 }
 
 .auth-shell__main {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
 
+.auth-shell__lang {
+  margin-top: -1.5rem; /* sits close under the card's bottom margin */
+}
+
 .auth-card {
   width: 100%;
-  max-width: 28rem;
+  max-width: 21.25rem; /* 340px, R9 prototype au__card */
   margin: 2.5rem auto;
+  border-radius: 12px;
+}
+
+.auth-card__logo {
+  display: block;
+  margin: 0 auto 0.875rem;
+}
+
+.auth-card__title {
+  margin: 0 0 1.125rem;
+  text-align: center;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.auth-card a {
+  color: var(--color-primary);
+}
+
+/* [designer] 2026-09-17: a link alone on its own line is already a link by
+   position and colour, so no underline (as the prototype). A link inline in
+   a sentence ("No account? Sign up") keeps the underline: colour alone must
+   not be the only cue (WCAG 1.4.1). */
+.auth-card__standalone-link {
+  text-decoration: none;
+}
+
+.auth-card__standalone-link:hover,
+.auth-card__standalone-link:focus-visible {
+  text-decoration: underline;
 }
 
 /* A11y: standard visually-hidden (screen-reader-only) utility — grundtone
@@ -276,6 +382,32 @@ main {
 .app-sidebar--column > header,
 .app-sidebar--column > template {
   flex-shrink: 0;
+}
+
+/* Nav items ([designer] 2026-09-17, measured in the redesign prototypes).
+   Active = a translucent wash of the primary colour (R5/R7/billing variant,
+   the fleet-wide active pattern). Hover = neutral surface-alt with no colour
+   or weight change, so hover can never be mistaken for the selected item.
+   Written here because @grundtone/design-system's utilities have no hover
+   variants. */
+.app-sidebar__link {
+  display: block;
+  padding: 0.5rem;
+  border-radius: 7px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.app-sidebar__link:hover {
+  background-color: var(--color-surface-alt);
+}
+
+.app-sidebar__link--active,
+.app-sidebar__link--active:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .app-sidebar__user {
