@@ -14,5 +14,8 @@
       <slot />
     </main>
     <AppFooter />
+    <!-- Same toast host as the app shell (UX-audit finding 1): auth flows
+         (sign-up, verify, invitations) can confirm actions too. -->
+    <GTToastContainer />
   </div>
 </template>

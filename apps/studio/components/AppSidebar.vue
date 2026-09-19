@@ -61,8 +61,8 @@
   const isAuditActive = computed(() => route.path === `/orgs/${activeSlug.value}/audit`)
   const isSettingsActive = computed(() => route.path === `/orgs/${activeSlug.value}/settings`)
 
-  const linkClass = 'block p-2 rounded text-sm no-underline text-inherit hover:bg-surface-raised'
-  const activeClass = 'bg-surface-raised font-bold'
+  const linkClass = 'app-sidebar__link'
+  const activeClass = 'app-sidebar__link--active'
 </script>
 
 <template>
