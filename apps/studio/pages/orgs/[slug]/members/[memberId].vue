@@ -238,7 +238,7 @@
           v-if="inheritedProjectRole"
           class="flex items-center gap-3 px-4 py-3 bg-info-subtle border-l-4 border-l-info text-sm"
         >
-          <GTIcon name="info" size="sm" />
+          <GTIcon name="info-circle" size="sm" />
           <span>
             {{
               t('memberDetail.inheritedNotice', {
