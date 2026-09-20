@@ -154,7 +154,7 @@
         <li
           v-for="m in data.direct"
           :key="m.id"
-          class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+          class="card-row flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
         >
           <div class="flex flex-col gap-1">
             <strong>{{ m.name ?? m.email }}</strong>
@@ -180,7 +180,7 @@
         <li
           v-for="m in data?.orgMembers ?? []"
           :key="m.id"
-          class="flex justify-between items-center p-4 bg-surface border rounded-lg"
+          class="card-row flex justify-between items-center p-4 bg-surface border rounded-lg"
         >
           <div class="flex flex-col gap-1">
             <strong>{{ m.name ?? m.email }}</strong>
@@ -201,7 +201,7 @@
         <li
           v-for="inv in data!.pending"
           :key="inv.id"
-          class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+          class="card-row flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
         >
           <div class="flex flex-col gap-1">
             <strong>{{ inv.email }}</strong>

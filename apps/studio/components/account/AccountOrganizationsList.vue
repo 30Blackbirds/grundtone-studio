@@ -68,7 +68,7 @@
       <li
         v-for="org in orgs"
         :key="org.id"
-        class="flex items-center justify-between gap-4 p-4 bg-surface-raised border rounded-lg"
+        class="card-row flex items-center justify-between gap-4 p-4 bg-surface-raised border rounded-lg"
       >
         <div>
           <strong>{{ org.name }}</strong>
