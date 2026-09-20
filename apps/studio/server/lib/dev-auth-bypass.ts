@@ -12,7 +12,11 @@ import { getRequestHeader, type H3Event } from 'h3'
 //   3. the connection's PEER ADDRESS is loopback (and its Host agrees), OR the
 //      request is Nitro's own internal SSR fetch, which has no peer — and that
 //      exception is only safe because of gate 4
-//   4. the process REFUSES TO START unless it listens on loopback
+//   4. the request was not made BY A PAGE belonging to someone else
+//      (Sec-Fetch-Site) — gates 3 and 4 answer "which machine", this answers
+//      "which page", and a hostile tab in the reviewer's own browser is on the
+//      right machine
+//   5. the process REFUSES TO START unless it listens on loopback
 //      (assertBypassBindsLoopback). Gates 3 and 4 are load-bearing TOGETHER:
 //      drop 4 and a LAN visitor's page render would inherit the bypass through
 //      its own internal fetch.
@@ -196,7 +200,18 @@ export function requestRemoteAddress(event: H3Event): string | undefined {
  *
  * `__unenv__` is the marker because it is a property of the server's own mock
  * request object. A client cannot forge it: nothing from the wire reaches this
- * field, and headers and query are not consulted.
+ * field, and headers and query are not consulted — an HTTP header of that name
+ * lands in `req.headers`, never as `'__unenv__' in req`, and three cells pin
+ * exactly that distinction.
+ *
+ * 🔴 THE RUNTIME ASSUMPTION, NAMED BECAUSE THIS FILE OTHERWISE ASSERTS ITS OWN
+ * ([sikkerhed], #294): the marker's discriminating power is a property of the
+ * RUNTIME, not of the request. unenv polyfills `node:http` for non-Node
+ * presets, where EVERY request object could be unenv-shaped and the marker
+ * would stop separating anything. Under studio's Node preset it is absent for
+ * real requests — measured on the built server — but nothing here enforces the
+ * preset. Change the Nitro preset and this check must be re-measured, not
+ * assumed to have survived.
  *
  * 🔴 AND BEING INTERNAL IS NOT ENOUGH ON ITS OWN. A LAN visitor loading
  * /dashboard would produce an internal child fetch too, and allowing every
@@ -209,6 +224,45 @@ export function requestRemoteAddress(event: H3Event): string | undefined {
 export function isInternalRequest(event: H3Event): boolean {
   const req = event.node?.req as unknown as Record<string, unknown> | undefined
   return Boolean(req && '__unenv__' in req)
+}
+
+/**
+ * Sec-Fetch-Site values that mean "this request did not come from a page
+ * belonging to someone else".
+ *
+ * 🔴 THE GATE WAS TRUE FOR THE NETWORK AND FALSE FOR THE BROWSER, found by
+ * [sikkerhed] after #294 — they went looking for who ELSE sits on loopback.
+ * Gate 4 keeps strangers off the listener, but a hostile page open in the
+ * REVIEWER'S OWN browser is not a stranger to it: the browser sends from their
+ * machine, so the peer address is loopback, the Host is loopback, and the
+ * bypass needs no cookie. The endpoint then runs as the bypass user. The
+ * response cannot be read cross-origin (there are no CORS headers, and that is
+ * deliberate), but THE WRITE LANDS — and form posts and GETs with side effects
+ * need no preflight.
+ *
+ * It is worse than ordinary CSRF: normally the attack needs the victim to hold
+ * a session. Here the ORIGIN IS the session, so every tab in that browser is
+ * authenticated.
+ *
+ * `Sec-Fetch-Site` is the right instrument because a script cannot set it —
+ * `Sec-` is a forbidden header prefix, enforced by the browser, not by us. A
+ * non-browser client (curl, the SSR fetch) omits it entirely, which reads as
+ * "no page made this request".
+ *
+ * 🔴 STRICTER THAN THE ONE-LINE CURE, ON PURPOSE. [sikkerhed] proposed
+ * rejecting `cross-site`. That leaves `same-site`, and on localhost that is not
+ * empty: origins differing only by PORT are same-site but not same-origin, so a
+ * hostile page on `http://localhost:9999` would have slipped through. Allowing
+ * only `same-origin` and `none` (a user-typed navigation) closes it, and the
+ * app's own requests are same-origin by construction — measured end to end
+ * after the change, not assumed.
+ */
+const ALLOWED_FETCH_SITES = new Set(['same-origin', 'none'])
+
+export function isSameOriginRequest(event: H3Event): boolean {
+  const site = getRequestHeader(event, 'sec-fetch-site')
+  if (!site) return true
+  return ALLOWED_FETCH_SITES.has(site.trim().toLowerCase())
 }
 
 // 🔴 `process.env['NODE_ENV']`, NOT `process.env.NODE_ENV`, AND THE BRACKETS
@@ -265,6 +319,10 @@ export function devAuthBypassEnabled(event: H3Event): boolean {
   // Nitro's own SSR fetch has no peer to observe; the listener is what
   // guarantees locality there (assertBypassBindsLoopback). Everything off the
   // wire must still prove where it came from.
+  // A page belonging to someone else must not be able to act as the reviewer,
+  // even from their own machine. Checked BEFORE the internal shortcut so the
+  // ordering cannot be read as "internal wins".
+  if (!isSameOriginRequest(event)) return false
   if (isInternalRequest(event)) return true
   if (!isLoopbackAddress(requestRemoteAddress(event))) return false
   return isLoopbackHost(requestHostHeader(event))
