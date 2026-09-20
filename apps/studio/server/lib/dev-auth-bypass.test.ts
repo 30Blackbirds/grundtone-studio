@@ -8,6 +8,10 @@ import {
   devAuthBypassEnabled,
   isLoopbackHost,
   isLoopbackAddress,
+  isInternalRequest,
+  requestRemoteAddress,
+  assertBypassBindsLoopback,
+  DEV_AUTH_BYPASS_NOT_LOOPBACK_BOUND,
 } from './dev-auth-bypass'
 
 // Riff: the local design-review bypass. These cells exist for one reason —
@@ -235,5 +239,117 @@ describe('the leak assertion', () => {
     expect(() =>
       assertBypassNotLeaked({ NODE_ENV: 'development', STUDIO_DEV_AUTH_BYPASS: '1' }),
     ).not.toThrow()
+  })
+})
+
+// 🔴 THE INTERNAL SSR FETCH, and the defect the socket gate introduced.
+// Measured with a probe on the BUILT server, because the shape of an internal
+// event is exactly the thing one would otherwise guess wrong:
+//   /dashboard      remote "::1", no __unenv__     (a real request)
+//   /api/dashboard  remote "",    has __unenv__    (the page fetching itself)
+// The empty string is why the socket gate denied it: it is not undefined, and
+// it is not an address either.
+describe('the internal SSR fetch', () => {
+  const internal = (host: string | undefined = 'localhost:3024') =>
+    ({
+      node: {
+        req: { headers: host ? { host } : {}, socket: { remoteAddress: '' }, __unenv__: {} },
+      },
+      headers: new Headers(host ? { host } : {}),
+    }) as unknown as H3Event
+
+  it('is recognised by a marker the HTTP layer never sets from the wire', () => {
+    expect(isInternalRequest(internal())).toBe(true)
+    expect(isInternalRequest(eventFrom('localhost:3024', '127.0.0.1'))).toBe(false)
+  })
+
+  // 🔴 THE EMPTY STRING IS THE POINT, and it has its own cell so nobody
+  // "tidies" it into undefined later. An internal event's remoteAddress is
+  // `''` — not missing, not an address. `requestRemoteAddress` normalises it to
+  // undefined, which is why the socket gate refused it and why the marker, not
+  // the address, has to decide this case.
+  it('reports an EMPTY remote address, not a missing one', () => {
+    const e = internal()
+    expect(
+      (e as unknown as { node: { req: { socket: { remoteAddress: string } } } }).node.req.socket
+        .remoteAddress,
+    ).toBe('')
+    expect(requestRemoteAddress(e)).toBeUndefined()
+    expect(isLoopbackAddress('')).toBe(false)
+  })
+
+  it('is allowed, because the page it renders was already gated at the listener', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(internal())).toBe(true)
+  })
+
+  it('still needs the environment gates — internal is not a master key', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(internal())).toBe(false)
+
+    process.env.NODE_ENV = 'development'
+    delete process.env.STUDIO_DEV_AUTH_BYPASS
+    expect(devAuthBypassEnabled(internal())).toBe(false)
+  })
+
+  // 🔴 A CLIENT MUST NOT BE ABLE TO CLAIM IT. The marker is a property of the
+  // server's own mock request object; nothing from the wire reaches it. These
+  // are the shapes an attacker controls.
+  it('cannot be claimed from the wire', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    const forged = (headers: Record<string, string>) =>
+      ({
+        node: { req: { headers, socket: { remoteAddress: '192.168.1.40' } } },
+        headers: new Headers(headers),
+      }) as unknown as H3Event
+    const attempts: Record<string, string>[] = [
+      { host: 'localhost', __unenv__: '1' },
+      { host: 'localhost', 'x-unenv': '1' },
+      { host: 'localhost', 'x-internal': 'true' },
+    ]
+    for (const headers of attempts) {
+      expect(devAuthBypassEnabled(forged(headers)), JSON.stringify(headers)).toBe(false)
+    }
+  })
+})
+
+// 🔴 GATE 4. The internal-fetch exception is only safe because no stranger can
+// reach the listener at all. [sikkerhed] named this as an unasserted assumption
+// on #292 — and Nitro's default bind is 0.0.0.0, so it was not even likely.
+describe('the loopback-bind assertion', () => {
+  it('refuses to start a bypassed server bound to every interface', () => {
+    for (const host of ['0.0.0.0', '::', '192.168.1.171', undefined]) {
+      expect(
+        () => assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', HOST: host }),
+        String(host),
+      ).toThrow(DEV_AUTH_BYPASS_NOT_LOOPBACK_BOUND)
+    }
+  })
+
+  it('names the host it found, so the message is actionable', () => {
+    expect(() =>
+      assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', HOST: '0.0.0.0' }),
+    ).toThrow(/HOST=0\.0\.0\.0/)
+    expect(() => assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1' })).toThrow(/HOST=unset/)
+  })
+
+  it('accepts the loopback spellings, and NITRO_HOST as the alternative name', () => {
+    for (const host of ['127.0.0.1', 'localhost', '::1']) {
+      expect(() =>
+        assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', HOST: host }),
+      ).not.toThrow()
+    }
+    expect(() =>
+      assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', NITRO_HOST: '127.0.0.1' }),
+    ).not.toThrow()
+  })
+
+  // Without the bypass there is nothing to protect, and a server bound to
+  // 0.0.0.0 is the normal production case.
+  it('says nothing when the bypass is off', () => {
+    expect(() => assertBypassBindsLoopback({ HOST: '0.0.0.0' })).not.toThrow()
   })
 })

@@ -9,7 +9,13 @@ import { getRequestHeader, type H3Event } from 'h3'
 // 🔴 THREE GATES, ALL REQUIRED, AND THE LAST ONE IS NOT AN ENV VAR.
 //   1. NODE_ENV === 'development'
 //   2. STUDIO_DEV_AUTH_BYPASS === '1'      (explicit, never implied by (1))
-//   3. the connection's PEER ADDRESS is loopback (and its Host agrees)
+//   3. the connection's PEER ADDRESS is loopback (and its Host agrees), OR the
+//      request is Nitro's own internal SSR fetch, which has no peer — and that
+//      exception is only safe because of gate 4
+//   4. the process REFUSES TO START unless it listens on loopback
+//      (assertBypassBindsLoopback). Gates 3 and 4 are load-bearing TOGETHER:
+//      drop 4 and a LAN visitor's page render would inherit the bypass through
+//      its own internal fetch.
 // (1) and (2) are deliberately independent: a development build that someone
 // runs elsewhere still needs the explicit opt-in, and setting the variable in a
 // non-development build does not open anything — it makes the process REFUSE TO
@@ -47,6 +53,32 @@ export function assertBypassNotLeaked(env: NodeJS.ProcessEnv = process.env): voi
 }
 
 assertBypassNotLeaked()
+
+export const DEV_AUTH_BYPASS_NOT_LOOPBACK_BOUND =
+  'STUDIO_DEV_AUTH_BYPASS=1 requires HOST (or NITRO_HOST) to be a loopback address — ' +
+  'refusing to start a bypassed server that other machines can reach'
+
+/**
+ * 🔴 THE BYPASS MAY ONLY RUN ON A SERVER NOBODY ELSE CAN REACH, and this
+ * assertion is what turns that from an assumption into a fact.
+ *
+ * [sikkerhed] named the assumption on #292: what I called the real protection —
+ * "the server is only bound locally" — was asserted nowhere, in a codebase that
+ * otherwise asserts its assumptions and kills the process when they break. And
+ * Nitro's default bind is `0.0.0.0`, so it was not even the likely case.
+ *
+ * It carries weight the per-request gate cannot: an internal SSR fetch has no
+ * peer address to check (see `isInternalRequest`), so the guarantee that the
+ * page render was asked for by a local caller must come from the LISTENER, not
+ * from the child request. A positively declared loopback HOST is that guarantee
+ * — the port opens only for a value someone stated, never by default.
+ */
+export function assertBypassBindsLoopback(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.STUDIO_DEV_AUTH_BYPASS !== '1') return
+  const host = env.HOST ?? env.NITRO_HOST
+  if (host === 'localhost' || isLoopbackAddress(host)) return
+  throw new Error(`${DEV_AUTH_BYPASS_NOT_LOOPBACK_BOUND} (HOST=${host ?? 'unset'})`)
+}
 
 // Synthetic identity. The ids are not UUIDs on purpose: they are unmistakable
 // in a log, a database row or a screenshot, so no one can confuse a seeded
@@ -142,6 +174,43 @@ export function requestRemoteAddress(event: H3Event): string | undefined {
   return address && address.length > 0 ? address : undefined
 }
 
+/**
+ * Is this event Nitro's own internal fetch rather than something off the wire?
+ *
+ * 🔴 WHY IT HAD TO EXIST, and it is a defect the socket gate introduced.
+ * Measured on the built server with a probe, because guessing the shape of an
+ * internal event is exactly the kind of thing that produces a plausible wrong
+ * answer:
+ *
+ *   /dashboard      hasSocket: true, remote: "::1", reqKeys: [... socket ...]
+ *   /api/dashboard  hasSocket: true, remote: "",    reqKeys: [... __unenv__ ...]
+ *
+ * The second is the SSR data fetch the page makes about itself. It is not a TCP
+ * connection, so it has no peer address — `remoteAddress` is the EMPTY STRING,
+ * not undefined — and the socket gate denied it. The endpoint answered 401, the
+ * dashboard's org list came back empty, and `onMounted` then sent the visitor
+ * to /onboarding because "this user has no organizations". [designer] found it
+ * on a HARD LOAD; client-side navigation is a real request with a real socket,
+ * which is why my own verification missed it: I measured the hydrated DOM, not
+ * what the server sent.
+ *
+ * `__unenv__` is the marker because it is a property of the server's own mock
+ * request object. A client cannot forge it: nothing from the wire reaches this
+ * field, and headers and query are not consulted.
+ *
+ * 🔴 AND BEING INTERNAL IS NOT ENOUGH ON ITS OWN. A LAN visitor loading
+ * /dashboard would produce an internal child fetch too, and allowing every
+ * internal request would hand them the data the parent request was refused.
+ * What closes that is `assertBypassBindsLoopback`: with the bypass on, the
+ * process refuses to start unless it listens on loopback, so there is no LAN
+ * visitor to inherit anything. The two guards are load-bearing TOGETHER —
+ * remove the bind assertion and this one becomes a hole.
+ */
+export function isInternalRequest(event: H3Event): boolean {
+  const req = event.node?.req as unknown as Record<string, unknown> | undefined
+  return Boolean(req && '__unenv__' in req)
+}
+
 // 🔴 `process.env['NODE_ENV']`, NOT `process.env.NODE_ENV`, AND THE BRACKETS
 // ARE LICENSED BY A MEASUREMENT — do not "tidy" them away.
 //
@@ -186,9 +255,17 @@ export function requestRemoteAddress(event: H3Event): string | undefined {
 // I had even named this risk in my own message — "a proxy that sets Host on
 // behalf of a stranger" — and then left it open. Naming a hazard is not closing
 // it.
+// Runs at module load, next to the leak assertion: the two together are what
+// let an internal request be trusted at all.
+assertBypassBindsLoopback()
+
 export function devAuthBypassEnabled(event: H3Event): boolean {
   if (process.env['NODE_ENV'] !== 'development') return false
   if (process.env['STUDIO_DEV_AUTH_BYPASS'] !== '1') return false
+  // Nitro's own SSR fetch has no peer to observe; the listener is what
+  // guarantees locality there (assertBypassBindsLoopback). Everything off the
+  // wire must still prove where it came from.
+  if (isInternalRequest(event)) return true
   if (!isLoopbackAddress(requestRemoteAddress(event))) return false
   return isLoopbackHost(requestHostHeader(event))
 }
