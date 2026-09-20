@@ -9,6 +9,7 @@ import {
   isLoopbackHost,
   isLoopbackAddress,
   isInternalRequest,
+  isSameOriginRequest,
   requestRemoteAddress,
   assertBypassBindsLoopback,
   DEV_AUTH_BYPASS_NOT_LOOPBACK_BOUND,
@@ -351,5 +352,85 @@ describe('the loopback-bind assertion', () => {
   // 0.0.0.0 is the normal production case.
   it('says nothing when the bypass is off', () => {
     expect(() => assertBypassBindsLoopback({ HOST: '0.0.0.0' })).not.toThrow()
+  })
+})
+
+// 🔴 GATE 4: WHICH PAGE, NOT WHICH MACHINE. [sikkerhed] found the hole after
+// #294 by asking who ELSE sits on loopback. A hostile page open in the
+// reviewer's own browser is not a stranger to the listener: the browser sends
+// from their machine, the peer address is loopback, the Host is loopback, and
+// the bypass needs no cookie — so the endpoint ran as the bypass user. The
+// response is unreadable cross-origin, but THE WRITE LANDS, and a form post
+// needs no preflight. Worse than ordinary CSRF: the origin IS the session, so
+// every tab in that browser was authenticated.
+describe('the cross-origin gate', () => {
+  const fromPage = (site: string | undefined) =>
+    ({
+      node: {
+        req: {
+          headers:
+            site === undefined
+              ? { host: 'localhost:3020' }
+              : { host: 'localhost:3020', 'sec-fetch-site': site },
+          socket: { remoteAddress: '127.0.0.1' },
+        },
+      },
+      headers: new Headers({}),
+    }) as unknown as H3Event
+
+  it('refuses a request made by a page from another origin', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(fromPage('cross-site'))).toBe(false)
+  })
+
+  // 🔴 STRICTER THAN THE PROPOSED CURE, AND THE CELL SAYS WHY. Rejecting only
+  // `cross-site` leaves `same-site`, which on localhost is not empty: origins
+  // differing only by PORT are same-site. A hostile page on localhost:9999
+  // would have walked through the one-line version.
+  it('refuses same-site too, because a different PORT is same-site on localhost', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(fromPage('same-site'))).toBe(false)
+  })
+
+  it("allows the app's own requests and a user-typed navigation", () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(fromPage('same-origin')), 'same-origin').toBe(true)
+    expect(devAuthBypassEnabled(fromPage('none')), 'none').toBe(true)
+  })
+
+  // A non-browser client omits the header entirely. Treating absence as a
+  // refusal would break curl, the SSR fetch and every measurement in this file.
+  it('allows a request with no Sec-Fetch-Site at all', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(fromPage(undefined))).toBe(true)
+    expect(isSameOriginRequest(fromPage(undefined))).toBe(true)
+  })
+
+  it('is case- and whitespace-insensitive, as header values are', () => {
+    expect(isSameOriginRequest(fromPage(' Same-Origin '))).toBe(true)
+    expect(isSameOriginRequest(fromPage('CROSS-SITE'))).toBe(false)
+  })
+
+  // 🔴 ORDER MATTERS AND IS PINNED: the cross-origin check runs BEFORE the
+  // internal shortcut, so "internal" can never be read as a way past it.
+  it('refuses a cross-site request even if it also looks internal', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    const both = {
+      node: {
+        req: {
+          headers: { host: 'localhost:3020', 'sec-fetch-site': 'cross-site' },
+          socket: { remoteAddress: '' },
+          __unenv__: {},
+        },
+      },
+      headers: new Headers({}),
+    } as unknown as H3Event
+    expect(isInternalRequest(both)).toBe(true)
+    expect(devAuthBypassEnabled(both)).toBe(false)
   })
 })
