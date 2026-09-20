@@ -359,7 +359,8 @@
       "retry": "Try again",
       "finish": "Go to your project"
     },
-    "stepAnnouncement": "Step {current} of {total}: {label}"
+    "stepAnnouncement": "Step {current} of {total}: {label}",
+    "stepLabel": "Step {current} of {total} — {title}"
   },
   "changelog": {
     "title": "What's new",

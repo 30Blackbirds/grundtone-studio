@@ -45,12 +45,11 @@
 
 <template>
   <form class="flex flex-col gap-6" @submit.prevent="submit">
-    <header class="flex flex-col gap-2">
-      <h1 class="m-0">{{ t('onboarding.project.title') }}</h1>
-      <p class="text-tertiary m-0">
-        {{ t('onboarding.project.subtitle', { org: state.orgName }) }}
-      </p>
-    </header>
+    <OnboardingStepHeader
+      icon="folder"
+      :title="t('onboarding.project.title')"
+      :subtitle="t('onboarding.project.subtitle', { org: state.orgName })"
+    />
 
     <div class="flex flex-col gap-4">
       <GTInput

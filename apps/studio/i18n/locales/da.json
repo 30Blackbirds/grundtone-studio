@@ -359,7 +359,8 @@
       "retry": "Prøv igen",
       "finish": "Gå til dit projekt"
     },
-    "stepAnnouncement": "Trin {current} af {total}: {label}"
+    "stepAnnouncement": "Trin {current} af {total}: {label}",
+    "stepLabel": "Trin {current} af {total} — {title}"
   },
   "changelog": {
     "title": "Hvad er nyt",

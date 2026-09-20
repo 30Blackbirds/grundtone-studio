@@ -38,10 +38,11 @@
 
 <template>
   <form class="flex flex-col gap-6" @submit.prevent="submit">
-    <header class="flex flex-col gap-2">
-      <h1 class="m-0">{{ t('onboarding.org.title') }}</h1>
-      <p class="text-tertiary m-0">{{ t('onboarding.org.subtitle') }}</p>
-    </header>
+    <OnboardingStepHeader
+      icon="users"
+      :title="t('onboarding.org.title')"
+      :subtitle="t('onboarding.org.subtitle')"
+    />
 
     <div class="flex flex-col gap-4">
       <GTInput

@@ -46,10 +46,11 @@
 
 <template>
   <div class="flex flex-col gap-6">
-    <header class="flex flex-col gap-2">
-      <h1 class="m-0">{{ t('onboarding.install.title') }}</h1>
-      <p class="text-tertiary m-0">{{ t('onboarding.install.subtitle') }}</p>
-    </header>
+    <OnboardingStepHeader
+      icon="check-circle"
+      :title="t('onboarding.install.title')"
+      :subtitle="t('onboarding.install.subtitle')"
+    />
 
     <GTAlert
       v-if="status === 'publishing'"

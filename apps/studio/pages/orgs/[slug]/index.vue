@@ -134,12 +134,11 @@
         </div>
       </NuxtLink>
     </div>
-    <div v-else class="p-6 bg-surface-raised border rounded-lg">
-      <p class="m-0 mb-2 text-tertiary">{{ t('projects.empty') }}</p>
+    <EmptyState v-else icon="folder" :title="t('projects.empty')">
       <GTButton variant="secondary" size="sm" @click="showCreate = true">
         {{ t('dashboard.noProjectsCta') }}
       </GTButton>
-    </div>
+    </EmptyState>
 
     <GTModal :open="showCreate" :title="t('projects.new')" @update:open="showCreate = $event">
       <form id="create-project-form" class="flex flex-col gap-4" @submit.prevent="create">
