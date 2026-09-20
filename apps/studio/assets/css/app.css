@@ -282,6 +282,29 @@ main {
   gap: 1.5rem;
 }
 
+/* 🔴 A KEY PREFIX IS ONE UNBREAKABLE WORD. `min-width: 0` lets the flex item
+   shrink, but `gt_pub_devbypass…` has no space to break at, so its min-content
+   width still pushed Revoke off the screen at 375 ([designer], KH-1023 —
+   measured 67px, and 79px still remained after the flex fix alone).
+   `anywhere` rather than `break-word`: the latter only breaks when the word
+   alone overflows its own line box, which is not the case inside a row that is
+   itself being squeezed. */
+.api-key__prefix {
+  overflow-wrap: anywhere;
+}
+
+/* 🔴 A GRID ITEM DEFAULTS TO `min-width: auto`, SO A WIDE CHILD PUSHES THE
+   TRACK PAST THE CONTAINER instead of shrinking. Without this the token editor
+   overflowed the page horizontally at 375 ([designer], KH-1023).
+   Measured, and the reason this line is not presented as the fix: on its own it
+   took the editor's overflow from 445px to 295px — a third. The rest came from
+   three separate rows that could not wrap, each corrected where it lives. A
+   smaller overflow is harder to notice than the original, so shipping only this
+   would have made the defect worse to find. */
+.editor-layout > * {
+  min-width: 0;
+}
+
 .editor-layout__preview {
   position: sticky;
   top: 5rem; /* clears the sticky app-shell header */

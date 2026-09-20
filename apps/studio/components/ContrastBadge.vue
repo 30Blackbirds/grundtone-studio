@@ -31,7 +31,7 @@
 </script>
 
 <template>
-  <div class="flex items-center gap-3 p-3 border rounded-lg bg-surface-raised">
+  <div class="flex flex-wrap items-center gap-3 p-3 border rounded-lg bg-surface-raised">
     <span
       class="contrast-swatch"
       :style="{ background: bg ?? 'transparent', color: fg ?? 'inherit' }"
