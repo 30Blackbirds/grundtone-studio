@@ -253,11 +253,11 @@
         <li
           v-for="k in activeKeys"
           :key="k.id"
-          class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+          class="flex justify-between items-center gap-3 p-4 bg-surface-raised border rounded-lg"
         >
-          <div class="flex flex-col gap-1">
-            <span class="flex items-center gap-2">
-              <code class="font-mono text-sm">{{ k.keyPrefix }}…</code>
+          <div class="flex flex-col gap-1 min-w-0">
+            <span class="flex flex-wrap items-center gap-2 min-w-0">
+              <code class="api-key__prefix font-mono text-sm">{{ k.keyPrefix }}…</code>
               <GTBadge v-if="k.keyType === 'secret'" variant="warning">
                 {{ t('apiKeys.secretBadge') }}
               </GTBadge>

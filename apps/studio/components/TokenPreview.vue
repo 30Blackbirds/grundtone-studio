@@ -48,13 +48,13 @@
     <p class="text-secondary">Editor-changes apply live to this isolated container.</p>
 
     <div class="flex flex-col gap-4 mt-6">
-      <div class="flex gap-3">
+      <div class="flex flex-wrap gap-3">
         <GTButton variant="primary">Primary</GTButton>
         <GTButton variant="secondary">Secondary</GTButton>
         <GTButton variant="outlined">Outlined</GTButton>
       </div>
 
-      <div class="flex gap-3">
+      <div class="flex flex-wrap gap-3">
         <GTBadge variant="info">info</GTBadge>
         <GTBadge variant="success">success</GTBadge>
         <GTBadge variant="warning">warning</GTBadge>
