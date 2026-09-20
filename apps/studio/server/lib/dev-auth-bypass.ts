@@ -261,6 +261,31 @@ const ALLOWED_FETCH_SITES = new Set(['same-origin', 'none'])
 
 export function isSameOriginRequest(event: H3Event): boolean {
   const site = getRequestHeader(event, 'sec-fetch-site')
+  // 🔴 ABSENT HEADER = ALLOWED, AND THAT BRANCH HAS TWO KNOWN RESIDUALS.
+  // They are written here rather than left in a review thread, because this
+  // line reads like an oversight and is not: curl and Nitro's own SSR fetch
+  // both omit the header, and closing this branch would break the internal
+  // render and every local script.
+  //
+  // Named by [sikkerhed] on #294. Their browser-version numbers are THEIRS —
+  // I have not measured them, and the residuals stand whatever the exact
+  // versions are:
+  //
+  //   1. A BROWSER OLD ENOUGH NOT TO SEND IT ([sikkerhed]: Safari before 16.4,
+  //      Firefox before 90) falls into this branch, so for that browser the
+  //      cross-origin write described above is NOT closed. The other three
+  //      gates still hold — development, the explicit variable, a loopback
+  //      peer — so the exposure is a hostile page open in an OLD browser on
+  //      the reviewer's own machine.
+  //   2. ANY NON-BROWSER PROCESS ON THAT MACHINE passes: it omits the header
+  //      and its peer address is loopback. That is not a hole this gate can
+  //      close — it is the premise of the whole feature, which trusts the
+  //      reviewer's own machine. Stated so nobody later reads gate 3 as
+  //      protection against local software.
+  //
+  // Neither is cured, deliberately. Curing (1) means requiring the header,
+  // which denies curl and the SSR fetch — the accept set, not just the reject
+  // set. Curing (2) is not possible without abandoning the premise.
   if (!site) return true
   return ALLOWED_FETCH_SITES.has(site.trim().toLowerCase())
 }
@@ -309,9 +334,31 @@ export function isSameOriginRequest(event: H3Event): boolean {
 // I had even named this risk in my own message — "a proxy that sets Host on
 // behalf of a stranger" — and then left it open. Naming a hazard is not closing
 // it.
-// Runs at module load, next to the leak assertion: the two together are what
-// let an internal request be trusted at all.
-assertBypassBindsLoopback()
+// 🔴 NOT CALLED HERE. It runs from server/plugins/dev-auth-bypass-bind.ts,
+// when Nitro starts — because the thing it asserts is about a LISTENER, and
+// this module is imported by things that never open one.
+//
+// MEASURED (the reason it moved): `pnpm db:seed` with the bypass on and HOST
+// unset died with "refusing to start a bypassed server that other machines can
+// reach". A seed opens no port. The assertion was true about the variable and
+// FALSE ABOUT THE PROCESS, and the workaround it forced — setting HOST=127.0.0.1
+// on a script that does not bind — teaches a reviewer that the value is a
+// formality. A guard people learn to satisfy without meaning it is on its way
+// to being switched off.
+//
+// WHAT THIS COSTS, stated rather than glossed: an assertion at module scope ran
+// because the module was IMPORTED, and nobody could remove it without removing
+// the import. This one runs because a plugin file exists, and deleting that
+// file would fail OPEN — the bypass would then run on a 0.0.0.0-bound server
+// with nothing complaining. That is a worse failure direction than the one it
+// replaces, so it is not left to discipline: a cell in dev-auth-bypass.test.ts
+// reads server/plugins/ and fails if no plugin calls it.
+//
+// `assertBypassNotLeaked()` above stays at module scope on purpose. Its subject
+// is the ENVIRONMENT, not a listener, so importing the module really is the
+// right trigger — and server/db/seed.ts depends on exactly that: the seed
+// refuses to run with the bypass variable set outside development, with the
+// same message the server gives.
 
 export function devAuthBypassEnabled(event: H3Event): boolean {
   if (process.env['NODE_ENV'] !== 'development') return false
