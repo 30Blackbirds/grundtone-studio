@@ -198,6 +198,30 @@
       ]"
     >
       <GTTabPanel id="tokens">
+        <!-- 🔴 THE PUBLISH BAR (KH-1029, redesign-brand-assets.html). It says
+             what state this tab's content is in and that the three things in
+             it — colours, logo, fonts — are ONE draft. The prototype puts it
+             directly under the tab bar, above the first card, because the note
+             is about everything below it and not about the brand section alone.
+
+             🔴 IT CARRIES NO PUBLISH BUTTON, AND THE PROTOTYPE HAS ONE. Publish
+             already lives in the page header a few centimetres above, together
+             with Discard and Save draft, and a second button firing the same
+             action is a usability decision rather than an implementation
+             detail — two publish buttons on one screen invite the question of
+             whether they do the same thing. The riff's gap list names "the
+             pubbar with 'Kladde' badge and the note", not the button.
+             [designer] decides whether the action should be duplicated here. -->
+        <div v-if="canEdit || hasDraft" class="pubbar">
+          <strong class="pubbar__title">{{ t('project.tabTokens') }}</strong>
+          <GTBadge v-if="isDirty || hasDraft" variant="warning" size="sm">
+            {{ t('dashboard.status.draft') }}
+          </GTBadge>
+          <span class="pubbar__note text-tertiary">
+            {{ t('brandAssets.publishTogetherNote') }}
+          </span>
+        </div>
+
         <!-- In-app-hjælp v1 (launch-krav: self-serve-support): publicerings-
              flowet er support-driver #1 — forklaringen bor hvor beslutningen
              tages, ikke i et eksternt dok. -->

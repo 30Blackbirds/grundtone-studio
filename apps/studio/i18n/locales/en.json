@@ -570,7 +570,8 @@
     "budgetFull": "Max 4 font files in total across the two font slots — remove one to add another.",
     "previewTitle": "Live preview — combined brand context",
     "previewSub": "How Font 1 (heading) and Font 2 (body) play together.",
-    "budgetCounter": "{used} of {max} font files used"
+    "budgetCounter": "{used} of {max} font files used",
+    "publishTogetherNote": "Logo and fonts publish TOGETHER with the colours — one draft, one click."
   },
   "contrast": {
     "unparseable": "Can't read this color — use #RRGGBB",
