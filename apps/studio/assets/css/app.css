@@ -512,6 +512,15 @@ main {
   margin-top: -1.5rem; /* sits close under the card's bottom margin */
 }
 
+/* The way back out of a shell-less informational page ([designer], KH-1027).
+   `align-self: flex-start` because the parent centres its children: without it
+   the link would sit under the page title in the middle of the column, reading
+   as part of the content rather than as a way out of it. */
+.auth-shell__back {
+  align-self: flex-start;
+  margin: 1.5rem 0 0 1.5rem;
+}
+
 .auth-card {
   width: 100%;
   max-width: 21.25rem; /* 340px, R9 prototype au__card */

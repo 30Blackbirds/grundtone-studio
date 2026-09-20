@@ -247,7 +247,8 @@
       "mismatch": "Adgangskoderne matcher ikke.",
       "requestNewLink": "Anmod om nyt link",
       "error": "Kunne ikke opdatere adgangskode"
-    }
+    },
+    "backToSignIn": "Tilbage til log ind"
   },
   "orgs": {
     "title": "Organisationer",

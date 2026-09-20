@@ -73,6 +73,35 @@ export function isAuthPath(path: string): boolean {
   return AUTH_PATHS.has(path)
 }
 
+// The paths that are public because a flow LANDS there — a mail link, a reset
+// token. They are mid-journey: the visitor has somewhere to go next, and a
+// "back" control would compete with it.
+const FLOW_PATHS: ReadonlySet<string> = new Set([
+  '/verify-email',
+  '/verify',
+  '/verify/done',
+  '/forgot-password',
+  '/reset-password',
+])
+
+/**
+ * A public page a visitor READS rather than passes through — the footer's
+ * destinations.
+ *
+ * 🔴 WHY IT EXISTS ([designer], KH-1027): the shell-less public layout has no
+ * way back. A visitor clicks /dpa in the footer of /login and is stranded:
+ * there is no sidebar, no header, no link home. Measured: /dpa has none today.
+ * The set is DERIVED here — public, minus the auth entry points, minus the
+ * mid-flow landings — rather than listed in the layout, so a new footer page
+ * inherits the way back instead of quietly not having one. The cell in
+ * auth-decision.test.ts pins it against the footer's actual links.
+ */
+export function isInformationalPath(path: string): boolean {
+  if (!isPublicPath(path)) return false
+  if (isAuthPath(path)) return false
+  return !FLOW_PATHS.has(path)
+}
+
 /**
  * Resolve the auth-aware redirect for a navigation. Pure — no I/O.
  *

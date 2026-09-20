@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAuthPath, isPublicPath, resolveAuthAction } from './auth-decision'
+import { isAuthPath, isInformationalPath, isPublicPath, resolveAuthAction } from './auth-decision'
 
 describe('isPublicPath', () => {
   it.each([
@@ -182,6 +182,52 @@ describe('unauthed reachability (drift guard)', () => {
         resolveAuthAction({ path, fullPath: path, authed: false }),
         `${path} is linked from the footer shown on /login, so it must not redirect`,
       ).toEqual({ type: 'allow' })
+    }
+  })
+
+  // 🔴 SAME DENOMINATOR, SECOND QUESTION. The footer decides which pages an
+  // unauthed visitor can REACH; this cell decides which of them can get BACK.
+  // [designer], KH-1027: a visitor clicks /dpa in the footer of /login and is
+  // stranded — the shell-less layout has no sidebar, no header, no link home,
+  // and /dpa has no way out today. Deriving the set from the footer means a new
+  // footer page inherits the way back instead of quietly not having one.
+  it('every internal footer destination also gets a way back', async () => {
+    const { readFileSync } = await import('node:fs')
+    const footer = readFileSync(new URL('../components/AppFooter.vue', import.meta.url), 'utf8')
+    const links = [...new Set([...footer.matchAll(/to="(\/[^"]*)"/g)].map((m) => m[1]!))]
+
+    expect(links.length, 'no internal footer links found; the reader is broken').toBeGreaterThan(3)
+
+    for (const path of links) {
+      expect(
+        isInformationalPath(path),
+        `${path} is reachable from the footer of /login, so it must carry a way back`,
+      ).toBe(true)
+    }
+  })
+
+  // The other direction, and the reason the predicate is not just
+  // `isPublicPath`: on these the visitor is going FORWARD, and a competing
+  // "back" control is worse than none.
+  it('gives no way back on the auth entry points or the mid-flow landings', () => {
+    for (const path of [
+      '/login',
+      '/signup',
+      '/verify',
+      '/verify/done',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+    ]) {
+      expect(isInformationalPath(path), path).toBe(false)
+    }
+  })
+
+  it('gives no way back on a path that is not public at all', () => {
+    // Otherwise the layout would offer "back to sign in" on a page only a
+    // signed-in visitor can see.
+    for (const path of ['/dashboard', '/account', '/orgs/acme']) {
+      expect(isInformationalPath(path), path).toBe(false)
     }
   })
 
