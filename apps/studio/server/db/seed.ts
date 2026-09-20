@@ -148,6 +148,57 @@ async function seedDesignReviewRows(orgId: string, actorId: string, projectId: s
     console.log('✓ 4 audit rows, so the audit log has something to render')
   }
 
+  // 🔴 A PROJECT WITH NO PUBLISHED CONFIG IS A STATE THE PRODUCT CANNOT REACH
+  // ALONGSIDE THESE AUDIT ROWS, and [designer] spotted the contradiction before
+  // I did: the card showed no token count, the stats said Published 0 and
+  // "Since publish —", while the activity list said "Published configuration
+  // 2 hr. ago". Measured in the code: tokenCount, status and the swatch colour
+  // ALL come from the activeVersion -> configVersion join, and my first seed
+  // created neither. The audit rows were written straight to the table, so they
+  // described a project state that did not exist.
+  //
+  // Fixture data a designer JUDGES has to be internally consistent, or they
+  // spend their attention deciding whether a contradiction is the product.
+  const versions = await db
+    .select()
+    .from(schema.configVersion)
+    .where(eq(schema.configVersion.projectId, projectId))
+  if (versions.length === 0) {
+    const publishedAt = new Date(Date.now() - 2 * 3_600_000) // matches the audit row
+    const [version] = await db
+      .insert(schema.configVersion)
+      .values({
+        projectId,
+        version: 1,
+        status: 'published',
+        publishedAt,
+        publishedBy: actorId,
+        publishedByEmail: DEV_BYPASS_USER.email,
+        tokensJson: {
+          colors: {
+            primary: '#3b5bdb',
+            secondary: '#5c7cfa',
+            background: '#ffffff',
+            surface: '#f8f9fa',
+            text: '#212529',
+          },
+          typography: { fontFamily: { base: 'IBM Plex Sans', mono: 'IBM Plex Mono' } },
+          radius: { sm: '4px', md: '8px', lg: '12px' },
+        },
+      })
+      .returning()
+    if (version) {
+      await db.insert(schema.activeVersion).values({
+        projectId,
+        configVersionId: version.id,
+        activatedAt: publishedAt,
+        activatedBy: actorId,
+        activatedByEmail: DEV_BYPASS_USER.email,
+      })
+      console.log('✓ 1 published config version + active pointer')
+    }
+  }
+
   const keys = await db.select().from(schema.apiKey).where(eq(schema.apiKey.projectId, projectId))
   if (keys.length === 0) {
     await db.insert(schema.apiKey).values({
