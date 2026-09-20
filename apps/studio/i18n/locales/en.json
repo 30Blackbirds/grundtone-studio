@@ -247,7 +247,8 @@
       "mismatch": "Passwords do not match.",
       "requestNewLink": "Request a new link",
       "error": "Could not update password"
-    }
+    },
+    "backToSignIn": "Back to sign in"
   },
   "orgs": {
     "title": "Organizations",
