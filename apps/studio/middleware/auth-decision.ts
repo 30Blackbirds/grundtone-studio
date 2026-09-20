@@ -36,6 +36,14 @@ const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   '/verify/done',
   '/forgot-password',
   '/reset-password',
+  // 🔴 The footer links here from the AUTH layout too, so an unauthed visitor
+  // on /login can click it — and the API behind it sets
+  // `Cache-Control: public, max-age=300` and performs no auth check. Three
+  // signals said public; only this list said otherwise, and it won on the
+  // client while the server rendered the page 200. Found by [designer] on a
+  // fresh-tab load: /changelog redirected to /login?redirect=/changelog while
+  // curl returned the content.
+  '/changelog',
   '/privacy',
   '/dpa',
   '/sub-processors',
