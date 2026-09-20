@@ -14,6 +14,19 @@ export default defineNuxtConfig({
   // with "[nuxt] instance unavailable". Client rendering sidesteps that class;
   // /api/* stays protected by the Nitro auth middleware regardless.
   routeRules: {
+    // 🔴 A SERVER REDIRECT, BECAUSE THE CLIENT ONE PRODUCED A HYDRATION
+    // MISMATCH (KH-1034, found by [designer] on the root path). `pages/index.vue`
+    // called `navigateTo('/dashboard')` inside `onMounted` — client-only by
+    // construction — so the server rendered `<p>Loading…</p>`, the client
+    // hydrated it and immediately navigated somewhere else. Two different trees
+    // at the same position is the definition of the mismatch.
+    // Measured on the served build before the change: `/` returned 200 and the
+    // server HTML contained "Loading" once. A 302 renders nothing at all, so
+    // there is no tree to disagree about — the class of defect is removed
+    // rather than the symptom.
+    // NOTE: `pages/index.vue` is deleted with this rule. Remove the rule and `/`
+    // becomes a 404, not a loading screen.
+    '/': { redirect: '/dashboard' },
     '/orgs/**': { ssr: false },
     '/account': { ssr: false },
   },
