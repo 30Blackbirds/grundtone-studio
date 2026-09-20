@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { absoluteDate, activityTone, relativeTime } from './relative-time'
+import { absoluteDate, activityTone, dayOnly, relativeTime } from './relative-time'
 
 const now = new Date('2026-09-17T12:00:00Z')
 const ago = (seconds: number) => new Date(now.getTime() - seconds * 1000)
@@ -44,5 +44,21 @@ describe('activityTone', () => {
     ['organization.updated', 'neutral'],
   ])('%s → %s', (action, tone) => {
     expect(activityTone(action)).toBe(tone)
+  })
+})
+
+describe('dayOnly', () => {
+  const d = new Date('2026-06-13T14:35:00Z')
+
+  it('renders a date with no clock, in the active locale', () => {
+    expect(dayOnly(d, 'da')).toBe('13. jun. 2026')
+    expect(dayOnly(d, 'en')).toBe('Jun 13, 2026')
+  })
+
+  it('leaves absoluteDate alone — it still carries the time', () => {
+    // The reason dayOnly exists as its own function: audit rows and the hover
+    // title behind a relative time need the clock, and a flag on absoluteDate
+    // would have been one edit away from dropping it everywhere.
+    expect(absoluteDate(d, 'en')).toMatch(/\d{1,2}:\d{2}/)
   })
 })

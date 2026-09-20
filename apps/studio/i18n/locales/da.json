@@ -657,7 +657,20 @@
       "member": "Medlemmer kan se det meste data i organisationen og handle på de projekter, de er føjet til. Kan som udgangspunkt invitere medlemmer til organisationen.",
       "billing": "Kan administrere abonnement og fakturering."
     },
-    "manage": "Administrér"
+    "manage": "Administrér",
+    "subtitleActive": "{n} aktive",
+    "subtitlePending": "{n} afventer",
+    "colMember": "Medlem",
+    "colRole": "Rolle",
+    "colStatus": "Status",
+    "colAdded": "Tilføjet",
+    "colEmail": "E-mail",
+    "colInvited": "Inviteret",
+    "colExpires": "Udløber",
+    "statusActive": "Aktiv",
+    "confirmCancelTitle": "Tilbagekald invitation?",
+    "confirmCancelMessage": "{email} kan ikke længere acceptere den. Du kan sende en ny invitation bagefter.",
+    "rowActions": "Handlinger for {name}"
   },
   "memberDetail": {
     "settings": "Indstillinger",

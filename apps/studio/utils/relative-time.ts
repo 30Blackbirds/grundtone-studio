@@ -24,6 +24,19 @@ export function absoluteDate(date: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
+/**
+ * Date without a time, for columns where the clock is noise — "Added",
+ * "Invited" in the R5 members tables, which the prototype renders as
+ * "13. jun 2026".
+ *
+ * Separate from `absoluteDate` rather than a flag on it: that one carries a
+ * time on purpose (audit rows, and the hover title behind a relative time),
+ * and changing it would quietly drop the clock everywhere it is read.
+ */
+export function dayOnly(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date)
+}
+
 // Dot colour for a dashboard activity row, mapped against the prototype's three
 // examples: publish = primary, member changes = success, everything else neutral.
 export type ActivityTone = 'publish' | 'member' | 'neutral'
