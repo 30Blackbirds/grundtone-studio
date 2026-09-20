@@ -1303,3 +1303,101 @@ main {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* R5 members (KH-1022). The table/cards swap at 920px — [designer]'s measured
+   breakpoint for R1/R5/R6, not the 640px GTTable stacks at on its own. Both
+   renderings exist in the markup; `display: none` removes one from the layout
+   AND from the accessibility tree, so only one is ever announced. */
+
+/* 🔴 THE NARROW LIST OWNS ITS OWN `display` AND `gap`, and does NOT carry the
+   `grid`/`gap-2` utilities. grundtone's utility sheet loads AFTER this file, so
+   `.grid { display: grid }` beats `.members-narrow { display: none }` at equal
+   specificity — measured at 1440, where BOTH renderings were visible and the
+   member list appeared twice. Same trap as the `.dash-header` / `.items-center`
+   tie in #297: source order, not specificity, decides these. */
+.members-narrow {
+  display: none;
+  gap: 0.5rem;
+}
+
+@media (width <= 57.5rem) {
+  .members-wide {
+    display: none;
+  }
+
+  .members-narrow {
+    display: grid;
+  }
+}
+
+/* 🔴 THE ROLE PILL IS GREY, BUT ITS TEXT IS DARKER THAN THE PROTOTYPE'S, AND
+   THAT IS A DELIBERATE, MEASURED DEVIATION.
+
+   The R5 prototype styles the pill `color: var(--t2)` (#6c757d) on
+   `var(--surface-alt)` (#f0f1f2). Computed: 4.15:1 — under AA for small text.
+   [designer] measured that exact pair on the before-state and listed it among
+   the three failures, then wrote the instruction this follows: "grey pills OR a
+   text colour that reaches 4.5:1; do not carry the coloured text over."
+
+   Building the prototype literally would have reproduced a failure they had
+   already flagged. `--color-text` on the same pill is 13.64:1. The pill stays
+   grey — only the text darkens — so the prototype's intent survives and the
+   contrast does too. [designer] should confirm the darker text. */
+.members-wide .gt-badge,
+.members-narrow .gt-badge {
+  color: var(--color-text);
+}
+
+/* Section headings match the prototype's small uppercase label rather than the
+   18px/700 h2 the before-state used ([designer] measured that gap). */
+.members-section-heading {
+  margin: 1.5rem 0 0.75rem;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+}
+
+.member-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.member-cell__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The avatar is a decorative initial, not an identity: `aria-hidden`, and the
+   name sits next to it as real text. */
+.member-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.member-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.member-status__dot {
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  border-radius: 999px;
+  background: var(--color-success);
+}

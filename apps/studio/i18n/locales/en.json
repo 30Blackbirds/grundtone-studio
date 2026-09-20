@@ -657,7 +657,20 @@
       "member": "Members can view most data within the organization and act on the projects they are added to. By default they can invite members to the organization.",
       "billing": "Can manage subscription and billing details."
     },
-    "manage": "Manage"
+    "manage": "Manage",
+    "subtitleActive": "{n} active",
+    "subtitlePending": "{n} pending",
+    "colMember": "Member",
+    "colRole": "Role",
+    "colStatus": "Status",
+    "colAdded": "Added",
+    "colEmail": "Email",
+    "colInvited": "Invited",
+    "colExpires": "Expires",
+    "statusActive": "Active",
+    "confirmCancelTitle": "Revoke invitation?",
+    "confirmCancelMessage": "{email} will no longer be able to accept it. You can send a new invitation afterwards.",
+    "rowActions": "Actions for {name}"
   },
   "memberDetail": {
     "settings": "Settings",

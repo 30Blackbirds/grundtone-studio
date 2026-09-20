@@ -66,6 +66,11 @@ const invitations = [
     role: 'member',
     status: 'pending',
     inviterId: DEV_BYPASS_USER.id,
+    // The R5 table has an "Invited" column. Better Auth's invitation really
+    // carries `createdAt` (plugins/organization/schema.d.mts), so the column
+    // has a data source in production — the fixture was simply missing it, and
+    // an empty column on the review server reads as a defect in the page.
+    createdAt: new Date('2026-09-14T09:00:00Z'),
     // 🔴 A PLAUSIBLE DATE, NOT A FAR-FUTURE ONE. My first version used 2099 and
     // the page rendered "expires in 26401 days" — a number no real invitation
     // can show, sitting in the exact spot a designer is judging. Fixture values
