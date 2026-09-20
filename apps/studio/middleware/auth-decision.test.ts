@@ -231,6 +231,55 @@ describe('unauthed reachability (drift guard)', () => {
     }
   })
 
+  // 🔴 ONE DECISION, TWO CALL SITES (KH-1034 / KH-1123). Since the signed-in
+  // visitor now leaves /login on the SERVER, "where should this visitor go" is
+  // asked in two places: middleware/auth.global.ts in the browser and
+  // server/middleware/redirect-authed.ts in Nitro. A second, hand-rolled copy
+  // in either of them would drift — and the drift would surface as exactly the
+  // hydration mismatch the server redirect exists to remove, because the two
+  // sides would render different pages for the same request.
+  it('both auth call sites decide through resolveAuthAction, not their own copy', async () => {
+    const { readFileSync } = await import('node:fs')
+    const sites = [
+      '../middleware/auth.global.ts',
+      '../server/middleware/redirect-authed.ts',
+    ] as const
+
+    expect(sites.length, 'denominator: the files that decide a redirect').toBe(2)
+
+    for (const site of sites) {
+      const src = readFileSync(new URL(site, import.meta.url), 'utf8')
+      expect(src, `${site} must import the shared decision`).toMatch(
+        /import \{[^}]*resolveAuthAction[^}]*\} from '[^']*auth-decision'/,
+      )
+      // Re-deriving from the predicates instead of calling the decision is how
+      // the copy would creep back in one innocent line at a time.
+      for (const predicate of ['isAuthPath(', 'isPublicPath(']) {
+        expect(src.includes(predicate), `${site} re-derives the decision via ${predicate}`).toBe(
+          false,
+        )
+      }
+    }
+  })
+
+  // 🔴 ORDERING IS LOAD-BEARING, AND IT FAILS CLOSED TO THE BUG.
+  // server/middleware/redirect-authed.ts reads `event.context.auth`, which
+  // server/middleware/auth.ts sets. Nitro runs server middleware in filename
+  // order, so `auth.ts` must sort BEFORE it. If that ever stops being true the
+  // context is empty, the visitor is treated as signed out, and /login renders
+  // the form again — which is EXACTLY the state before the cure, so nothing
+  // would look broken. This cell names the assumption so a rename cannot
+  // quietly undo it.
+  it('the auth middleware sorts before the middleware that reads its context', async () => {
+    const { readdirSync } = await import('node:fs')
+    const files = readdirSync(new URL('../server/middleware', import.meta.url)).sort()
+
+    expect(files, 'both middleware files must exist').toEqual(
+      expect.arrayContaining(['auth.ts', 'redirect-authed.ts']),
+    )
+    expect(files.indexOf('auth.ts')).toBeLessThan(files.indexOf('redirect-authed.ts'))
+  })
+
   it('every page under pages/legal/ is public', async () => {
     const { readdirSync } = await import('node:fs')
     const files = readdirSync(new URL('../pages/legal', import.meta.url))

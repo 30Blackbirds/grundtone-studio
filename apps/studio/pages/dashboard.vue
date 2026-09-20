@@ -9,20 +9,65 @@
   // One reference time per render, so every relative time on the page agrees.
   const now = new Date()
 
-  const { data: dash, refresh } = await useAsyncData<DashboardPayload>(
+  // 🔴 THE DEFAULT IS `null`, AND THAT IS THE FIX, NOT A STYLE CHOICE
+  // (KH-1034 / KH-1123, found by [designer]).
+  //
+  // This used to default to `{ orgs: [], projects: [], activity: [] }`, and a
+  // signed-in visitor who loaded /login directly ended up in the onboarding
+  // wizard although they had an organization. MEASURED on the served build:
+  // /api/dashboard was never requested at all on that path — so it was not a
+  // race between the fetch and the check, and no `nextTick` would have cured
+  // it. `useAsyncData` in nuxt 3.21.11 (dist/app/composables/asyncData.js:114)
+  // short-circuits when `fetchOnServer && nuxtApp.isHydrating && data.value !=
+  // null`: it sets the status to `success` and NEVER CALLS THE HANDLER,
+  // because during hydration it assumes SSR already fetched. Arriving here via
+  // a client-side redirect that runs while `isHydrating` is still true makes
+  // that assumption false, and the non-null thing it saw was our own default.
+  //
+  // So the old fallback value was ALSO a valid normal outcome — "no orgs" is
+  // what a brand-new user really looks like — and the page could not tell
+  // "never fetched" from "fetched, and empty". `null` cannot be confused with
+  // either, and it makes the short-circuit above fail, so the data is fetched
+  // before mount instead.
+  //
+  // NOTE for anyone tempted by the obvious guard: `status` does NOT
+  // discriminate here. In the short-circuited case it is literally 'success'.
+  const { data: loaded, refresh } = await useAsyncData<DashboardPayload | null>(
     'dashboard',
     () =>
       $fetch<DashboardPayload>('/api/dashboard', {
         headers: useRequestHeaders(['cookie']),
       }),
-    { default: () => ({ orgs: [], projects: [], activity: [] }) },
+    { default: () => null },
   )
 
+  const EMPTY_DASHBOARD: DashboardPayload = { orgs: [], projects: [], activity: [] }
+  // Everything that only RENDERS may read the empty shape; only the decision
+  // below needs to tell "not loaded" from "loaded and empty".
+  const dash = computed<DashboardPayload>(() => loaded.value ?? EMPTY_DASHBOARD)
+
   // Authed users with no orgs land in the onboarding wizard instead of an
-  // empty dashboard. Runs only on the client because navigateTo during SSR
-  // breaks the auth-cookie round-trip on first signup.
+  // empty dashboard. Client-only because navigateTo during SSR breaks the
+  // auth-cookie round-trip on first signup.
+  //
+  // A watcher INSIDE onMounted, not a bare onMounted check: on the redirect
+  // path the fetch resolves AFTER mount, so a one-shot check would read `null`
+  // and decide nothing; `immediate` covers the ordinary path where the payload
+  // is already there. Registering it in onMounted keeps it client-only without
+  // an `import.meta.client` guard — which matters because that guard is
+  // undefined under vitest, and a cell for this condition would have gone
+  // green while testing nothing at all.
+  //
+  // It reads `loaded`, never `dash`, so the condition can only ever be true of
+  // an answer the server actually gave.
   onMounted(() => {
-    if ((dash.value?.orgs.length ?? 0) === 0) navigateTo('/onboarding')
+    watch(
+      loaded,
+      (value) => {
+        if (value && value.orgs.length === 0) navigateTo('/onboarding')
+      },
+      { immediate: true },
+    )
   })
 
   const publishedCount = computed(
