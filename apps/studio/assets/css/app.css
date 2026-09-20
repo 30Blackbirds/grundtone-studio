@@ -192,6 +192,22 @@ main {
   flex-shrink: 0;
 }
 
+/* 🔴 THE ALIGNMENT LIVES HERE, NOT IN A UTILITY CLASS ON THE ELEMENT, and that
+   is the whole fix for [designer]'s 375 finding (KH-1025). The header carried
+   `items-center` in the template, which is `.items-center` from grundtone —
+   the same specificity (0,1,0) as `.dash-header` in the media query below, and
+   loaded AFTER app.css, so source order decided it. Measured at 375 before the
+   change: flex-direction came out `column` (nothing competes with it) while
+   align-items stayed `center`, giving a 295px header with a 235px title inside
+   it — the title sat at x=70 while the stat tiles started at x=40. That 30px is
+   exactly (295 - 235) / 2.
+   A specificity bump (.dash-header.dash-header) would have worked and taught
+   the next person that this file has to shout to be heard; removing the utility
+   instead means the template stops fighting the stylesheet. */
+.dash-header {
+  align-items: center;
+}
+
 /* [designer] 2026-09-17: on narrow screens "New organization" stacks under the
    title instead of wrapping to two lines (it is a rare, deliberate action, so it
    keeps its full label). Measured: the English label wraps at <= 486px, Danish
