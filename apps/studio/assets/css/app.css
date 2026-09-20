@@ -1483,3 +1483,59 @@ main {
 .empty-state__action {
   margin-top: 0.25rem;
 }
+
+/* Brand-assets publish bar (KH-1029), the prototype's `.pubbar`: a bordered
+   raised strip at the top of the Tokens tab carrying the draft state and the
+   one sentence that explains why logo and fonts have no publish button of
+   their own.
+
+   It WRAPS rather than truncating: the note is a whole sentence and it is
+   longer in Danish than in English (measured elsewhere today — a fixed row
+   that cannot wrap turns that difference into clipped pixels). */
+.pubbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.pubbar__title {
+  font-size: var(--font-size-sm);
+}
+
+.pubbar__note {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+/* 🔴 THE DRAFT BADGE'S TEXT IS DARKENED, BECAUSE THE LIBRARY'S WARNING BADGE
+   FAILS AA AND THE PROTOTYPE ALREADY KNEW.
+
+   Measured on the rendered bar: GTBadge variant="warning" paints #ffc107 text
+   on a 14% tint of itself over white — effective background rgb(255,246,220),
+   contrast 1.51:1. That is the same defect [quality] measured across all four
+   tinted variants (riff KH-1121, in progress in the library).
+
+   The R8 brand-assets prototype does NOT use that colour: its `.draftbadge` is
+   #8a6d00 on the same tint — 4.56:1, which passes. So here, unlike the R5 role
+   pill, following the prototype FIXES the contrast rather than reproducing a
+   failure.
+
+   Expressed as a mix of the warning TOKEN rather than the prototype's raw hex,
+   so it follows whatever --color-warning resolves to in a brand: 50% toward
+   black lands on rgb(128,96,4) at 5.42:1, a little more headroom than the
+   prototype's own 4.56 and the same colour family.
+
+   Scoped to this bar on purpose. When KH-1121 fixes the badge in the library,
+   this override should be removed and the result re-measured — not kept as a
+   second source of truth. */
+.pubbar .gt-badge {
+  color: color-mix(in srgb, var(--color-warning) 50%, #000);
+}
