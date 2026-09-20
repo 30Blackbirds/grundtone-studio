@@ -1243,3 +1243,35 @@ main {
 .brand-file-budget__seg.on {
   background: var(--color-primary);
 }
+
+/* 🔴 COLUMNS THAT FOLLOW THE CONTAINER, NOT A BREAKPOINT (KH-1124, the clip
+   [designer] found at 375 and I twice failed to cure).
+
+   These grids held `grid-cols-2` unconditionally. Inside the token accordion
+   at 375 that makes each cell 125.5px, and a contrast chip's badge is a
+   `white-space: nowrap` element with `min-width: auto` — it cannot shrink. In
+   Danish that badge is 181px, so it overflowed its own 126px chip by 55px.
+
+   A viewport media query would be a PROXY here and would have been the third
+   wrong cure: the cell's width is set by the ACCORDION PANEL (295px at 375),
+   not by the viewport, so the honest rule reads the container. `auto-fit`
+   drops to one column exactly when two would no longer fit, at any width and
+   for any panel — it cannot strand.
+
+   Measured floor: a chip needs its 40px swatch + 12px gap + the badge. 14rem
+   (224px) keeps the desktop layout identical — a 524px editor track still
+   takes two columns (2 x 224 + 16 = 464 <= 524), which is what [designer]
+   accepted at 1440.
+
+   🔴 `auto-fill`, NOT `auto-fit`, and I only found that by measuring 1440.
+   `auto-fit` COLLAPSES tracks that hold nothing, so a group with a single
+   token field reported `496px 0px` — that one field would have stretched to
+   the full width instead of sitting in its half, a visible desktop change
+   nobody asked for. `auto-fill` keeps the empty track, so a wide container is
+   byte-for-byte the old two-column layout and only a narrow one drops to
+   one. The narrow behaviour is identical either way, which is exactly why
+   measuring only 375 would have shipped it. */
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}

@@ -206,7 +206,7 @@
           :open="group.open"
           :heading-level="4"
         >
-          <div v-if="group.base.length" class="grid grid-cols-2 gap-4">
+          <div v-if="group.base.length" class="token-grid gap-4">
             <div v-for="slot in group.base" :key="slot" class="flex flex-col gap-1">
               <TokenColorField
                 :label="t(`tokens.color.${slot}`)"
@@ -245,7 +245,7 @@
                   : t('tokens.editor.showDerived', { count: group.derived.length })
               }}
             </GTButton>
-            <div v-if="showDerived[group.key]" class="grid grid-cols-2 gap-4 mt-3">
+            <div v-if="showDerived[group.key]" class="token-grid gap-4 mt-3">
               <div v-for="slot in group.derived" :key="slot" class="flex flex-col gap-1">
                 <TokenColorField
                   :label="t(`tokens.color.${slot}`)"
@@ -290,7 +290,7 @@
            text/background, text/surface, onPrimary/primary, text/secondary.
            Her: de sekundære tekst-trin og primærens hover/pressed-tilstande —
            dem brugere glemmer. -->
-      <div class="grid grid-cols-2 gap-3">
+      <div class="token-grid gap-3">
         <ContrastBadge
           :label="t('contrast.pair.textSecondaryOnBackground')"
           :fg="resolved.textSecondary"
@@ -317,7 +317,7 @@
 
     <section v-if="mode === 'base'">
       <h3 class="mt-0 mb-3">{{ t('tokens.typography') }}</h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="token-grid gap-4">
         <GTInput
           :model-value="fontFamily.base"
           :label="t('tokens.font.base')"

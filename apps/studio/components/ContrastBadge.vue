@@ -52,6 +52,23 @@
 </template>
 
 <style scoped>
+  /* 🔴 THE BADGE MUST BE ABLE TO WRAP, because its content is a SENTENCE and
+     not a tag (KH-1124). The library gives `.gt-badge` `white-space: nowrap`
+     with `min-width: auto`, which is right for "AA" or "Published" — it is not
+     right for "AA (kun store skrifttyper)", 181px of it, and that string is
+     ours, not the library's.
+
+     Measured: with the columns fixed the chip is wide enough today, so this is
+     not what cures the clip. It is what stops the NEXT translation curing it
+     back — a label can grow past any fixed cell, and a nowrap element that
+     cannot shrink turns that into clipped pixels rather than a second line.
+     Scoped to this component: the rest of the app's badges are short labels
+     and keep the library's behaviour. */
+  :deep(.gt-badge) {
+    white-space: normal;
+    text-align: start;
+  }
+
   .contrast-swatch {
     display: inline-flex;
     align-items: center;
