@@ -462,13 +462,31 @@ describe('the bind assertion is wired to something that starts a listener', () =
     // file that merely mentions the call, or one whose export form changed so
     // Nitro no longer picks it up, stops counting.
     //
-    // Calibrated rather than oversold: the likeliest regression (the file is
-    // deleted) is caught, a moved directory is caught by the denominator above,
-    // and the EVENT is measured on the artifact instead — bypass on with
-    // HOST=0.0.0.0 throws and never serves. Still not caught here: the call
-    // placed behind a condition that never runs.
+    // 🔴 COMMENTS ARE STRIPPED FIRST, and that is [sikkerhed]'s correction of
+    // their own #302 verdict: they wrote that the pattern "requires a CALL, not
+    // a mention in a comment", then measured it and found it false. A regex
+    // does not know what a comment is. A file holding
+    // `// remember to call assertBypassBindsLoopback() one day` beside an empty
+    // `export default defineNitroPlugin(() => {})` passed BOTH patterns.
+    //
+    // The edit that scenario describes — remove the call, leave a note saying
+    // it is temporarily off — is not the likeliest one, but it is exactly the
+    // kind that survives because nobody measures again.
+    //
+    // Calibrated rather than oversold. Caught: the file is deleted (likeliest
+    // regression); the directory moves (the denominator above); the
+    // registration form changes; the call survives only as a comment. NOT
+    // caught: the call placed behind a condition that never runs — this reads
+    // TEXT, never the EVENT. The event is measured on the artifact instead:
+    // bypass on with HOST=0.0.0.0 throws and never serves.
+    // A naive strip: it would also cut the tail of a `https://…` inside a
+    // string. Harmless for what this asks — it can only ever REMOVE text, and
+    // both things it looks for sit on lines of their own — and the real plugin
+    // passing is the control that says so.
+    const withoutComments = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
     const callers = plugins.filter((f) => {
-      const src = readFileSync(new URL(f, dir), 'utf8')
+      const src = withoutComments(readFileSync(new URL(f, dir), 'utf8'))
       return (
         /assertBypassBindsLoopback\s*\(/.test(src) && /export default defineNitroPlugin\(/.test(src)
       )
