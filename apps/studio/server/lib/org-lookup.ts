@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { getRequestHeader } from 'h3'
+import { DEV_BYPASS_ORG, DEV_BYPASS_USER, devAuthBypassEnabled } from './dev-auth-bypass'
 
 // Organization data now lives in the central auth service (Better Auth's
 // organization plugin). Studio resolves orgs over HTTP against the auth org API
@@ -24,10 +25,36 @@ function authBase(): string {
   return base
 }
 
+// 🔴 THE LOCAL DESIGN-REVIEW BYPASS HAS TO REACH IN HERE TOO, and finding that
+// out took a measurement rather than a guess: these lookups do NOT go through
+// studio's own /api/auth proxy, where the stub lives. They call the auth
+// service directly with `authBase()`, and they return null without a cookie —
+// so pointing AUTH_INTERNAL_URL at studio would not have worked either. A
+// bypass that stopped at the proxy would leave /api/projects resolving no org,
+// i.e. an empty dashboard behind a door that opened. Same three gates, same
+// module; nothing new is trusted here.
+function bypassOrg(event: H3Event): FullOrg | null {
+  if (!devAuthBypassEnabled(event)) return null
+  return {
+    id: DEV_BYPASS_ORG.id,
+    name: DEV_BYPASS_ORG.name,
+    slug: DEV_BYPASS_ORG.slug,
+    members: [{ id: 'dev-bypass-member-1', userId: DEV_BYPASS_USER.id, role: 'owner' }],
+  }
+}
+
 async function fetchFullOrg(
   event: H3Event,
   query: Record<string, string>,
 ): Promise<FullOrg | null> {
+  const stub = bypassOrg(event)
+  if (stub) {
+    // Answer only for the org the bypass actually has; anything else is a
+    // genuine miss, not a stub gap that should masquerade as one.
+    const asked = query.organizationSlug ?? query.organizationId
+    return asked === stub.slug || asked === stub.id ? stub : null
+  }
+
   const cookie = getRequestHeader(event, 'cookie')
   if (!cookie) return null
   try {
@@ -75,6 +102,9 @@ export interface OrgListItem {
 
 /** All orgs the signed-in user is a member of (empty when unauthenticated). */
 export async function listCallerOrgs(event: H3Event): Promise<OrgListItem[]> {
+  const stub = bypassOrg(event)
+  if (stub) return [{ id: stub.id, name: stub.name, slug: stub.slug }]
+
   const cookie = getRequestHeader(event, 'cookie')
   if (!cookie) return []
   try {
