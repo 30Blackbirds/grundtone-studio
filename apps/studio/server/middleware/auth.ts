@@ -1,6 +1,20 @@
 import { createJwtVerifier } from '@klanghaus/auth-jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
+// 🔴 THIS IMPORT MUST STAY EAGER AND UNCONDITIONAL — it is load-bearing, and
+// not for the symbols it brings in.
+//
+// `dev-auth-bypass.ts` runs `assertBypassNotLeaked()` at module scope: a
+// deployment carrying STUDIO_DEV_AUTH_BYPASS outside development REFUSES TO
+// BOOT instead of quietly ignoring the variable. That guard only exists
+// because Nitro loads every server middleware at startup and this line pulls
+// the module in. Make it a dynamic `await import(...)` inside the handler, or
+// move it behind a condition, and the leak goes silent again — WITHOUT A
+// SINGLE TEST TURNING RED, because the assertion would still pass everywhere
+// it is called directly.
+//
+// The note is repeated here rather than only in that module because the hazard
+// LIVES there while the mistake would be MADE here ([sikkerhed], #292).
 import {
   DEV_BYPASS_ORG,
   DEV_BYPASS_USER,
