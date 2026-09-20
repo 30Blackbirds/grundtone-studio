@@ -158,6 +158,33 @@ describe('unauthed reachability (drift guard)', () => {
     expect(resolveAuthAction({ path, fullPath: path, authed: false })).toEqual({ type: 'allow' })
   })
 
+  // 🔴 DERIVED FROM THE HAZARD, NOT FROM MEMORY (third instance of this drift).
+  // The list above is hand-held, and it has now drifted three times: /legal,
+  // then /verify + /verify/done, then /changelog — found by [designer] loading
+  // it in a fresh tab and being redirected to /login?redirect=/changelog while
+  // curl returned the page with 200. Two answers about one page.
+  //
+  // AppFooter is rendered by layouts/auth.vue as well as layouts/app.vue, so
+  // every internal link in it is clickable by a visitor who is NOT logged in.
+  // That makes the footer the denominator: read it from disk, and a new link
+  // forces a deliberate choice instead of a silent redirect.
+  it('every internal link in the footer is reachable without a session', async () => {
+    const { readFileSync } = await import('node:fs')
+    const footer = readFileSync(new URL('../components/AppFooter.vue', import.meta.url), 'utf8')
+    const links = [...new Set([...footer.matchAll(/to="(\/[^"]*)"/g)].map((m) => m[1]))]
+
+    // The guard must not pass by finding no links at all — that is how a
+    // refactor of the footer would silently disarm it.
+    expect(links.length, 'no internal footer links found; the reader is broken').toBeGreaterThan(3)
+
+    for (const path of links) {
+      expect(
+        resolveAuthAction({ path, fullPath: path, authed: false }),
+        `${path} is linked from the footer shown on /login, so it must not redirect`,
+      ).toEqual({ type: 'allow' })
+    }
+  })
+
   it('every page under pages/legal/ is public', async () => {
     const { readdirSync } = await import('node:fs')
     const files = readdirSync(new URL('../pages/legal', import.meta.url))
