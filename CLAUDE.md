@@ -91,6 +91,20 @@ refactor), it cannot be marked completed without a test that exercises it.
 - Focus tests on: token schema, css renderer, api-key crypto, publish pipeline, SDK behaviour. UI
   components and trivial getters are lower priority — but evaluate them per the DoD above.
 
+Two failures that both happened here on 2026-09-20, written down because each one _looked_ like the
+opposite of what it was:
+
+- **A zero is not a finding until you have controlled the instrument.** Chasing whether toasts
+  render, three separate actions produced 0 toasts, and all three were the measurement: an endpoint
+  the local auth stub answers with 501, a clipboard call that rejects when the browser pane is not
+  focused, and an action whose code does not toast at all. Each on its own read as "the product is
+  still broken". Fire the signal you expect _before_ you trust its absence.
+- **A cell that reads the source text is not a cell that reads the event.** The guard asserting that
+  a Nitro plugin calls the bypass bind-assertion stayed green through a mutation that removed the
+  event entirely — first when the export form changed so Nitro no longer loaded the file, then when
+  the call survived only as a comment. Both were found by mutating, not by reading. If a cell greps,
+  say in the cell what it therefore cannot see.
+
 ## Architecture invariants
 
 - **All API endpoints validate via zod.** No raw `readBody()`.
