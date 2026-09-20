@@ -189,12 +189,11 @@
           </div>
         </NuxtLink>
       </div>
-      <div v-else class="p-6 bg-surface-raised border rounded-lg">
-        <p class="m-0 text-tertiary">{{ t('dashboard.noProjects') }}</p>
+      <EmptyState v-else icon="folder" :title="t('dashboard.noProjects')">
         <NuxtLink v-if="dash.orgs.length" :to="`/orgs/${dash.orgs[0].slug}`" class="text-sm">
           {{ t('dashboard.noProjectsCta') }}
         </NuxtLink>
-      </div>
+      </EmptyState>
     </section>
 
     <section v-if="dash.activity.length">

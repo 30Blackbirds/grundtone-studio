@@ -46,10 +46,11 @@
 
 <template>
   <form class="flex flex-col gap-6" @submit.prevent="submit">
-    <header class="flex flex-col gap-2">
-      <h1 class="m-0">{{ t('onboarding.tokens.title') }}</h1>
-      <p class="text-tertiary m-0">{{ t('onboarding.tokens.subtitle') }}</p>
-    </header>
+    <OnboardingStepHeader
+      icon="settings"
+      :title="t('onboarding.tokens.title')"
+      :subtitle="t('onboarding.tokens.subtitle')"
+    />
 
     <div class="grid grid-cols-2 gap-6 items-start">
       <TokenColorField v-model="state.primaryColor" :label="t('tokens.color.primary')" />

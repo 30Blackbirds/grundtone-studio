@@ -1401,3 +1401,85 @@ main {
   border-radius: 999px;
   background: var(--color-success);
 }
+
+/* R8 onboarding (KH-1026), 1:1 with redesign-r8-onboarding.html's `.ob__steps`
+   / `.ob__seg` / `.ob__lbl`: four equal 4px segments, filled up to and
+   including the current step, and one line of text beneath. */
+.onboarding-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.onboarding-progress__track {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.onboarding-progress__seg {
+  flex: 1;
+  block-size: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.onboarding-progress__seg--on {
+  background: var(--color-primary);
+}
+
+.onboarding-progress__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* The prototype's `.ob__ic`: a 44px rounded square holding the step's glyph,
+   tinted 12% of primary. `color-mix` because the tint has to follow whatever
+   primary the brand resolves to, not a frozen hex. */
+.onboarding-step-icon,
+.empty-state__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 0.6875rem;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+/* 19px/700 in the prototype — deliberately smaller than the page h1 above it,
+   so the wizard reads as one page with a step inside it rather than two
+   competing titles. */
+.onboarding-step-title {
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+
+/* The shared empty state (UX-audit #10). Centred, because it is a signpost
+   rather than content: an icon, what is missing, and the way out. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.empty-state__title {
+  font-weight: 600;
+}
+
+.empty-state__body {
+  max-width: 38ch;
+  font-size: var(--font-size-sm);
+}
+
+.empty-state__action {
+  margin-top: 0.25rem;
+}
