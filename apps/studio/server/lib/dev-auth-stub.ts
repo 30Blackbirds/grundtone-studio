@@ -96,6 +96,70 @@ export const DEV_AUTH_STUB_ROUTES: Record<string, unknown> = {
   'organization/set-active': fullOrganization,
 }
 
+/**
+ * 🔴 THE 22 PATHS STUDIO CALLS AND THE STUB DOES NOT ANSWER, split by whether
+ * they may EVER be stubbed. Measured 2026-09-20 on main 0c2f875 — call sites
+ * grepped in studio, paths read from the installed better-auth 1.6.25, answers
+ * probed against the running bypass server. 28 called, 6 answered, 22 × 501.
+ *
+ * The list is not documentation. `dev-auth-stub.test.ts` fails when studio
+ * calls a path that appears in neither this file's answers nor these two
+ * lists — so the denominator stops growing silently, which is the difference
+ * between having counted once and continuing to count.
+ *
+ * 🔴 THE SPLIT IS [sikkerhed]'S, AND IT IS THE LOAD-BEARING PART:
+ * a 501 is a DEAD button; a stub is a button that LOOKS LIKE IT WORKS. For
+ * anything that in production changes a RIGHT, an INVITATION or a SESSION, the
+ * dead button is the safe one, because a stub that returns success teaches the
+ * reviewer that the action worked — and that is the wrong thing to learn about
+ * exactly those actions.
+ *
+ * `sign-out` is the sharp case, and it is also the one a reviewer meets first
+ * (the sidebar is on every page behind login): a stubbed sign-out returning 200
+ * without ending the session would tell a designer they are signed out on a
+ * machine where the bypass is still wide open.
+ */
+export const NEVER_STUB_AUTH_PATHS: readonly string[] = [
+  // Session and credentials.
+  'sign-out',
+  'sign-in/magic-link',
+  'sign-in/email',
+  'sign-up/email',
+  'change-email',
+  'change-password',
+  'request-password-reset',
+  'reset-password',
+  'delete-user',
+  'send-verification-email',
+  // Rights and invitations.
+  'organization/invite-member',
+  'organization/cancel-invitation',
+  'organization/accept-invitation',
+  'organization/reject-invitation',
+  'organization/update-member-role',
+  'organization/remove-member',
+  'organization/leave',
+  'organization/delete',
+]
+
+/**
+ * Paths that MAY be stubbed if [designer] asks for the flow — they change what
+ * is displayed, not who may do what. Nothing here is stubbed yet, and nothing
+ * will be until the flows are named: guessing which ones a review needs is how
+ * the other seventeen stayed hidden behind a fix for one.
+ */
+export const STUBBABLE_AUTH_PATHS: readonly string[] = [
+  'organization/create',
+  'organization/update',
+  'organization/get-invitation',
+  'update-user',
+]
+
+/** Which answer a caller gets for a path the stub does not serve. */
+export function unstubbedGroup(key: string): 'never' | 'on-request' {
+  return NEVER_STUB_AUTH_PATHS.includes(key) ? 'never' : 'on-request'
+}
+
 /** `/api/auth/organization/list?x=1` -> `organization/list` */
 export function stubKeyFor(path: string): string {
   return path

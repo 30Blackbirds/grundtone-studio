@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, proxyRequest } from 'h3'
 import { devAuthBypassEnabled } from '~~/server/lib/dev-auth-bypass'
-import { DEV_AUTH_STUB_ROUTES, stubKeyFor } from '~~/server/lib/dev-auth-stub'
+import { DEV_AUTH_STUB_ROUTES, stubKeyFor, unstubbedGroup } from '~~/server/lib/dev-auth-stub'
 
 // BFF-proxy for central auth (domæne-arkitekturen: login = BFF).
 //
@@ -40,9 +40,18 @@ export default defineEventHandler((event) => {
     if (key in DEV_AUTH_STUB_ROUTES) return DEV_AUTH_STUB_ROUTES[key]
     // A path the stub does not know must NOT quietly become an empty 200: that
     // would render as a blank panel and be reported as a design defect.
+    //
+    // 🔴 AND A 501 NOBODY SEES IS A DEAD BUTTON, which is the same defect one
+    // layer up. Measured 2026-09-20: 22 of the 28 auth paths studio calls land
+    // here, 18 of them reachable by clicking — so silence here is not an edge
+    // case, it is most of the app behind login. `data` carries the marker the
+    // client keys on (lib/auth-client.ts) to say so on screen; it is a marker
+    // only this branch can emit, so a real upstream 501 in production can never
+    // be mistaken for one of these.
     throw createError({
       statusCode: 501,
       statusMessage: `dev auth bypass has no answer for ${key} — add it to DEV_AUTH_STUB_ROUTES`,
+      data: { devAuthBypass: true, path: key, group: unstubbedGroup(key) },
     })
   }
 
