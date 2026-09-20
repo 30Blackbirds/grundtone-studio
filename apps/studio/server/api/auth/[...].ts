@@ -1,4 +1,6 @@
 import { createError, defineEventHandler, proxyRequest } from 'h3'
+import { devAuthBypassEnabled } from '~~/server/lib/dev-auth-bypass'
+import { DEV_AUTH_STUB_ROUTES, stubKeyFor } from '~~/server/lib/dev-auth-stub'
 
 // BFF-proxy for central auth (domæne-arkitekturen: login = BFF).
 //
@@ -30,6 +32,20 @@ function authProxyTarget(): string | undefined {
 }
 
 export default defineEventHandler((event) => {
+  // 🔴 THE LOCAL DESIGN-REVIEW BYPASS (dev-auth-bypass.ts) SHORT-CIRCUITS HERE,
+  // before the proxy target is even resolved, because locally there is no auth
+  // service to proxy to. Three gates, all checked in one place; see that file.
+  if (devAuthBypassEnabled(event)) {
+    const key = stubKeyFor(event.path)
+    if (key in DEV_AUTH_STUB_ROUTES) return DEV_AUTH_STUB_ROUTES[key]
+    // A path the stub does not know must NOT quietly become an empty 200: that
+    // would render as a blank panel and be reported as a design defect.
+    throw createError({
+      statusCode: 501,
+      statusMessage: `dev auth bypass has no answer for ${key} — add it to DEV_AUTH_STUB_ROUTES`,
+    })
+  }
+
   const target = authProxyTarget()
   if (!target) {
     throw createError({

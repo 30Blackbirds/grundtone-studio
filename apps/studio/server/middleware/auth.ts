@@ -1,6 +1,11 @@
 import { createJwtVerifier } from '@klanghaus/auth-jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
+import {
+  DEV_BYPASS_ORG,
+  DEV_BYPASS_USER,
+  devAuthBypassEnabled,
+} from '~~/server/lib/dev-auth-bypass'
 
 // Studio no longer runs Better Auth. Authentication is delegated to the central
 // auth service: the browser holds a `better-auth.session_token` cookie scoped to
@@ -87,6 +92,21 @@ async function exchangeCookieForToken(event: H3Event): Promise<string | null> {
 }
 
 export default defineEventHandler(async (event) => {
+  // 🔴 LOCAL DESIGN-REVIEW BYPASS. Three gates, evaluated in
+  // server/lib/dev-auth-bypass.ts — NODE_ENV=development AND an explicit
+  // STUDIO_DEV_AUTH_BYPASS=1 AND a loopback caller. Placed first because the
+  // exchange below needs an auth service that does not run on a design
+  // reviewer's machine; without this the endpoints 401 and every page behind
+  // login renders an empty shell.
+  if (devAuthBypassEnabled(event)) {
+    event.context.auth = {
+      sub: DEV_BYPASS_USER.id,
+      tenant: DEV_BYPASS_ORG.id,
+      email: DEV_BYPASS_USER.email,
+    } satisfies AuthActor
+    return
+  }
+
   const token = await exchangeCookieForToken(event)
   if (!token) {
     // No browser session — a headless client may present a per-project secret

@@ -19,20 +19,46 @@
 // Run with: pnpm --filter @grundtone-studio/studio db:seed
 
 import { drizzle } from 'drizzle-orm/postgres-js'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import postgres from 'postgres'
 import * as schema from './schema'
+import { DEV_BYPASS_ORG, DEV_BYPASS_USER } from '../lib/dev-auth-bypass'
+import { AUDIT_ACTIONS } from '../lib/audit'
 
 const TEST_PROJECT = { name: 'Main', slug: 'main' }
+
+const bypassSeed = process.env.STUDIO_DEV_AUTH_BYPASS === '1'
+
+/** An audit action the app really knows, or a loud failure. See its use below. */
+function assertAction(action: string): string {
+  if (!(AUDIT_ACTIONS as readonly string[]).includes(action)) {
+    throw new Error(
+      `seed: '${action}' is not in AUDIT_ACTIONS — it would render as a raw i18n key. ` +
+        `Known actions: ${AUDIT_ACTIONS.join(', ')}`,
+    )
+  }
+  return action
+}
 
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is not set')
 
-const organizationId = process.env.SEED_ORG_ID
+// 🔴 THE LOCAL DESIGN-REVIEW PATH (server/lib/dev-auth-bypass.ts). With the
+// bypass on, there is no central auth service to provision anything in, so the
+// ids default to the bypass's own synthetic ones — and ONLY then. Without the
+// bypass this stays exactly as strict as before: no ids, no seed.
+//
+// Note the deliberate coupling: importing the bypass module also runs its
+// leak assertion, so `STUDIO_DEV_AUTH_BYPASS=1` without `NODE_ENV=development`
+// stops the seed too, with the same message the server would give. The two
+// variables travel together or not at all.
+const organizationId = process.env.SEED_ORG_ID ?? (bypassSeed ? DEV_BYPASS_ORG.id : undefined)
+const userId = process.env.SEED_USER_ID ?? (bypassSeed ? DEV_BYPASS_USER.id : undefined)
 if (!organizationId) {
   throw new Error(
     'SEED_ORG_ID is not set — provision the org in the central auth service first ' +
-      '(rockfaker / [infra]) and pass its id here.',
+      '(rockfaker / [infra]) and pass its id here. For a local design review, set ' +
+      'NODE_ENV=development and STUDIO_DEV_AUTH_BYPASS=1 instead.',
   )
 }
 
@@ -60,14 +86,98 @@ async function ensureProject(orgId: string) {
   return row
 }
 
+// 🔴 ONLY FOR THE BYPASS PATH, and only synthetic rows. A design reviewer needs
+// something to look at: an empty members table, an empty audit log and an empty
+// key list all render as the same blank panel, and a reviewer cannot tell "no
+// data" from "broken page". Every value below is obviously fictional
+// (`localhost.invalid`, `dev-bypass-…`) so a seeded row can never be mistaken
+// for a real one in a screenshot or a database.
+//
+// NOTHING IS COPIED FROM PRODUCTION. The key row carries a hash of a literal
+// string that is not a usable key, and it is never printed.
+async function seedDesignReviewRows(orgId: string, actorId: string, projectId: string) {
+  const existing = await db
+    .select()
+    .from(schema.projectMember)
+    .where(
+      and(eq(schema.projectMember.projectId, projectId), eq(schema.projectMember.userId, actorId)),
+    )
+  if (existing.length === 0) {
+    await db.insert(schema.projectMember).values({
+      projectId,
+      userId: actorId,
+      memberEmail: DEV_BYPASS_USER.email,
+      memberName: DEV_BYPASS_USER.name,
+      role: 'admin',
+    })
+    console.log('✓ project membership (admin) for the local review user')
+  }
+
+  const audit = await db
+    .select()
+    .from(schema.auditLog)
+    .where(eq(schema.auditLog.organizationId, orgId))
+  if (audit.length === 0) {
+    // 🔴 THE ACTION NAMES COME FROM AUDIT_ACTIONS, NOT FROM MEMORY, and this is
+    // not defensive programming — it is a bug I made and saw on the rendered
+    // page. My first version wrote 'apikey.created'; the real action is
+    // 'api_key.created', so the dashboard showed
+    // `audit.actions['apikey.created']` — a raw i18n key, indistinguishable
+    // from the defect KH-1037 cured. A reviewer would have reported the page.
+    // Seed data that a designer JUDGES has to be as correct as product data,
+    // and `assertAction` makes a rename fail the seed instead of quietly
+    // producing raw keys again.
+    await db.insert(schema.auditLog).values(
+      (
+        [
+          [assertAction('project.created'), 'project', TEST_PROJECT.name],
+          [assertAction('config.published'), 'project', TEST_PROJECT.name],
+          [assertAction('api_key.created'), 'api_key', 'gt_pub_devbypass'],
+          [assertAction('member.invited'), 'member', 'bo@localhost.invalid'],
+        ] as const
+      ).map(([action, targetType, targetLabel], i) => ({
+        organizationId: orgId,
+        actorUserId: actorId,
+        actorEmail: DEV_BYPASS_USER.email,
+        action,
+        targetType,
+        targetLabel,
+        createdAt: new Date(Date.now() - (i + 1) * 3_600_000),
+      })),
+    )
+    console.log('✓ 4 audit rows, so the audit log has something to render')
+  }
+
+  const keys = await db.select().from(schema.apiKey).where(eq(schema.apiKey.projectId, projectId))
+  if (keys.length === 0) {
+    await db.insert(schema.apiKey).values({
+      projectId,
+      // Not a usable key: a hash of a literal marker string, never printed.
+      keyHash: 'dev-bypass-not-a-real-key-hash',
+      keyPrefix: 'gt_pub_devbypass',
+      createdBy: actorId,
+      createdByEmail: DEV_BYPASS_USER.email,
+    })
+    console.log('✓ 1 api key row, so the keys list is not empty')
+  }
+}
+
 async function main(orgId: string) {
   const p = await ensureProject(orgId)
+  if (bypassSeed && p && userId) await seedDesignReviewRows(orgId, userId, p.id)
   console.log('')
   console.log('Studio project seeded.')
   console.log(`  Project: ${p.name} (${p.slug})  id=${p.id}  org=${orgId}`)
   console.log('')
-  console.log('Reminder: sign in via the CENTRAL auth service, and ensure the PDP has the')
-  console.log('org→project parent tuple + your admin grant (rockfaker / [infra] writes these).')
+  if (bypassSeed) {
+    // The reminder below is wrong on this path and would send the reader to
+    // another team for something they do not need.
+    console.log('Local design review: start the server with NODE_ENV=development and')
+    console.log('STUDIO_DEV_AUTH_BYPASS=1, and open it on localhost. No sign-in needed.')
+  } else {
+    console.log('Reminder: sign in via the CENTRAL auth service, and ensure the PDP has the')
+    console.log('org→project parent tuple + your admin grant (rockfaker / [infra] writes these).')
+  }
 }
 
 await main(organizationId)

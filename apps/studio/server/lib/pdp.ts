@@ -8,6 +8,7 @@ import { Code, ConnectError, createPromiseClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-node'
 import { PermissionsService } from '@klanghaus/permissions-client/connect'
 import { recordPdpUnavailable } from './metrics'
+import { isDevBypassSubject } from './dev-auth-bypass'
 
 // Central Permissions PDP client (Beslutning O/W). Studio asks the PDP for every
 // authz decision instead of querying membership tables locally. The PDP derives
@@ -185,6 +186,18 @@ async function clientFor(event: H3Event) {
   return createPromiseClient(PermissionsService, transport)
 }
 
+// 🔴 THE LOCAL DESIGN-REVIEW BYPASS REACHES THE PERMISSION LAYER TOO, and that
+// is a deliberate, uncomfortable line to cross — this module IS the security
+// boundary, not the UX one. It is here because the three gates in
+// server/lib/dev-auth-bypass.ts were not enough on their own: measured on the
+// running bypass server, /api/orgs/<id>/audit answered 403 "Requires org:manager"
+// and the project page 403 "Requires project:viewer". A reviewer would have seen
+// empty panels and reported them as design defects.
+//
+// The grant is narrowed twice over: the three gates (development build, explicit
+// variable, loopback caller) AND the subject must be the bypass's own fictional
+// user. `isDevBypassSubject` carries the reasoning for the second one.
+
 /**
  * Check whether the current actor may perform `action` on a project.
  * `unavailable` when the PDP could not answer; never `allowed` on failure.
@@ -196,6 +209,7 @@ export async function checkProject(
 ): Promise<PdpVerdict> {
   const actor = getActor(event)
   if (!actor) return 'denied'
+  if (isDevBypassSubject(event, actor.sub)) return 'allowed'
   try {
     const client = await clientFor(event)
     if (!client) return 'denied'
@@ -221,6 +235,7 @@ export async function checkOrg(
 ): Promise<PdpVerdict> {
   const actor = getActor(event)
   if (!actor) return 'denied'
+  if (isDevBypassSubject(event, actor.sub)) return 'allowed'
   try {
     const client = await clientFor(event)
     if (!client) return 'denied'
@@ -248,6 +263,10 @@ export async function batchCheckProjects(
   const result: Record<string, PdpVerdict> = {}
   for (const id of projectIds) result[id] = 'denied'
   if (!actor || projectIds.length === 0) return result
+  if (isDevBypassSubject(event, actor.sub)) {
+    for (const id of projectIds) result[id] = 'allowed'
+    return result
+  }
   try {
     const client = await clientFor(event)
     if (!client) return result
