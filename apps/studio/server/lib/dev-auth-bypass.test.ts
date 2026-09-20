@@ -434,3 +434,60 @@ describe('the cross-origin gate', () => {
     expect(devAuthBypassEnabled(both)).toBe(false)
   })
 })
+
+// 🔴 THE BIND ASSERTION MOVED OUT OF MODULE SCOPE, AND THAT TRADE NEEDS A
+// MECHANICAL READER (#294 follow-up).
+//
+// It used to run because this module was IMPORTED — impossible to remove
+// without removing the import. It now runs from a Nitro plugin, because what
+// it asserts is about a LISTENER and the module is also imported by things
+// that open no port (measured: `pnpm db:seed` died with "refusing to start a
+// bypassed server" while starting no server).
+//
+// The new arrangement FAILS OPEN: delete the plugin and the bypass runs on a
+// 0.0.0.0-bound server with nothing complaining. So the plugin's existence is
+// not left to discipline.
+describe('the bind assertion is wired to something that starts a listener', () => {
+  it('a Nitro plugin calls assertBypassBindsLoopback', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs')
+    const dir = new URL('../plugins/', import.meta.url)
+    const plugins = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+
+    expect(plugins.length, 'denominator: server plugins searched').toBeGreaterThan(0)
+
+    const callers = plugins.filter((f) =>
+      /assertBypassBindsLoopback\s*\(/.test(readFileSync(new URL(f, dir), 'utf8')),
+    )
+    expect(
+      callers,
+      `no server plugin calls assertBypassBindsLoopback — the bypass could bind 0.0.0.0 ` +
+        `with nothing asserting otherwise. Searched: ${plugins.join(', ')}`,
+    ).not.toHaveLength(0)
+  })
+
+  it('the module itself does not call it at import time', async () => {
+    // The other half of the same trade. If both were true the seed would trip
+    // again, and the plugin would look like it was doing the work.
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('./dev-auth-bypass.ts', import.meta.url), 'utf8')
+    const body = src.slice(src.indexOf('export function assertBypassBindsLoopback'))
+    const afterFunction = body.slice(body.indexOf('\n}') + 2)
+
+    expect(
+      /^\s*assertBypassBindsLoopback\s*\(\s*\)/m.test(afterFunction),
+      'dev-auth-bypass.ts calls assertBypassBindsLoopback at module scope again — ' +
+        'importing it (e.g. from server/db/seed.ts) will fail on a process that binds nothing',
+    ).toBe(false)
+  })
+
+  it('still refuses a non-loopback bind when it IS asked', () => {
+    // The rule itself is unchanged; only its trigger moved. Without this the
+    // two cells above would pass on a function that asserts nothing.
+    expect(() =>
+      assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', HOST: '0.0.0.0' }),
+    ).toThrow(/refusing to start/)
+    expect(() =>
+      assertBypassBindsLoopback({ STUDIO_DEV_AUTH_BYPASS: '1', HOST: '127.0.0.1' }),
+    ).not.toThrow()
+  })
+})
