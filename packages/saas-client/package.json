@@ -25,7 +25,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@grundtone/core": "^2.22.0",
+    "@grundtone/core": "^3.2.0",
     "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
