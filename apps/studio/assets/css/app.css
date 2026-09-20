@@ -1275,3 +1275,31 @@ main {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 }
+
+/* 🔴 ONE TREATMENT FOR THE CARD ROW, because giving it to one row at a time is
+   how studio#298 ended up curing 2 of 7 (KH-1124 follow-up, riff inb66wty).
+
+   The shape is a flex row with `justify-between`: an info column on the left
+   (name + email, or a key prefix) and actions on the right (a badge, a button).
+   A flex item defaults to `min-width: auto`, so the info column refuses to go
+   below its longest unbreakable word — an email address — and pushes the
+   actions past the right edge.
+
+   MEASURED BEFORE, at 375 (clientWidth verified in the same call):
+     project Members tab   en  doc 36  row past 35   ·  da  doc 60  row past 60
+     /orgs/<slug>/members  en  doc 49  invite  50    ·  da  doc 70  invite  70,
+                                                         members  9 each
+     1440, both surfaces: doc 0, every row 1072px — desktop was already fine
+     and must stay that way.
+
+   It is the same cure #298 applied to the API-key row (`min-w-0` on the info
+   column plus letting the long string wrap), lifted to one class so the next
+   row of this shape inherits it instead of being found by a designer.
+
+   Only the FIRST child is allowed to shrink. Putting `min-width: 0` on every
+   child would let the action column collapse too, squashing a button — the
+   info column is the one that has to give. */
+.card-row > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

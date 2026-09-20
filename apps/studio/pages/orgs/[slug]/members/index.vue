@@ -154,7 +154,7 @@
       <li
         v-for="m in members"
         :key="m.id"
-        class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+        class="card-row flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
       >
         <div class="flex flex-col gap-1">
           <strong>{{ m.user?.name || m.user?.email }}</strong>
@@ -181,7 +181,7 @@
         <li
           v-for="inv in pendingInvitations"
           :key="inv.id"
-          class="flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
+          class="card-row flex justify-between items-center p-4 bg-surface-raised border rounded-lg"
         >
           <div class="flex flex-col gap-1">
             <strong>{{ inv.email }}</strong>
