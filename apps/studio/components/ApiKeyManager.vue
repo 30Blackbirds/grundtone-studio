@@ -148,7 +148,7 @@
         <h2 class="m-0">{{ t('apiKeys.title') }}</h2>
         <GTTooltip :content="t('apiKeys.whatIsItTooltip')" position="bottom">
           <button type="button" class="text-tertiary" :aria-label="t('apiKeys.whatIsItLabel')">
-            <GTIcon name="info" size="sm" />
+            <GTIcon name="info-circle" size="sm" />
           </button>
         </GTTooltip>
       </div>

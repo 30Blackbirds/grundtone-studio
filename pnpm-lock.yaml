@@ -105,6 +105,9 @@ importers:
       '@grundtone/core':
         specifier: ^3.2.0
         version: 3.2.0(vue@3.5.41(typescript@6.0.3))
+      '@grundtone/icons':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@grundtone/nuxt':
         specifier: ^3.2.1
         version: 3.2.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.3(@tiptap/pm@3.31.3))(@tiptap/extensions@3.31.3(@tiptap/core@3.31.3(@tiptap/pm@3.31.3))(@tiptap/pm@3.31.3))(happy-dom@20.14.5)(magic-string@1.4.1)(magicast@0.5.4)(oxc-parser@0.128.0)(rolldown@1.0.3)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.0.3)(rollup@4.62.0)(vite@7.3.6(@types/node@22.19.17)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)))(vue@3.5.41(typescript@6.0.3))

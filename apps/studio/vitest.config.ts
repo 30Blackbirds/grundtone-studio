@@ -25,6 +25,7 @@ export default defineConfig({
       'components/**/*.test.ts',
       'middleware/**/*.test.ts',
       'pages/**/*.test.ts',
+      'plugins/**/*.test.ts',
       'utils/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
