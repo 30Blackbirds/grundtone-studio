@@ -280,8 +280,11 @@ export function isSameOriginRequest(event: H3Event): boolean {
   //   2. ANY NON-BROWSER PROCESS ON THAT MACHINE passes: it omits the header
   //      and its peer address is loopback. That is not a hole this gate can
   //      close — it is the premise of the whole feature, which trusts the
-  //      reviewer's own machine. Stated so nobody later reads gate 3 as
-  //      protection against local software.
+  //      reviewer's own machine. [sikkerhed] put the boundary precisely: a
+  //      process with code execution on that machine can read the database
+  //      directly, so this gate is not the control there and cannot be made
+  //      into one. Stated so nobody later reads gate 3 as protection against
+  //      local software.
   //
   // Neither is cured, deliberately. Curing (1) means requiring the header,
   // which denies curl and the SSR fetch — the accept set, not just the reject
