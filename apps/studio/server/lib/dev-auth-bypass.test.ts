@@ -455,13 +455,29 @@ describe('the bind assertion is wired to something that starts a listener', () =
 
     expect(plugins.length, 'denominator: server plugins searched').toBeGreaterThan(0)
 
-    const callers = plugins.filter((f) =>
-      /assertBypassBindsLoopback\s*\(/.test(readFileSync(new URL(f, dir), 'utf8')),
-    )
+    // 🔴 BOTH CONDITIONS, AND THE SECOND ONE IS [sikkerhed]'s (#302 verdict).
+    // This cell reads TEXT, not the EVENT: it establishes that a plugin file
+    // contains the call, never that Nitro loaded it. Requiring the registration
+    // form too keeps it text, but it is the text NITRO ITSELF KEYS ON — so a
+    // file that merely mentions the call, or one whose export form changed so
+    // Nitro no longer picks it up, stops counting.
+    //
+    // Calibrated rather than oversold: the likeliest regression (the file is
+    // deleted) is caught, a moved directory is caught by the denominator above,
+    // and the EVENT is measured on the artifact instead — bypass on with
+    // HOST=0.0.0.0 throws and never serves. Still not caught here: the call
+    // placed behind a condition that never runs.
+    const callers = plugins.filter((f) => {
+      const src = readFileSync(new URL(f, dir), 'utf8')
+      return (
+        /assertBypassBindsLoopback\s*\(/.test(src) && /export default defineNitroPlugin\(/.test(src)
+      )
+    })
     expect(
       callers,
-      `no server plugin calls assertBypassBindsLoopback — the bypass could bind 0.0.0.0 ` +
-        `with nothing asserting otherwise. Searched: ${plugins.join(', ')}`,
+      `no server plugin both calls assertBypassBindsLoopback AND registers via ` +
+        `\`export default defineNitroPlugin(\` — the bypass could bind 0.0.0.0 with nothing ` +
+        `asserting otherwise. Searched: ${plugins.join(', ')}`,
     ).not.toHaveLength(0)
   })
 
