@@ -7,6 +7,7 @@ import {
   DEV_AUTH_BYPASS_MISCONFIGURED,
   devAuthBypassEnabled,
   isLoopbackHost,
+  isLoopbackAddress,
 } from './dev-auth-bypass'
 
 // Riff: the local design-review bypass. These cells exist for one reason —
@@ -14,11 +15,26 @@ import {
 // not. A green here is not "the feature works"; it is "each gate still refuses
 // on its own".
 
-const eventWithHost = (host: string | undefined) =>
+// The default remote address is the IPv4-mapped form a dual-stack Node server
+// actually reports for `curl http://127.0.0.1:3024`, not the tidy '127.0.0.1'
+// one would write from memory.
+// 🔴 `null` MEANS "NO SOCKET", NOT `undefined` — because passing `undefined`
+// explicitly triggers a DEFAULT PARAMETER, which is exactly how the first
+// version of the no-socket cell tested the happy path while claiming to test
+// its absence. It went red only because the gate was already correct; with the
+// directions reversed it would have been a silent false green.
+const eventFrom = (host: string | undefined, remoteAddress: string | null = '::ffff:127.0.0.1') =>
   ({
-    node: { req: { headers: host === undefined ? {} : { host } } },
+    node: {
+      req: {
+        headers: host === undefined ? {} : { host },
+        socket: { remoteAddress: remoteAddress ?? undefined },
+      },
+    },
     headers: new Headers(host === undefined ? {} : { host }),
   }) as unknown as H3Event
+
+const eventWithHost = (host: string | undefined) => eventFrom(host)
 
 const env = { ...process.env }
 afterEach(() => {
@@ -73,6 +89,66 @@ describe('the three gates', () => {
   it('does not accept a host that merely starts with a loopback name', () => {
     expect(isLoopbackHost('localhost.attacker.example')).toBe(false)
     expect(isLoopbackHost('127.0.0.1.attacker.example')).toBe(false)
+  })
+
+  // 🔴 THE CELL FOR [sikkerhed]'s FINDING, and it is the whole reason the gate
+  // reads a socket at all. Host is a header the CLIENT chooses, so the previous
+  // version asked the caller where it was and believed the answer:
+  //
+  //   curl -H 'Host: localhost' http://<a-machine-on-the-LAN>:3024/...
+  //
+  // no proxy needed. This request must be denied on the ADDRESS, whatever the
+  // header says.
+  it('denies a request from a non-loopback socket even when it claims Host: localhost', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    for (const remote of ['192.168.1.40', '10.0.0.7', '2001:db8::1', '::ffff:192.168.1.40']) {
+      expect(
+        devAuthBypassEnabled(eventFrom('localhost:3024', remote)),
+        `Host: localhost from ${remote}`,
+      ).toBe(false)
+    }
+  })
+
+  // The positive control for the cell above: a gate that denied every address
+  // would pass it while making the feature unusable.
+  it('accepts the loopback peer addresses a real server reports', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    for (const remote of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '127.0.0.2']) {
+      expect(devAuthBypassEnabled(eventFrom('localhost:3024', remote)), remote).toBe(true)
+    }
+  })
+
+  it('denies when there is no socket to observe — absence is not "probably local"', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(eventFrom('localhost:3024', null))).toBe(false)
+  })
+
+  // The Host check survives as a SECOND layer; this pins that it still refuses.
+  it('still denies a foreign Host from a loopback socket, so the second layer stays', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.STUDIO_DEV_AUTH_BYPASS = '1'
+    expect(devAuthBypassEnabled(eventFrom('studio.grundtone.com', '127.0.0.1'))).toBe(false)
+  })
+
+  // 🔴 THE DEAD SET MEMBER [sikkerhed] FOUND BY RUNNING THE PREDICATE. A dead
+  // ACCEPT is a false negative: it refuses a legitimate caller and looks like
+  // the gate working, which is why no other cell noticed it.
+  it('accepts the loopback spellings that were dead or missing before', () => {
+    for (const host of ['::1', '[::1]', '[::1]:3024', 'LOCALHOST', 'localhost.', '127.0.0.2']) {
+      expect(isLoopbackHost(host), host).toBe(true)
+    }
+  })
+
+  it('separates the address predicate from the host predicate', () => {
+    // 'localhost' is a HOST, never an address: an address predicate that
+    // accepted it would be reading a name as an observation.
+    expect(isLoopbackAddress('localhost')).toBe(false)
+    expect(isLoopbackAddress('::ffff:127.0.0.1')).toBe(true)
+    expect(isLoopbackAddress('::ffff:192.168.1.40')).toBe(false)
+    expect(isLoopbackAddress(undefined)).toBe(false)
   })
 })
 
