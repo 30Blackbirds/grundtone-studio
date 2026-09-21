@@ -117,7 +117,12 @@ jobs:
           # files the image serves, and the CDN pulls them from that image
           # (KH-988). Without packages/saas-client, an SDK change that breaks
           # the pinned SRI would only turn red after merge.
-          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|packages/saas-client/.*|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts|apps/studio/sdk-contract/.*)$'
+          #
+          # The integration guide and its snippets are included because the
+          # boot-smoke asserts that every /client URL /docs/install shows answers
+          # 200 (KH-857). Without them a PR that points the guide at a missing
+          # URL would skip the smoke and turn red only after merge.
+          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|packages/saas-client/.*|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts|apps/studio/sdk-contract/.*|apps/studio/pages/docs/install\.vue|apps/studio/utils/install-snippets\.ts)$'
           # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:
           # en fejlende `git diff` i en kommando-substitution afbryder trinnet
           # (exit 129) og goer jobbet ROEDT. Det er fail-CLOSED, ikke fail-open
