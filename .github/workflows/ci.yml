@@ -216,6 +216,32 @@ jobs:
       # No pnpm install needed — the script is plain Node + node:fs.
       - run: node scripts/check-i18n-parity.mjs
 
+  # 🔴 Published SDK contract versions are immutable (KH-991). Every file under
+  # apps/studio/sdk-contract/ is a version customers may have pinned with SRI:
+  # it may be ADDED, never changed or deleted. The guard compares the tree with
+  # the base revision, so the base must be the revision this change lands on:
+  #   pull_request  the target branch
+  #   push          the commit before the push (github.event.before) — on a push
+  #                 origin/main IS the new head, and comparing it with itself
+  #                 would check nothing and stay green.
+  # A base that cannot be resolved fails the job; it is never a skip.
+  sdk-contract:
+    name: SDK contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      # No pnpm install needed — the guard is plain Node + git.
+      - name: Published contract versions are unchanged
+        env:
+          SDK_CONTRACT_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: node apps/studio/scripts/sdk-contract-guard.mjs
+
   actionlint:
     name: Actionlint
     runs-on: ubuntu-latest
