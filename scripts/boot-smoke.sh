@@ -16,8 +16,9 @@
 # Kontrakt:
 #   stdout  = NØJAGTIG det image-ID der blev kørt, intet andet
 #   stderr  = al diagnostik
-#   exit    = 0 only if healthz answers, /login returns 200, and the SDK
-#             contract files are served (see the /client block below)
+#   exit    = 0 only if healthz answers, /login returns 200, the SDK
+#             contract files are served (see the /client block below), and
+#             every /client URL shown on /docs/install answers 200
 #
 # Brug:  scripts/boot-smoke.sh <image-ref>
 #        BOOT_SMOKE_PORT=3987 scripts/boot-smoke.sh <image-ref>
@@ -169,6 +170,30 @@ for file in v9.js "v$major.99.99.js"; do
     || { log "✗ /client/$file returned '$code', want 404 — a catch-all answers for the SDK paths"; exit 1; }
   log "✓ /client/$file 404 in boot-smoke"
 done
+
+# 4. The integration guide must point at URLs that exist (KH-857 d). Before
+# this, /docs/install linked /client/v1.js and /client/v1.0.0.js for weeks
+# while both were 404: the guide and the artefact never met. The page is
+# rendered by THIS image, and the image is the CDN's origin, so every
+# /client/... path in the server-rendered HTML must answer 200 here. The host
+# in the page (cdnBase) is stripped: what is measured is the path contract.
+# The page must also name the latest AND the pinned URL, so a guide that stops
+# rendering them cannot pass by having nothing to check.
+code=$(curl -s -o "$SDK_TMP/install.html" -w '%{http_code}' "http://127.0.0.1:$PORT/docs/install")
+[ "$code" = '200' ] || { log "✗ /docs/install returned $code in boot-smoke"; exit 1; }
+doc_paths=$(grep -oE '/client/v[0-9][0-9A-Za-z.]*' "$SDK_TMP/install.html" | sort -u)
+for want in "/client/v$major.js" "/client/v$contract.js" "/client/v$contract.js.sri"; do
+  printf '%s\n' "$doc_paths" | grep -qxF "$want" \
+    || { log "✗ /docs/install does not show $want (shows: $(echo "$doc_paths" | tr '\n' ' '))"; exit 1; }
+done
+ndoc=0
+for path in $doc_paths; do
+  code=$(sdk_get "$path" /dev/null)
+  [ "${code%% *}" = '200' ] \
+    || { log "✗ /docs/install shows $path, but the image answers '$code'"; exit 1; }
+  ndoc=$((ndoc + 1))
+done
+log "✓ /docs/install: all $ndoc /client/ URL(s) it shows answer 200: $(echo "$doc_paths" | tr '\n' ' ')"
 rm -rf "$SDK_TMP"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren
