@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { dayOnly } from '~~/utils/relative-time'
+
   const props = defineProps<{ projectId: string; canManage: boolean }>()
   const { t, d } = useI18n()
 
@@ -79,6 +81,9 @@
       )
       createdPlaintext.value = res.plaintext
       createdKeyType.value = newKeyType.value
+      // The secret is shown ONCE, in the alert on the page — not inside the
+      // modal, which a reflexive Escape would close with the key still unseen.
+      showCreate.value = false
       newOrigins.value = ''
       newEnv.value = 'live'
       newKeyType.value = 'publishable'
@@ -109,6 +114,11 @@
     showCreate.value = false
   }
 
+  function openCreate() {
+    createError.value = null
+    showCreate.value = true
+  }
+
   const toast = useToast()
   const pendingRevokeId = ref<string | null>(null)
   const revoking = ref(false)
@@ -129,6 +139,30 @@
   }
 
   const activeKeys = computed(() => (keys.value ?? []).filter((k) => !k.revokedAt))
+
+  const { locale } = useI18n()
+  // "Oprettet" is a date with no clock, like the R5 tables (dayOnly, #309).
+  const created = (iso: string) => dayOnly(new Date(iso), locale.value)
+  const lastUsed = (iso: string | null) =>
+    iso ? t('apiKeys.lastUsed', { date: d(new Date(iso), 'short') }) : t('apiKeys.neverUsed')
+
+  // 🔴 NO "NAVN" COLUMN. The R7 prototype's first column is the key's name,
+  // and api_keys has no name field (server/db/schema/studio.ts). Adding one is
+  // a schema change that KH-1023 routes through [sikkerhed] — so this table is
+  // built without it, and the column goes in when the field exists. The
+  // prefix column ("Nøgle") is what identifies a key until then.
+  const keyRows = computed(() =>
+    activeKeys.value.map((k) => ({
+      id: k.id,
+      key: k.keyPrefix,
+      keyType: k.keyType,
+      env: k.environment,
+      origins: k.allowedOrigins,
+      rateLimit: k.rateLimit,
+      lastUsed: lastUsed(k.lastUsedAt),
+      created: created(k.createdAt),
+    })),
+  )
   const revokedKeys = computed(() => (keys.value ?? []).filter((k) => k.revokedAt))
 
   // First active publishable key drives the install snippet UI (the CDN
@@ -152,10 +186,13 @@
           </button>
         </GTTooltip>
       </div>
-      <GTButton v-if="canManage && !showCreate && !createdPlaintext" @click="showCreate = true">
+      <GTButton v-if="canManage" @click="openCreate">
         {{ t('apiKeys.create') }}
       </GTButton>
     </header>
+    <p class="text-tertiary text-sm m-0 -mt-4">
+      {{ t('apiKeys.subtitleActive', { n: activeKeys.length }, activeKeys.length) }}
+    </p>
 
     <!-- In-app-hjælp v1 (launch-krav): pk/sk-forvekslingen er support-driver
          #2 — den foldbare forklaring bor over tabellen hvor nøglerne vælges. -->
@@ -194,62 +231,123 @@
       </div>
     </GTAlert>
 
-    <form
-      v-if="showCreate && !createdPlaintext"
-      class="flex flex-col gap-4 p-4 bg-surface-raised border rounded-lg"
-      @submit.prevent="createKey"
-    >
-      <GTSelect
-        v-model="newKeyType"
-        :label="t('apiKeys.keyType')"
-        :help-text="t('apiKeys.keyTypeHelp')"
-        :options="[
-          { value: 'publishable', label: t('apiKeys.typePublishable') },
-          { value: 'secret', label: t('apiKeys.typeSecret') },
-        ]"
-      />
-      <GTSelect
-        v-model="newEnv"
-        :label="t('apiKeys.environment')"
-        :options="[
-          { value: 'live', label: t('apiKeys.envLive') },
-          { value: 'test', label: t('apiKeys.envTest') },
-        ]"
-      />
-      <!-- Origins + rate limit are CDN concerns; secret keys are server/CLI
+    <!-- 🔴 A MODAL, NOT AN INLINE FORM (R7, UX-audit #6: inline-expanding
+         forms push the list around). The form body is unchanged — same fields,
+         same validation, same submit — only its container moved. After a
+         successful create the modal closes and the reveal-once alert above
+         takes over, because the secret must not live inside something a
+         reflexive Escape would dismiss. -->
+    <GTModal :open="showCreate" :title="t('apiKeys.create')" @update:open="showCreate = $event">
+      <form class="flex flex-col gap-4" @submit.prevent="createKey">
+        <GTSelect
+          v-model="newKeyType"
+          :label="t('apiKeys.keyType')"
+          :help-text="t('apiKeys.keyTypeHelp')"
+          :options="[
+            { value: 'publishable', label: t('apiKeys.typePublishable') },
+            { value: 'secret', label: t('apiKeys.typeSecret') },
+          ]"
+        />
+        <GTSelect
+          v-model="newEnv"
+          :label="t('apiKeys.environment')"
+          :options="[
+            { value: 'live', label: t('apiKeys.envLive') },
+            { value: 'test', label: t('apiKeys.envTest') },
+          ]"
+        />
+        <!-- Origins + rate limit are CDN concerns; secret keys are server/CLI
            credentials that never hit the CDN /k route, so we hide them. -->
-      <template v-if="newKeyType !== 'secret'">
-        <GTTextarea
-          v-model="newOrigins"
-          :label="t('apiKeys.allowedOrigins')"
-          :help-text="t('apiKeys.allowedOriginsHelp')"
-          placeholder="acme.com&#10;*.acme.com"
-          :rows="3"
-        />
-        <GTInput
-          v-model="newRateLimit"
-          type="number"
-          :label="t('apiKeys.rateLimit')"
-          :help-text="t('apiKeys.rateLimitHelp')"
-          :min="1"
-          :max="1_000_000"
-          :step="100"
-        />
-      </template>
-      <GTAlert v-if="createError" variant="error" :heading="createError" />
-      <div class="flex gap-3 justify-end">
-        <GTButton type="button" variant="secondary" @click="showCreate = false">
-          {{ t('app.cancel') }}
-        </GTButton>
-        <GTButton type="submit" :loading="creating">{{ t('apiKeys.generate') }}</GTButton>
-      </div>
-    </form>
+        <template v-if="newKeyType !== 'secret'">
+          <GTTextarea
+            v-model="newOrigins"
+            :label="t('apiKeys.allowedOrigins')"
+            :help-text="t('apiKeys.allowedOriginsHelp')"
+            placeholder="acme.com&#10;*.acme.com"
+            :rows="3"
+          />
+          <GTInput
+            v-model="newRateLimit"
+            type="number"
+            :label="t('apiKeys.rateLimit')"
+            :help-text="t('apiKeys.rateLimitHelp')"
+            :min="1"
+            :max="1_000_000"
+            :step="100"
+          />
+        </template>
+        <GTAlert v-if="createError" variant="error" :heading="createError" />
+        <div class="flex gap-3 justify-end">
+          <GTButton type="button" variant="secondary" @click="showCreate = false">
+            {{ t('app.cancel') }}
+          </GTButton>
+          <GTButton type="submit" :loading="creating">{{ t('apiKeys.generate') }}</GTButton>
+        </div>
+      </form>
+    </GTModal>
 
     <section>
       <h3 class="text-sm uppercase text-tertiary tracking-wide mb-3">
         {{ t('apiKeys.active') }}
       </h3>
-      <ul v-if="activeKeys.length" class="list-reset grid gap-2">
+      <!-- Table above 920px, cards below — [designer]'s breakpoint for R1/R5/
+           R6, not the 640px GTTable stacks at on its own (riff e4o6sixt). Same
+           two-rendering swap as the R5 members page (#309). -->
+      <div v-if="activeKeys.length" class="table-wide">
+        <GTTable
+          :caption="t('apiKeys.active')"
+          :columns="[
+            { key: 'key', label: t('apiKeys.colKey') },
+            { key: 'env', label: t('apiKeys.colEnv') },
+            { key: 'lastUsed', label: t('apiKeys.colLastUsed') },
+            { key: 'created', label: t('apiKeys.colCreated') },
+            { key: 'actions', label: '' },
+          ]"
+          :rows="keyRows"
+          :responsive="false"
+        >
+          <template #cell-key="{ row }">
+            <span class="flex flex-col gap-1 min-w-0">
+              <span class="flex flex-wrap items-center gap-2">
+                <code class="api-key__prefix font-mono text-sm">{{ row.key }}…</code>
+                <GTBadge v-if="row.keyType === 'secret'" variant="warning">
+                  {{ t('apiKeys.secretBadge') }}
+                </GTBadge>
+              </span>
+              <!-- Origins and rate limit have no column in the prototype, but
+                   they are real settings a user chose; dropping them from the
+                   desktop view would hide them. They sit under the prefix, as
+                   the email sits under the name in the R5 table. -->
+              <span v-if="row.keyType !== 'secret'" class="text-tertiary text-sm">
+                {{
+                  (row.origins as string[]).length
+                    ? (row.origins as string[]).join(', ')
+                    : t('apiKeys.anyOrigin')
+                }}
+                · {{ t('apiKeys.rateLimitBadge', { n: row.rateLimit }) }}
+              </span>
+            </span>
+          </template>
+          <template #cell-env="{ row }">
+            <GTTooltip :content="t('apiKeys.envTooltip')" position="bottom">
+              <GTBadge :variant="row.env === 'live' ? 'success' : 'neutral'">
+                {{ t(`apiKeys.env${row.env === 'live' ? 'Live' : 'Test'}`) }}
+              </GTBadge>
+            </GTTooltip>
+          </template>
+          <template #cell-actions="{ row }">
+            <GTButton
+              v-if="canManage"
+              variant="outlined"
+              size="sm"
+              @click="pendingRevokeId = String(row.id)"
+            >
+              {{ t('apiKeys.revoke') }}
+            </GTButton>
+          </template>
+        </GTTable>
+      </div>
+      <ul v-if="activeKeys.length" class="table-narrow list-reset">
         <li
           v-for="k in activeKeys"
           :key="k.id"

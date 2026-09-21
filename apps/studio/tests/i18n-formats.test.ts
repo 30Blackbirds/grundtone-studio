@@ -83,3 +83,25 @@ describe('date format names used in the app', () => {
     expect([...used].filter((name) => !(name in datetimeFormats[locale]))).toEqual([])
   })
 })
+
+// 🔴 THE SUBTITLE COUNTS PLURALISE, AND IN DANISH THE ADJECTIVE AGREES.
+// Measured on the served R7 page (KH-1023): with one key the subtitle read
+// "1 aktive nøgler" — plural adjective, plural noun, singular count. The R5
+// members subtitle had the same latent fault; the seeded fixture has three
+// members, so it only ever rendered the plural and nobody saw it. The count
+// is passed as vue-i18n's plural selector (third argument), as
+// dashboard.tokenCount already does.
+describe('subtitle counts pluralise', () => {
+  const t = (locale: 'da' | 'en', key: string, n: number) => i18nFor(locale).t(key, { n }, n)
+
+  it.each([
+    ['da', 'apiKeys.subtitleActive', 1, '1 aktiv nøgle'],
+    ['da', 'apiKeys.subtitleActive', 2, '2 aktive nøgler'],
+    ['en', 'apiKeys.subtitleActive', 1, '1 active key'],
+    ['en', 'apiKeys.subtitleActive', 2, '2 active keys'],
+    ['da', 'members.subtitleActive', 1, '1 aktiv'],
+    ['da', 'members.subtitleActive', 3, '3 aktive'],
+  ] as const)('%s %s n=%i -> %s', (locale, key, n, expected) => {
+    expect(t(locale, key, n)).toBe(expected)
+  })
+})

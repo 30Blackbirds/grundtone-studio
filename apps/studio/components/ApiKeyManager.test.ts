@@ -2,7 +2,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { defineComponent, h, ref } from 'vue'
 import ApiKeyManager from './ApiKeyManager.vue'
 // Real ConfirmDialog (not a stub): the revoke tests exercise the actual
 // open → confirm/cancel contract end-to-end against GTModal/GTButton stubs.
@@ -34,9 +36,16 @@ vi.stubGlobal('useRequestHeaders', () => ({}))
 // setup-vue.ts ships a default useI18n that ignores params. This component
 // renders interpolated strings (`apiKeys.rateLimitBadge`, `{n}`), so we
 // reach for the params-aware variant from the start.
+// It must also carry `locale` and `d`, because the real useI18n does: the
+// component reads `locale.value` to format the "Created" column (R7, KH-1023).
+// A stub narrower than the contract made the component throw in setup and
+// render nothing — six cells failed on `expected ''`, which reads like a
+// broken page rather than an incomplete stub.
 vi.stubGlobal('useI18n', () => ({
   t: (key: string, params?: Record<string, unknown>) =>
     params ? `${key}(${JSON.stringify(params)})` : key,
+  d: (date: Date) => date.toISOString(),
+  locale: ref('en'),
 }))
 
 const writeTextMock = vi.fn(() => Promise.resolve())
@@ -124,6 +133,30 @@ const global = {
     GTInput: gtStub('GTInput'),
     GTIcon: gtStub('GTIcon'),
     GTTooltip: gtStub('GTTooltip'),
+    GTDetails: gtStub('GTDetails'),
+    GTTable: defineComponent({
+      name: 'GTTable',
+      props: ['columns', 'rows', 'caption', 'responsive'],
+      setup(props, { slots }) {
+        return () =>
+          h(
+            'table',
+            { 'data-test': 'gt-table' },
+            (props.rows as Record<string, unknown>[]).map((row) =>
+              h(
+                'tr',
+                (props.columns as { key: string }[]).map((c) =>
+                  h(
+                    'td',
+                    slots[`cell-${c.key}`]?.({ row, value: row[c.key] }) ??
+                      String(row[c.key] ?? ''),
+                  ),
+                ),
+              ),
+            ),
+          )
+      },
+    }),
     InstallSnippet,
   },
   mocks: {
@@ -351,5 +384,39 @@ describe('ApiKeyManager', () => {
       ([, opts]) => (opts as { method?: string })?.method === 'DELETE',
     )
     expect(deleteCalls).toHaveLength(0)
+  })
+})
+
+describe('the R7 key table (KH-1023)', () => {
+  // The existing cells pass on the CARD rendering alone, because the cards and
+  // the table carry the same text — so without this, the table could render
+  // nothing and every cell above would stay green.
+  it('renders each active key as a table row with prefix, env and created date', async () => {
+    fetchMock.mockResolvedValueOnce([
+      k(),
+      k({ id: 'k2', keyPrefix: 'pk_test_xyz', environment: 'test' }),
+    ])
+    const w = mount(Wrapper, { props: { projectId: PROJECT_ID, canManage: true }, global })
+    await flushPromises()
+
+    const table = w.find('[data-test="gt-table"]')
+    expect(table.exists(), 'the table is not rendered at all').toBe(true)
+    const rows = table.findAll('tr')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]!.text()).toContain('pk_live_abc')
+    expect(rows[0]!.text()).toContain('apiKeys.envLive')
+    expect(rows[1]!.text()).toContain('pk_test_xyz')
+    expect(rows[1]!.text()).toContain('apiKeys.envTest')
+    // "Created" is a date with no clock (dayOnly), in the active locale.
+    expect(rows[0]!.text()).toContain('May 19, 2026')
+  })
+
+  it('has no name column — api_keys has no name field yet', () => {
+    // Pins the deliberate omission, so the column is added on purpose when
+    // the schema change lands (routed via [sikkerhed]), not by accident.
+    // cwd, not import.meta.url: this file runs under happy-dom, where
+    // import.meta.url is not a file: URL and `new URL(...)` throws.
+    const src = readFileSync(resolve(process.cwd(), 'components/ApiKeyManager.vue'), 'utf8')
+    expect(src).not.toMatch(/key:\s*'name'/)
   })
 })

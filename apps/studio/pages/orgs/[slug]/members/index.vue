@@ -195,7 +195,7 @@
       </GTButton>
     </header>
     <p class="text-tertiary text-sm mt-0 mb-6">
-      {{ activeOrg?.name }} · {{ t('members.subtitleActive', { n: activeCount }) }} ·
+      {{ activeOrg?.name }} · {{ t('members.subtitleActive', { n: activeCount }, activeCount) }} ·
       {{ t('members.subtitlePending', { n: pendingCount }) }}
     </p>
 
@@ -237,7 +237,7 @@
          CSS — which would drift the moment the library changes them — the page
          renders both and `display: none` hides one. `display: none` removes a
          subtree from the accessibility tree too, so only one is ever announced. -->
-    <div class="members-wide">
+    <div class="members-wide table-wide">
       <GTTable
         :caption="t('members.active')"
         :columns="[
@@ -279,7 +279,7 @@
       </GTTable>
     </div>
 
-    <ul class="members-narrow list-reset">
+    <ul class="members-narrow table-narrow list-reset">
       <li
         v-for="m in members"
         :key="m.id"
@@ -305,7 +305,7 @@
     <template v-if="pendingInvitations && pendingInvitations.length">
       <h2 class="members-section-heading mt-8">{{ t('members.pending') }}</h2>
 
-      <div class="members-wide">
+      <div class="members-wide table-wide">
         <GTTable
           :caption="t('members.pending')"
           :columns="[
@@ -358,7 +358,7 @@
         </GTTable>
       </div>
 
-      <ul class="members-narrow list-reset">
+      <ul class="members-narrow table-narrow list-reset">
         <li
           v-for="inv in pendingInvitations"
           :key="inv.id"
