@@ -102,7 +102,18 @@ function readBase(repoRoot, baseRef, relDir) {
   // 🔴 A MISSING BASE IS AN ERROR, NOT A SKIP. If the ref cannot be resolved the
   // immutability rule — the one this guard exists for — would silently check
   // nothing and stay green. Failing loudly is the only safe answer.
-  git('rev-parse', '--verify', `${baseRef}^{commit}`)
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`], {
+      cwd: repoRoot,
+      stdio: 'ignore',
+    })
+  } catch {
+    console.error(
+      `✗ base revision '${baseRef}' cannot be resolved — immutability was NOT checked. ` +
+        'Set SDK_CONTRACT_BASE to a fetched revision (CI needs fetch-depth: 0).',
+    )
+    process.exit(2)
+  }
   const names = git('ls-tree', '-r', '--name-only', baseRef, '--', relDir)
     .toString('utf8')
     .split('\n')
