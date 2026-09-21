@@ -29,6 +29,18 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
     programmatic: 'ts',
     curl: 'sh',
   }
+
+  // 🔴 A FILENAME ONLY WHERE THE SNIPPET HAS ONE. The R7 prototype's bar shows
+  // `nuxt.config.ts` — but next to a `loadByApiKey()` body, not the
+  // `app.use(grundtone, …)` this tab renders, which lives in a Vue app's
+  // `main.ts`. Copying the prototype's filename would label the code wrong.
+  // The programmatic snippet belongs in any file and curl in a terminal, so
+  // those two carry no filename rather than an invented one; the tab above
+  // already names them.
+  const FILENAMES: Record<string, string | undefined> = {
+    scriptTag: 'index.html',
+    vuePlugin: 'main.ts',
+  }
 </script>
 
 <template>
@@ -54,7 +66,9 @@ await loadByApiKey({ apiKey: '${sampleKey.value}' })`,
       "
     >
       <GTTabPanel v-for="(code, id) in snippets" :id="id" :key="id">
-        <CodeSnippet :code="code" :language="LANGUAGES[id] ?? 'txt'" :label="t(`install.${id}`)" />
+        <!-- No `label`: it repeated the tab's own name one line below it. The
+             bar carries the filename (when there is one) and the language. -->
+        <CodeSnippet :code="code" :language="LANGUAGES[id] ?? 'txt'" :filename="FILENAMES[id]" />
       </GTTabPanel>
     </GTTabs>
   </section>
