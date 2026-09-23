@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { installSnippets } from '~~/utils/install-snippets'
+
   const props = defineProps<{ apiKey: string | null }>()
   const { t } = useI18n()
 
@@ -7,13 +9,10 @@
 
   const sampleKey = computed(() => props.apiKey ?? 'pk_live_<your-key>')
 
-  // `</` + `script>` keeps the closing tag out of the SFC's surrounding <script> block.
-  const closeTag = '</' + 'script>'
   const snippets = computed(() => ({
-    scriptTag: `<script src="${cdnBase.value}/client/v1.js"
-        data-api-key="${sampleKey.value}">${closeTag}
-<link rel="stylesheet"
-      href="${cdnBase.value}/k/${sampleKey.value}/tokens.css" />`,
+    // From the shared guide snippets, so the SDK URL has one source: the
+    // contract constant (KH-857). The docs page renders the same string.
+    scriptTag: installSnippets({ cdnBase: cdnBase.value, sampleKey: sampleKey.value }).scriptTag,
     vuePlugin: `import { grundtone } from '@grundtone/saas-client'
 
 app.use(grundtone, { apiKey: '${sampleKey.value}' })`,
