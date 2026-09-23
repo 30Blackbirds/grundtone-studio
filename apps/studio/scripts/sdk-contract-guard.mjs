@@ -144,9 +144,14 @@ function main() {
 
   // The denominator, always — a green that does not say what it looked at
   // cannot be told apart from a green that looked at nothing.
+  // Two different quantities that can happen to be EQUAL, so they are named:
+  // files on disk now, and files the BASE had (every one of those is compared,
+  // whether or not the diff touched it — that is why an altered old file
+  // cannot hide by being absent from the change set).
   console.log(
-    `sdk-contract: ${versions.size} version(s) [${[...versions].sort().join(', ')}], ` +
-      `${current.size} file(s), ${base.size} compared against ${baseRef}; current contract ${contractVersion}`,
+    `sdk-contract: ${versions.size} version(s) [${[...versions].sort().join(', ')}]; ` +
+      `${current.size} file(s) on disk; ${base.size} file(s) existed on ${baseRef} ` +
+      `and were compared byte for byte; current contract ${contractVersion}`,
   )
   if (errors.length) {
     for (const e of errors) console.error(`✗ ${e}`)
