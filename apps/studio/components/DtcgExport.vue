@@ -8,6 +8,8 @@
     projectId: string
     hasDraft: boolean
     hasActive: boolean
+    /** Inside the project page's export modal, whose own title says this. */
+    hideHeading?: boolean
     // Changes whenever the saved draft or the active version changes, so the
     // report is fetched again instead of describing tokens that are gone.
     revision: string
@@ -68,7 +70,7 @@
 <template>
   <div class="flex flex-col gap-6">
     <div>
-      <h2 class="m-0">{{ t('dtcgExport.title') }}</h2>
+      <h2 v-if="!hideHeading" class="m-0">{{ t('dtcgExport.title') }}</h2>
       <p class="text-tertiary mt-1 mb-0 text-sm">{{ t('dtcgExport.intro') }}</p>
     </div>
 

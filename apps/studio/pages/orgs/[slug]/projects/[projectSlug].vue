@@ -126,6 +126,9 @@
   })
 
   const hasDraft = computed(() => Boolean(config.value?.draft))
+
+  // Export lives in a modal opened from the header action above.
+  const showExport = ref(false)
 </script>
 
 <template>
@@ -165,6 +168,17 @@
         >
           {{ t('project.publish') }}
         </GTButton>
+        <!-- 🔴 AN ACTION, NOT A TAB (KH-1005 E8, verbatim: "en 'Eksportér
+             (DTCG)'-HANDLING på projektsiden, der viser eksport-rapporten, når
+             noget blev udeladt"). The IA prototype names the project tab bar
+             exactly: Tokens/Komponenter/API-nøgler/Versioner/Medlemmer — five
+             tabs, and export is not among them. It shipped as a sixth tab; no
+             decision anywhere named it one. Export is available to every role
+             that can see the project and on every plan, so it does not sit
+             behind `canEdit`: the tokens are the customer's. -->
+        <GTButton variant="secondary" @click="showExport = true">
+          {{ t('dtcgExport.action') }}
+        </GTButton>
       </div>
     </header>
 
@@ -193,7 +207,6 @@
         { id: 'components', label: t('project.tabComponents') },
         { id: 'apiKeys', label: t('apiKeys.title') },
         { id: 'versions', label: t('versions.title') },
-        { id: 'export', label: t('dtcgExport.title') },
         { id: 'members', label: t('projectMembers.title') },
       ]"
     >
@@ -265,18 +278,22 @@
         <VersionHistory :project-id="project.id" :can-manage="canEdit" @activated="refreshConfig" />
       </GTTabPanel>
 
-      <GTTabPanel id="export">
-        <DtcgExport
-          :project-id="project.id"
-          :has-draft="Boolean(config?.draft)"
-          :has-active="Boolean(config?.active)"
-          :revision="`${config?.active?.id ?? ''}:${initialTokens}`"
-        />
-      </GTTabPanel>
-
       <GTTabPanel id="members">
         <ProjectMembersManager :project-id="project.id" :can-manage="canManage" />
       </GTTabPanel>
     </GTTabs>
+
+    <!-- The export report is the point of the action, so it opens where it can
+         be read without leaving the project (KH-1005 E8). -->
+    <GTModal :open="showExport" :title="t('dtcgExport.title')" @update:open="showExport = $event">
+      <DtcgExport
+        v-if="project"
+        hide-heading
+        :project-id="project.id"
+        :has-draft="Boolean(config?.draft)"
+        :has-active="Boolean(config?.active)"
+        :revision="`${config?.active?.id ?? ''}:${initialTokens}`"
+      />
+    </GTModal>
   </section>
 </template>

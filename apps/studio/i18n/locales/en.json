@@ -400,6 +400,7 @@
   },
   "dtcgExport": {
     "title": "Export (DTCG)",
+    "action": "Export (DTCG)",
     "intro": "Download this project's tokens in the Design Tokens Community Group format (2025.10), for use in other tools. Available on every plan.",
     "empty": "Nothing to export yet. Save a draft or publish first.",
     "sourceLabel": "Tokens to export",
