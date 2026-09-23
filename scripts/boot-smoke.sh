@@ -91,13 +91,20 @@ log "✓ /login 200 in boot-smoke"
 # code alone is not enough, because a catch-all can also answer 200. Each file
 # must carry its own content type.
 #
-# The versioned URL is cached as immutable and pinned by customers with SRI, so
-# its bytes may never change without a contract bump. Each versioned bundle must
-# hash to the SRI the image serves next to it, AND that SRI must equal the one
-# committed for the contract. A drift means the SDK changed under a published
-# version.
+# Two sources since KH-991, and each gets the check that means something for it:
+#   v<major>.*  the LATEST build, from the dist. It must be byte-identical to the
+#               committed files of the CURRENT contract version — if it is not,
+#               the SDK changed without bumping SDK_CONTRACT_VERSION.
+#   v<x.y.z>.*  EVERY committed version, from apps/studio/sdk-contract/. Each must
+#               be served with its exact committed bytes, and each bundle must
+#               hash to its committed SRI. This is what keeps an SRI pin on an
+#               OLDER version working after a bump.
+# (Before KH-991 this block compared the served v<contract>.sri with the
+# committed one. The image now serves that file FROM the committed directory, so
+# that comparison would be circular — it could no longer fail.)
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CONTRACT_FILE="$ROOT/apps/studio/utils/sdk-contract.ts"
+CONTRACT_DIR="$ROOT/apps/studio/sdk-contract"
 contract=$(sed -n "s/^export const SDK_CONTRACT_VERSION = '\([0-9][0-9.]*\)'$/\1/p" "$CONTRACT_FILE")
 [ -n "$contract" ] && [ "$(printf '%s\n' "$contract" | wc -l | tr -d ' ')" = 1 ] \
   || { log "✗ could not read exactly one SDK_CONTRACT_VERSION from $CONTRACT_FILE (got '$contract')"; exit 1; }
@@ -105,34 +112,63 @@ major=${contract%%.*}
 log "SDK contract v$contract (major v$major)"
 
 sdk_get() { curl -s -o "$2" -w '%{http_code} %{content_type}' "http://127.0.0.1:$PORT$1"; }
-SDK_TMP=$(mktemp -d)
-for spec in "v$major.js application/javascript" \
-            "v$contract.js application/javascript" "v$contract.js.sri text/plain" \
-            "v$contract.mjs application/javascript" "v$contract.mjs.sri text/plain"; do
-  file=${spec%% *}; want=${spec#* }
+content_type() {
+  case "$1" in
+    *.map) echo application/json ;;
+    *.sri) echo text/plain ;;
+    *) echo application/javascript ;;
+  esac
+}
+sdk_fetch() {
+  local file=$1 want got
+  want=$(content_type "$file")
   got=$(sdk_get "/client/$file" "$SDK_TMP/$file")
   case "$got" in
-    "200 $want"*) log "✓ /client/$file $got in boot-smoke" ;;
+    "200 $want"*) ;;
     *) log "✗ /client/$file returned '$got', want '200 $want'"; docker logs "$APP" 2>&1 | tail -50 >&2; exit 1 ;;
   esac
-done
+}
+SDK_TMP=$(mktemp -d)
+
+# 1. Latest build == committed current version.
 for ext in js mjs; do
-  file="v$contract.$ext"
-  sri=$(tr -d '\n' < "$SDK_TMP/$file.sri")
-  calc="sha384-$(openssl dgst -sha384 -binary "$SDK_TMP/$file" | openssl base64 -A)"
-  [ "$sri" = "$calc" ] \
-    || { log "✗ /client/$file hashes to $calc, but /client/$file.sri says '$sri'"; exit 1; }
-  committed_file="$ROOT/apps/studio/sdk-contract/$file.sri"
-  committed=$(tr -d '\n' < "$committed_file" 2>/dev/null || true)
-  [ "$sri" = "$committed" ] \
-    || { log "✗ /client/$file serves $sri, but $committed_file commits '$committed' — the SDK bytes changed without bumping SDK_CONTRACT_VERSION"; exit 1; }
-  log "✓ /client/$file matches its served and committed SRI"
+  sdk_fetch "v$major.$ext"
+  cmp -s "$SDK_TMP/v$major.$ext" "$CONTRACT_DIR/v$contract.$ext" \
+    || { log "✗ /client/v$major.$ext differs from the committed v$contract.$ext — the SDK bytes changed without bumping SDK_CONTRACT_VERSION"; exit 1; }
+  log "✓ /client/v$major.$ext is byte-identical to the committed v$contract.$ext"
 done
-# Negative control: an unknown version must not be served.
-code=$(sdk_get /client/v9.js /dev/null)
-[ "${code%% *}" = '404' ] \
-  || { log "✗ /client/v9.js returned '$code', want 404 — a catch-all answers for the SDK paths"; exit 1; }
-log "✓ /client/v9.js 404 in boot-smoke"
+
+# 2. Every committed version, served byte for byte and self-consistent.
+versions=$(find "$CONTRACT_DIR" -maxdepth 1 -name 'v*.js' -exec basename {} .js \; | sort)
+[ -n "$versions" ] || { log "✗ no committed contract versions under $CONTRACT_DIR"; exit 1; }
+nversions=0
+for v in $versions; do
+  for ext in js mjs js.map mjs.map js.sri mjs.sri; do
+    sdk_fetch "$v.$ext"
+    cmp -s "$SDK_TMP/$v.$ext" "$CONTRACT_DIR/$v.$ext" \
+      || { log "✗ /client/$v.$ext is not the committed $v.$ext"; exit 1; }
+  done
+  for ext in js mjs; do
+    sri=$(tr -d '\n' < "$SDK_TMP/$v.$ext.sri")
+    calc="sha384-$(openssl dgst -sha384 -binary "$SDK_TMP/$v.$ext" | openssl base64 -A)"
+    [ "$sri" = "$calc" ] \
+      || { log "✗ /client/$v.$ext hashes to $calc, but /client/$v.$ext.sri says '$sri'"; exit 1; }
+  done
+  nversions=$((nversions + 1))
+  log "✓ /client/$v.* — 6 files served with their committed bytes, both bundles match their SRI"
+done
+# The denominator: a green that does not say how many versions it walked cannot
+# be told apart from one that walked none.
+log "✓ $nversions committed contract version(s) served: $(echo "$versions" | tr '\n' ' ')"
+
+# 3. Negative controls: an unknown major and an uncommitted version must 404,
+# or a catch-all is answering for the SDK paths.
+for file in v9.js "v$major.99.99.js"; do
+  code=$(sdk_get "/client/$file" /dev/null)
+  [ "${code%% *}" = '404' ] \
+    || { log "✗ /client/$file returned '$code', want 404 — a catch-all answers for the SDK paths"; exit 1; }
+  log "✓ /client/$file 404 in boot-smoke"
+done
 rm -rf "$SDK_TMP"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren

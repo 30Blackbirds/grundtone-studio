@@ -124,6 +124,12 @@ COPY --from=builder --chown=app:app /app/packages/saas-client/CHANGELOG.md ./pac
 # SDK bundles served by /client/[file] — the CDN pull zone uses studio as its
 # origin, so this copy is what cdn.grundtone.com serves (KH-988)
 COPY --from=builder --chown=app:app /app/packages/saas-client/dist ./packages/saas-client/dist
+# Every PUBLISHED SDK contract version, served byte-for-byte at /client/v<x.y.z>.*
+# (KH-991). The dist above is only ever the LATEST build; without this copy a
+# contract bump would turn every older versioned URL into a 404 and break the
+# SRI pins on it. /app is the runtime cwd, so the route finds this at
+# ./sdk-contract.
+COPY --from=builder --chown=app:app /app/apps/studio/sdk-contract ./sdk-contract
 COPY --chown=app:app docker/entrypoint.sh ./entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh

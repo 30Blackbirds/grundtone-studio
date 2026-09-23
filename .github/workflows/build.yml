@@ -140,6 +140,27 @@ jobs:
             echo 'relevant=false' >> "$GITHUB_OUTPUT"
           fi
 
+      # 🔴 Published SDK contract versions are immutable (KH-991). Every file
+      # under apps/studio/sdk-contract/ is a version customers may have pinned
+      # with SRI: it may be ADDED, never changed or deleted. It lives HERE, not
+      # in ci.yml: ci.yml is disabled, and a guard in a workflow that never runs
+      # is armed against nothing. The gate above already covers sdk-contract/.
+      # The base must be the revision this change lands on:
+      #   pull_request  the PR's base sha
+      #   push to main  github.event.before (origin/main IS the new head)
+      #   tag           the commit itself — `before` is all zeros for a tag, and
+      #                 the tagged commit was already guarded on its push to main.
+      #                 Immutability is then trivially green, but completeness,
+      #                 bundle == SRI and "current version committed" still run,
+      #                 and the log line says "compared against HEAD".
+      #   dispatch      `before` is empty, so the guard's default origin/main.
+      # An unresolvable base exits 2; it is never a skip.
+      - name: SDK contract — published versions unchanged
+        if: steps.gate.outputs.relevant == 'true'
+        env:
+          SDK_CONTRACT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (startsWith(github.ref, 'refs/tags/') && 'HEAD' || github.event.before) }}
+        run: node apps/studio/scripts/sdk-contract-guard.mjs
+
       # Samme gate-output som de dyre trin: paa en PR uden build-input er der
       # intet at bygge og intet at logge ind for. Uden `if:` her ville
       # "spring over"-grenen stadig koste buildx-opsaetning + registry-login,
