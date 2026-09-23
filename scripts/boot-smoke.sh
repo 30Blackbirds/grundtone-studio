@@ -175,13 +175,27 @@ done
 # this, /docs/install linked /client/v1.js and /client/v1.0.0.js for weeks
 # while both were 404: the guide and the artefact never met. The page is
 # rendered by THIS image, and the image is the CDN's origin, so every
-# /client/... path in the server-rendered HTML must answer 200 here. The host
-# in the page (cdnBase) is stripped: what is measured is the path contract.
+# /client/... URL in the server-rendered HTML must answer 200 here.
 # The page must also name the latest AND the pinned URL, so a guide that stops
 # rendering them cannot pass by having nothing to check.
+#
+# 🔴 THE HOST IS PART OF THE CONTRACT, NOT ONLY THE PATH. An earlier version of
+# this block stripped the host and measured the path alone — so a guide
+# pointing customers at the WRONG HOST would have passed green, which is the
+# very class this check exists to catch ([sikkerhed], KH-857). Every /client
+# URL on the page must carry EXPECTED_CDN_HOST. The smoke runs the image with
+# NUXT_PUBLIC_CDN_BASE unset, so the page renders the production default.
+EXPECTED_CDN_HOST=${BOOT_SMOKE_CDN_HOST:-cdn.grundtone.com}
 code=$(curl -s -o "$SDK_TMP/install.html" -w '%{http_code}' "http://127.0.0.1:$PORT/docs/install")
 [ "$code" = '200' ] || { log "✗ /docs/install returned $code in boot-smoke"; exit 1; }
-doc_paths=$(grep -oE '/client/v[0-9][0-9A-Za-z.]*' "$SDK_TMP/install.html" | sort -u)
+doc_urls=$(grep -oE 'https?://[A-Za-z0-9.:-]+/client/v[0-9][0-9A-Za-z.]*' "$SDK_TMP/install.html" | sort -u)
+[ -n "$doc_urls" ] \
+  || { log "✗ /docs/install shows no absolute /client URL at all — the guide stopped naming the SDK, or the grep no longer sees the rendered HTML"; exit 1; }
+bad_hosts=$(printf '%s\n' "$doc_urls" | sed -E 's|^https?://([^/]+)/.*|\1|' | sort -u | grep -vx "$EXPECTED_CDN_HOST" || true)
+[ -z "$bad_hosts" ] \
+  || { log "✗ /docs/install points at the wrong host(s): $(echo "$bad_hosts" | tr '\n' ' ')— expected $EXPECTED_CDN_HOST"; exit 1; }
+log "✓ /docs/install: every /client URL is on $EXPECTED_CDN_HOST"
+doc_paths=$(printf '%s\n' "$doc_urls" | sed -E 's|^https?://[^/]+||' | sort -u)
 for want in "/client/v$major.js" "/client/v$contract.js" "/client/v$contract.js.sri"; do
   printf '%s\n' "$doc_paths" | grep -qxF "$want" \
     || { log "✗ /docs/install does not show $want (shows: $(echo "$doc_paths" | tr '\n' ' '))"; exit 1; }

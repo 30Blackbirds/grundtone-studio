@@ -70,6 +70,17 @@ jobs:
           # misvisende svar. En gate der ikke kan se, maa ikke gaette.
           fetch-depth: 0
 
+      # 🔴 The SDK URL has one source (KH-857). This runs BEFORE the path gate
+      # and without an `if:`, on every PR and push: the scan is a few hundred
+      # ms of plain node over `git ls-files`, and a guard that only runs when
+      # the image is rebuilt would miss the very change it exists to catch — a
+      # .vue file spelling /client/v1.js out by hand. ci.yml is disabled, so
+      # the vitest cells for it do not execute in any green check; this step is
+      # what arms the rule. The script prints its denominator and exits 2 if
+      # the file set collapses.
+      - name: SDK URL — one source
+        run: node apps/studio/scripts/sdk-url-guard.mjs
+
       # ── Sti-gate ────────────────────────────────────────────────────────
       # ÉT gate-trin med ét output, frem for `if:` paa hvert dyrt trin. Med
       # betingelsen gentaget koerer det fjerde trin nogen tilfoejer uden den
@@ -122,7 +133,7 @@ jobs:
           # boot-smoke asserts that every /client URL /docs/install shows answers
           # 200 (KH-857). Without them a PR that points the guide at a missing
           # URL would skip the smoke and turn red only after merge.
-          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|packages/saas-client/.*|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts|apps/studio/sdk-contract/.*|apps/studio/pages/docs/install\.vue|apps/studio/utils/install-snippets\.ts)$'
+          PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|packages/saas-client/.*|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts|apps/studio/sdk-contract/.*|apps/studio/pages/docs/install\.vue|apps/studio/utils/install-snippets\.ts|apps/studio/scripts/.*)$'
           # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:
           # en fejlende `git diff` i en kommando-substitution afbryder trinnet
           # (exit 129) og goer jobbet ROEDT. Det er fail-CLOSED, ikke fail-open
