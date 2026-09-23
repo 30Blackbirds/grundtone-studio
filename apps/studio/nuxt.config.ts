@@ -30,6 +30,43 @@ export default defineNuxtConfig({
     '/orgs/**': { ssr: false },
     '/account': { ssr: false },
   },
+  // 🔴 DEV ONLY: point Nitro at the resolved entry file of
+  // @opentelemetry/resources (KH-1184).
+  //
+  // THE SYMPTOM: `nuxt dev` started, printed its Local URL, built the Vite
+  // client and server — and then died with
+  //   ENOTDIR: not a directory, stat '…/@opentelemetry/resources/build/src/index.js/build/src/index.js/build/src/index.js/build/src'
+  // The port stayed OPEN and every request hung (curl 000 on healthz and on
+  // every page), so nobody could run studio locally — including [designer],
+  // who judges pages at 1440 and 375, and for whom the dev-auth bypass
+  // (#294/#295) exists.
+  //
+  // THE MECHANISM the path names: `main` applied to a path that ALREADY ends in
+  // `main`, again and again. @opentelemetry/resources declares `main:
+  // build/src/index.js` and has NO `exports` map, so the dev resolver walks the
+  // legacy field and re-enters. Aliasing to the resolved file removes the walk.
+  //
+  // MEASURED, A/B with a startup control on both sides (a 000 means nothing
+  // unless the server actually started):
+  //   telemetry plugin off → started, no ENOTDIR, healthz 200
+  //   telemetry plugin on  → started, ENOTDIR,    healthz 000
+  // so the trigger is this plugin's dynamic import of that one package. Two
+  // cures were tried and MEASURED NOT TO WORK before this one:
+  // removing `externals.traceInclude`, and `externals.inline` of the OTel
+  // chain. Clearing .nuxt/.nitro/vite caches did not help either.
+  //
+  // WHY $development: the production build must not move. The OTel chain has
+  // broken the image before (v0.2.11, 2026-08-03: Nitro's externals tracing
+  // dropped transitive CJS deps and the image crashlooped), and `traceInclude`
+  // below is the cure for THAT. This alias changes dev resolution only; the
+  // image is still built and boot-smoked by build.yml exactly as before.
+  $development: {
+    nitro: {
+      alias: {
+        '@opentelemetry/resources': _require.resolve('@opentelemetry/resources'),
+      },
+    },
+  },
   nitro: {
     // v0.2.11-incident: Nitros externals-tracing missede transitive CJS-deps i
     // OTel-exporter-kæden (exporter-metrics-otlp-proto → -otlp-http → …) —
