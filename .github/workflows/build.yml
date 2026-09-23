@@ -907,13 +907,30 @@ jobs:
           # et sted. Moenstret skal matche SAMME form som EU_INGEST-regexen i
           # server/lib/sentry-region.test.ts — ellers er de to haandhaevelser
           # ikke samme regel, og enhedstesten vogter kun det ene sted.
-          dsn=$(curl -s "$BASE/" | grep -o 'sentryDsn:"[^"]*"' | head -1)
-          if [ -n "$dsn" ] && ! printf '%s' "$dsn" \
+          # 🔴 LÆS EN SIDE DER SVARER, IKKE EN REDIRECT (KH-1192, målt på
+          # v0.4.0-deployet). Denne assertion læste `$BASE/`, og i prod er `/`
+          # en 307 til /dashboard med en krop på 96 BYTES — ingen HTML, ingen
+          # DSN. Kombineret med `[ -n "$dsn" ] &&` betød "fandt intet"
+          # BESTÅET, så assertionen var vakuum-grøn ved konstruktion: den kunne
+          # ikke fyre uanset hvor DSN'en pegede hen. Målt samtidig: på /login
+          # (200) ER DSN'en der, og den ER EU-ingest — så det var vagten der
+          # var blind, ikke produktet der manglede fejlrapportering.
+          # /login vælges frem for -L, fordi den er en ægte 200-side uden login
+          # og uden at afhænge af hvor en redirect peger hen i morgen.
+          dsn=$(curl -s "$BASE/login" | grep -o 'sentryDsn:"[^"]*"' | head -1)
+          # 🔴 DE TO FEJL MÅ IKKE DELE UDFALD. En manglende DSN (fejlrapporten
+          # er væk) og en DSN i forkert region (en publiceret juridisk sætning
+          # er falsk) er forskellige fejl og får hver sin røde.
+          if [ -z "$dsn" ]; then
+            echo "::error::Ingen sentryDsn i den serverede /login. Enten er fejlrapporteringen væk i dette miljø, eller også serveres den ikke længere i HTML — og så måler denne assertion intet. Se KH-1192."
+            exit 1
+          fi
+          if ! printf '%s' "$dsn" \
             | grep -qE '^sentryDsn:"https://[^@"]+@[^.")]+\.ingest\.de\.sentry\.io/'; then
             echo "::error::Serveret sentryDsn peger IKKE på EU-ingest. Privatlivspolitikkens §2.5 og §6 siger 'Sentry, EU-region' — flyt DSN'en tilbage, eller ret begge tekster med [jura]."
             exit 1
           fi
-          [ -n "$dsn" ] && echo "✓ serveret Sentry-DSN er EU-ingest (§2.5 holder)"
+          echo "✓ serveret Sentry-DSN er EU-ingest (§2.5 holder): ${dsn%%@*}@…"
 
       - name: Notify
         if: always()
