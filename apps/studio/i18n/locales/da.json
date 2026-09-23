@@ -400,6 +400,7 @@
   },
   "dtcgExport": {
     "title": "Eksport (DTCG)",
+    "action": "Eksportér (DTCG)",
     "intro": "Hent projektets tokens i Design Tokens Community Groups format (2025.10) til brug i andre værktøjer. Tilgængelig på alle planer.",
     "empty": "Intet at eksportere endnu. Gem en kladde eller publicér først.",
     "sourceLabel": "Tokens der eksporteres",
