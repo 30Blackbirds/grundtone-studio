@@ -19,10 +19,26 @@ import { CURATED_FONT_WEIGHTS, tokensSchema, type Tokens } from '~~/server/lib/t
 // reports; what may be SAVED is decided here, by the app's own schema (O3). A
 // mapped value that the schema rejects is a 400, not a silent drop.
 
-// A token file is a document a person exported from a design tool; this is not
-// an upload endpoint for arbitrary payloads. The cap is generous for tokens and
-// small enough that a malicious body cannot become a memory problem.
-const MAX_DOCUMENT_BYTES = 2_000_000
+// 🔴 WHAT THIS BOUNDS, AND WHAT IT DOES NOT. Corrected after [sikkerhed]
+// measured the earlier comment here and found it false three ways (#319).
+//
+// This limit is on the PARSED document, applied AFTER readBody. It does NOT
+// bound what the process receives: by the time this runs, the body has been
+// read and parsed. Nothing in this app bounds receipt today — studio's Caddy
+// has no `request_body` limit (positive control: sonar's sets max_size), and
+// config.post.ts has the same exposure. That is [sikkerhed]'s riff, not
+// something this endpoint introduced or can close.
+//
+// It is also not a byte count: JSON.stringify().length counts UTF-16 units of
+// the RE-serialized document, so a non-BMP body passes at ~3.6 MB of real
+// bytes and a pretty-printed one at ~2.27 MB uploaded. It is kept as a coarse
+// ceiling on obviously absurd documents, measured defensively because
+// stringify itself throws on a deeply nested input.
+//
+// The bound that actually protects the parser is DEPTH, in packages/dtcg
+// (MAX_DEPTH/MAX_NODES): a 30 KB document nested 5000 deep — 1.5 % of this
+// ceiling — used to make parseDocument throw RangeError, i.e. a 500.
+const MAX_SERIALIZED_UNITS = 2_000_000
 
 const importBody = z.object({
   /** The base file, parsed JSON — not a string. */
@@ -66,10 +82,22 @@ export default defineEventHandler(async (event): Promise<ImportResponse> => {
     ['base', base],
     ['dark', dark],
   ] as const) {
-    if (document !== undefined && JSON.stringify(document).length > MAX_DOCUMENT_BYTES) {
+    if (document === undefined) continue
+    let units: number
+    try {
+      units = JSON.stringify(document)?.length ?? 0
+    } catch {
+      // stringify throws on a document too deep to serialize. That is itself a
+      // refusal, not a 500: the parser would reject it for depth anyway.
       throw createError({
         statusCode: 413,
-        statusMessage: `the ${name} document is larger than ${MAX_DOCUMENT_BYTES} bytes`,
+        statusMessage: `the ${name} document could not be measured; it is too large or too deeply nested`,
+      })
+    }
+    if (units > MAX_SERIALIZED_UNITS) {
+      throw createError({
+        statusCode: 413,
+        statusMessage: `the ${name} document is larger than ${MAX_SERIALIZED_UNITS} serialized units`,
       })
     }
   }
@@ -82,10 +110,23 @@ export default defineEventHandler(async (event): Promise<ImportResponse> => {
     .limit(1)
   const current = (draft?.tokensJson ?? {}) as Tokens
 
-  const result = importTokens(base, dark ?? null, {
-    curatedFonts: CURATED_FONT_WEIGHTS,
-    current,
-  })
+  // 🔴 A FOREIGN DOCUMENT MAY NOT PRODUCE A 500. importTokens is bounded
+  // (depth, node count) and reports rather than throws, but this is the trust
+  // boundary: anything unforeseen in it becomes a 400 naming the file, never an
+  // unhandled exception. The catch is deliberately outside the write branch —
+  // nothing below it has run yet, so "imports nothing" still holds.
+  let result: ReturnType<typeof importTokens>
+  try {
+    result = importTokens(base, dark ?? null, {
+      curatedFonts: CURATED_FONT_WEIGHTS,
+      current,
+    })
+  } catch (error) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `the file could not be read: ${error instanceof Error ? error.message : 'unknown error'}`,
+    })
+  }
 
   // I4: slots in the file replace the draft's values; slots outside it are
   // untouched. The merge is per group, because a file that carries only colours

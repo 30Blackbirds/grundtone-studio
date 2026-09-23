@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { parseDocument } from './parse'
+import { checkBounds, MAX_DEPTH, MAX_NODES, parseDocument } from './parse'
+import { MAPPED_TYPES } from './import'
 import { VENDOR_DIR, validateTokensFile } from './testing/validate'
 
 // The parser is driven by the OFFICIAL 2025.10 test suite, vendored unchanged
@@ -107,6 +108,22 @@ describe('the known gap (KH-1179)', () => {
     }
   })
 
+  // 🔴 A GUARD ON THE DENOMINATOR, not on the five holes ([projektleder] on
+  // #319). "Harmless because Studio maps only four types" is a claim with a
+  // DATE on it: the day someone maps a composite type, those five fixtures go
+  // live without anyone touching the parser and without a single existing cell
+  // turning red. This cell is the one that turns red — it ties the gap to the
+  // thing that makes it harmless.
+  it('is only tolerable while no composite type can be mapped', () => {
+    const composite = ['border', 'transition', 'shadow', 'gradient', 'typography', 'strokeStyle']
+    const mappedComposites = composite.filter((t) => MAPPED_TYPES.has(t))
+    expect(
+      mappedComposites,
+      `A composite type (${mappedComposites.join(', ')}) is now mapped, so the ${COMPOSITE_SHAPE_GAP.length} unchecked composite sub-value fixtures can reach a saved token. Close KH-1179 before mapping it.`,
+    ).toEqual([])
+    expect([...MAPPED_TYPES].sort()).toEqual(['color', 'dimension', 'fontFamily', 'fontWeight'])
+  })
+
   it('every listed fixture is a real fixture in the structural set', () => {
     const inputs = structuralNegatives.map((t) => t.input)
     for (const input of COMPOSITE_SHAPE_GAP) expect(inputs).toContain(input)
@@ -117,5 +134,57 @@ describe.each(valueNegatives)('value negative: $id (structure only)', ({ input }
   it('does not crash, and is not silently turned into a typed token without a value', () => {
     // No verdict is asserted: these fail on value rules, outside this parser.
     expect(() => parseDocument(read(input))).not.toThrow()
+  })
+})
+
+describe('bounds on a foreign document ([sikkerhed] on #319)', () => {
+  // The defect these cells pin: parseDocument used to THROW RangeError on a
+  // deeply nested document — a 30 KB file, far under any size cap — because
+  // every walker recurses. A throw on a write path is a 500, not a refusal.
+  const deep = (depth: number) => {
+    const root: Record<string, unknown> = {}
+    let node = root
+    for (let i = 0; i < depth; i++) {
+      const child: Record<string, unknown> = {}
+      node[`g${i}`] = child
+      node = child
+    }
+    node.token = { $type: 'color', $value: { colorSpace: 'srgb', components: [0, 0, 0] } }
+    return root
+  }
+
+  it('refuses a document deeper than the limit instead of throwing', () => {
+    const document = deep(5000)
+    expect(JSON.stringify(document).length).toBeLessThan(200_000) // small, yet fatal before
+    let result!: ReturnType<typeof parseDocument>
+    expect(() => {
+      result = parseDocument(document)
+    }).not.toThrow()
+    expect(result.errors).toEqual([expect.objectContaining({ code: 'too_deep', path: '(root)' })])
+    expect(result.tokens).toEqual([])
+  })
+
+  it('accepts a document just inside the depth limit, so the bound is not vacuous', () => {
+    // The token adds four levels of its own on top of the groups (token object,
+    // $value, the components array, its numbers), so the group count is the
+    // limit minus those. Getting this wrong made the cell fail first time,
+    // which is how the arithmetic got measured instead of assumed.
+    const result = parseDocument(deep(MAX_DEPTH - 5))
+    expect(result.errors).toEqual([])
+    expect(result.tokens).toHaveLength(1)
+  })
+
+  it('refuses a document with more nodes than the limit', () => {
+    const wide: Record<string, unknown> = { $type: 'color' }
+    for (let i = 0; i < MAX_NODES + 10; i++) wide[`c${i}`] = {}
+    const result = parseDocument(wide)
+    expect(result.errors[0]).toMatchObject({ code: 'too_many_nodes' })
+  })
+
+  it('the bound is measured without recursing, so it survives what it measures', () => {
+    // checkBounds is the one function that must never throw on the input it is
+    // there to reject; a recursive probe would hit the same stack limit.
+    expect(() => checkBounds(deep(200_000))).not.toThrow()
+    expect(checkBounds(deep(200_000))?.code).toBeDefined()
   })
 })

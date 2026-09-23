@@ -9,6 +9,21 @@ import { EXTENSION_KEY, type StudioFontSlot, type StudioTokens } from './export'
 // apps/studio/server/lib/tokens.ts, and duplicating them here would create a
 // second truth that drifts the day a font is added. The app passes its own.
 
+// 🔴 THE TYPES STUDIO CAN MAP — load-bearing, not documentation. Every token
+// whose $type is outside this set is reported as not-mapped before any path
+// matching, so the set is what actually decides. It is also the denominator the
+// KH-1179 guard watches: the five composite sub-value fixtures that neither the
+// parser nor the official schema rejects are harmless ONLY while composite
+// types cannot be mapped. The day a fifth type is added here, that stops being
+// true, and a cell in parse.test.ts fails for exactly that reason rather than
+// letting the gap go live in silence.
+export const MAPPED_TYPES: ReadonlySet<string> = new Set([
+  'color',
+  'dimension',
+  'fontFamily',
+  'fontWeight',
+])
+
 export type ImportCode =
   | 'mapped'
   | 'unknown_path'
@@ -238,6 +253,10 @@ function mapTokens(imp: Importer, tokens: ParsedToken[], dark: boolean): void {
   for (const token of tokens) {
     imp.report.total++
     imp.dropExtensions(token)
+    if (!MAPPED_TYPES.has(token.type)) {
+      imp.notMapped(token, 'unsupported_type', `Studio has no slot for a ${token.type} token`)
+      continue
+    }
     const [head, ...rest] = token.path
 
     // colors: `color.<slot>` — the convention export.ts writes.

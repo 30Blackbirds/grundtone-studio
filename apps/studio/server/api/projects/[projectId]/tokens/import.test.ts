@@ -126,7 +126,12 @@ describe('POST /api/projects/[projectId]/tokens/import', () => {
     expect(requireProjectAccess).toHaveBeenCalledWith(expect.anything(), PROJECT.id, 'editor')
   })
 
-  it('refuses a document larger than the cap, before parsing it', async () => {
+  // 🔴 THE CLAIM THIS CELL MAY MAKE, corrected after [sikkerhed] read it on
+  // #319. fakeEvent hands the handler an ALREADY PARSED object, so this cell
+  // cannot say anything about raw bodies, bytes on the wire, or "before
+  // parsing". What it measures is the ceiling on the parsed document, and that
+  // the refusal happens before any write.
+  it('refuses an oversized parsed document, and writes nothing', async () => {
     const huge = {
       color: Object.fromEntries([...Array(60_000)].map((_, i) => [`c${i}`, color([0, 0, 0])])),
     }
@@ -134,6 +139,61 @@ describe('POST /api/projects/[projectId]/tokens/import', () => {
       handler(fakeEvent({ params: { projectId: PROJECT.id }, body: { base: huge } })),
     ).rejects.toMatchObject({ statusCode: 413 })
     expect(spies.inserts).toHaveLength(0)
+    expect(spies.updates).toHaveLength(0)
+    expect(auditEvents).toHaveLength(0)
+  })
+
+  // The defect: a 30 KB document nested 5000 deep — 1.5 % of the size ceiling —
+  // made the parser throw RangeError, so the endpoint answered 500 on an
+  // unhandled exception. A refused file must be a 4xx with a reason.
+  const deeplyNested = () => {
+    const root: Record<string, unknown> = {}
+    let node = root
+    for (let i = 0; i < 5000; i++) {
+      const child: Record<string, unknown> = {}
+      node[`g${i}`] = child
+      node = child
+    }
+    node.token = color([0, 0, 0])
+    return root
+  }
+
+  it('refuses a deeply nested document with a 4xx, not a 500, and writes nothing', async () => {
+    const root = deeplyNested()
+    expect(JSON.stringify(root).length).toBeLessThan(200_000)
+    const error = (await handler(
+      fakeEvent({ params: { projectId: PROJECT.id }, body: { base: root } }),
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    )) as { statusCode?: number; statusMessage?: string } | null
+    expect(error).not.toBeNull()
+    // 🔴 NAMING THE BRANCH, not just the status class. Measured: with the depth
+    // bound removed, this cell still passed — the catch below turned the
+    // RangeError into a 400, so "4xx" could not tell a BOUNDED refusal from a
+    // CAUGHT crash. The message distinguishes them: the bound produces a
+    // structural-error refusal, the catch produces "could not be read".
+    expect(error!.statusCode).toBe(400)
+    expect(error!.statusMessage).toContain('structural error')
+    expect(spies.inserts).toHaveLength(0)
+    expect(spies.updates).toHaveLength(0)
+    expect(auditEvents).toHaveLength(0)
+  })
+
+  it('a dry run of the same document is refused too, never reported as an empty but fine file', async () => {
+    const res = (await handler(
+      fakeEvent({
+        params: { projectId: PROJECT.id },
+        body: { base: deeplyNested(), dryRun: true },
+      }),
+    ).catch((e: unknown) => e)) as {
+      statusCode?: number
+      report?: { parseErrors: unknown[] }
+    }
+    expect(
+      (res.statusCode !== undefined && res.statusCode < 500) ||
+        (res.report?.parseErrors.length ?? 0) > 0,
+    ).toBe(true)
   })
 })
 

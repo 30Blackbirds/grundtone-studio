@@ -33,6 +33,8 @@ export type ParseErrorCode =
   | 'alias_in_subvalue'
   | 'alias_type_mismatch'
   | 'value_shape'
+  | 'too_deep'
+  | 'too_many_nodes'
   | 'pointer_syntax'
   | 'pointer_unresolved'
   | 'pointer_not_value'
@@ -92,6 +94,49 @@ const KNOWN_TYPES = new Set([
 ])
 
 const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+// 🔴 BOUNDS ON A FOREIGN DOCUMENT, measured rather than assumed ([sikkerhed] on
+// #319). JSON.parse survives any nesting depth, but every walker here recurses:
+// at depth ~5000 a 30 KB document — 1.5 % of any sane size cap — made
+// parseDocument throw RangeError, and a size check that itself calls
+// JSON.stringify threw before it could measure. A size cap is therefore NOT a
+// bound on this parser; depth is. Both limits are far above any real token
+// file: the official suite's deepest fixture is nowhere near them.
+export const MAX_DEPTH = 64
+export const MAX_NODES = 200_000
+
+/**
+ * Depth and node count, computed ITERATIVELY with an explicit stack: a
+ * recursive probe would hit the very limit it is measuring. Returns the first
+ * violation, or null.
+ */
+export function checkBounds(document: unknown): ParseError | null {
+  const stack: Array<{ node: unknown; depth: number }> = [{ node: document, depth: 1 }]
+  let nodes = 0
+  while (stack.length > 0) {
+    const { node, depth } = stack.pop()!
+    if (typeof node !== 'object' || node === null) continue
+    nodes++
+    if (nodes > MAX_NODES) {
+      return {
+        code: 'too_many_nodes',
+        path: '(root)',
+        reason: `the document has more than ${MAX_NODES} nodes`,
+      }
+    }
+    if (depth > MAX_DEPTH) {
+      return {
+        code: 'too_deep',
+        path: '(root)',
+        reason: `the document nests deeper than ${MAX_DEPTH} levels`,
+      }
+    }
+    for (const value of Array.isArray(node) ? node : Object.values(node)) {
+      if (typeof value === 'object' && value !== null) stack.push({ node: value, depth: depth + 1 })
+    }
+  }
+  return null
+}
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -383,6 +428,10 @@ export function parseDocument(document: unknown): ParseResult {
       errors: [{ code: 'document_not_object', path: '(root)', reason: 'not a JSON object' }],
     }
   }
+  // Bounds FIRST: everything below this line recurses, including structuredClone.
+  const tooBig = checkBounds(document)
+  if (tooBig) return { tokens: [], errors: [tooBig] }
+
   const copy = structuredClone(document) as Record<string, unknown>
   const parser = new Parser(copy)
   const edges = new Map<string, string>()
