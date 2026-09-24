@@ -31,13 +31,13 @@
     "@changesets/cli": "^2.31.0",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "eslint": "^10.5.0",
+    "eslint": "^10.11.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.4",
-    "stylelint": "^17.13.0",
+    "prettier": "^3.9.8",
+    "stylelint": "^17.15.0",
     "stylelint-config-standard": "^40.0.0",
-    "turbo": "^2.9.18"
+    "turbo": "^2.11.2"
   },
   "engines": {
     "node": ">=24.18.1"
