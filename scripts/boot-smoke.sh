@@ -68,10 +68,25 @@ docker run -d --name "$APP-nocdn" --network "$NET" \
   -e DATABASE_URL="postgres://postgres:smoke@$DB:5432/postgres" \
   -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
   "$IMAGE" >/dev/null
-sleep 3
-if [ "$(docker inspect -f '{{.State.Running}}' "$APP-nocdn")" = 'true' ]; then
-  log "✗ the image STARTED with NUXT_PUBLIC_CDN_BASE unset — the boot refusal is inert, so every"
-  log "  CDN host assertion below would pass on an app that had fallen back to the request origin"
+#
+# 🔴 WAIT FOR IT TO EXIT; DO NOT SAMPLE "is it running?" AFTER A FIXED SLEEP.
+# The first version slept 3s and read State.Running, and called the guard inert
+# because the container was still up — it was still running MIGRATIONS
+# (docker/entrypoint.sh runs them BEFORE the server starts), so it had not yet
+# reached the Nitro plugin. The measurement was impatient, not the guard.
+nocdn_exited=false
+for _ in $(seq 1 30); do
+  if [ "$(docker inspect -f '{{.State.Running}}' "$APP-nocdn")" != 'true' ]; then
+    nocdn_exited=true
+    break
+  fi
+  sleep 2
+done
+if [ "$nocdn_exited" != 'true' ]; then
+  log "✗ the image was STILL RUNNING 60s after starting with NUXT_PUBLIC_CDN_BASE unset — the boot"
+  log "  refusal is inert, so every CDN host assertion below would pass on an app that had fallen"
+  log "  back to the request origin"
+  docker logs "$APP-nocdn" 2>&1 | tail -20 >&2
   docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
   exit 1
 fi
