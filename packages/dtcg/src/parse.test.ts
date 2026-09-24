@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { checkBounds, MAX_DEPTH, MAX_NODES, parseDocument } from './parse'
+import { checkBounds, COMPOSITE_TYPES, MAX_DEPTH, MAX_NODES, parseDocument } from './parse'
 import { MAPPED_TYPES } from './import'
 import { VENDOR_DIR, validateTokensFile } from './testing/validate'
 
@@ -65,14 +65,13 @@ describe.each(positives)('positive: $id', ({ input }) => {
   })
 })
 
-// 🔴 The five fixtures neither instrument rejects today, named one by one with
-// the reason, never as a category. Each is a reference to a COMPOSITE
-// sub-value of the wrong shape (a shadow whose colour is an array, a gradient
-// stop of the wrong type); catching them needs a composite value model, which
-// Studio never maps. Tracked as KH-1179 — when it lands, these move into the
-// rejected set and this list is empty. The count is pinned, so the list cannot
-// grow silently, which is the only thing that would make it a hiding place.
-const COMPOSITE_SHAPE_GAP = [
+// 🔴 The exception list is GONE (KH-1179 closed). It used to name five
+// fixtures that neither the parser nor the official schema rejected — each a
+// reference to a composite sub-value of the wrong shape. They are now in the
+// set below like every other negative, and the cells that follow assert it was
+// the PARSER that closed them, because "parser or schema" would have been
+// satisfiable by the wrong instrument.
+const CLOSED_BY_THE_PARSER = [
   'negative/references/composite-ref-to-number-for-dimension.json',
   'negative/references/composite-ref-to-partial-color.json',
   'negative/references/composite-ref-wrong-subvalue-type.json',
@@ -80,53 +79,78 @@ const COMPOSITE_SHAPE_GAP = [
   'negative/references/stroke-dashArray-ref-wrong-type.json',
 ]
 
-describe.each(structuralNegatives.filter((t) => !COMPOSITE_SHAPE_GAP.includes(t.input)))(
-  'structural negative: $id',
-  ({ input }) => {
-    it('is rejected by the parser or by the official schema, with a reason', () => {
-      const document = read(input)
-      const parsed = parseDocument(document)
-      const schema = validateTokensFile(document)
-      expect(parsed.errors.length > 0 || !schema.valid).toBe(true)
-      if (parsed.errors.length > 0) expect(parsed.errors[0]!.reason).not.toBe('')
-    })
-  },
-)
+describe.each(structuralNegatives)('structural negative: $id', ({ input }) => {
+  it('is rejected by the parser or by the official schema, with a reason', () => {
+    const document = read(input)
+    const parsed = parseDocument(document)
+    const schema = validateTokensFile(document)
+    expect(parsed.errors.length > 0 || !schema.valid).toBe(true)
+    if (parsed.errors.length > 0) expect(parsed.errors[0]!.reason).not.toBe('')
+  })
+})
 
-describe('the known gap (KH-1179)', () => {
-  it('is exactly five fixtures, and every one of them is still unrejected', () => {
-    expect(COMPOSITE_SHAPE_GAP).toHaveLength(5)
-    for (const input of COMPOSITE_SHAPE_GAP) {
+describe('composite sub-value shapes (KH-1179, closed)', () => {
+  it('🔴 rejects all five by the PARSER, not by the schema', () => {
+    expect(CLOSED_BY_THE_PARSER).toHaveLength(5)
+    for (const input of CLOSED_BY_THE_PARSER) {
       const document = read(input)
-      // If one of these starts failing, the gap closed: move it out of the
-      // list. A cell that silently tolerated either outcome would let the list
-      // outlive the defect.
-      expect(parseDocument(document).errors, `${input} is now rejected by the parser`).toEqual([])
-      expect(validateTokensFile(document).valid, `${input} is now rejected by the schema`).toBe(
-        true,
-      )
+      const errors = parseDocument(document).errors
+      // The load-bearing assertion. A schema cannot follow a $ref, so it
+      // validates the `{$ref: …}` object and never sees the resolved value —
+      // it accepts 7 of the 8 reference negatives. Asserting "parser OR
+      // schema" here would pass on the one instrument that structurally
+      // cannot see this class.
+      expect(errors.length, `${input} is not rejected by the parser`).toBeGreaterThan(0)
+      expect(errors[0]!.code).toBe('value_shape')
+      // …and the reason names the PART, not just the token: "wrong shape" on a
+      // five-part composite sends the reader looking at all five.
+      expect(errors[0]!.reason).not.toBe('')
     }
   })
 
-  // 🔴 A GUARD ON THE DENOMINATOR, not on the five holes ([projektleder] on
-  // #319). "Harmless because Studio maps only four types" is a claim with a
-  // DATE on it: the day someone maps a composite type, those five fixtures go
-  // live without anyone touching the parser and without a single existing cell
-  // turning red. This cell is the one that turns red — it ties the gap to the
-  // thing that makes it harmless.
-  it('is only tolerable while no composite type can be mapped', () => {
-    const composite = ['border', 'transition', 'shadow', 'gradient', 'typography', 'strokeStyle']
-    const mappedComposites = composite.filter((t) => MAPPED_TYPES.has(t))
+  it('names which sub-value is wrong, not just that something is', () => {
+    const cases: [string, string][] = [
+      ['negative/references/composite-ref-to-number-for-dimension.json', 'width'],
+      ['negative/references/composite-ref-to-partial-color.json', 'color'],
+      ['negative/references/composite-ref-wrong-subvalue-type.json', 'color'],
+      ['negative/references/gradient-ref-to-non-gradient-stop.json', 'gradient stop 0'],
+      ['negative/references/stroke-dashArray-ref-wrong-type.json', 'dashArray entry 0'],
+    ]
+    for (const [input, part] of cases) {
+      expect(parseDocument(read(input)).errors[0]!.reason).toContain(part)
+    }
+  })
+
+  // 🔴 A GUARD ON THE DENOMINATOR, kept from when this was a known gap
+  // ([projektleder] on #319). The old version tied the gap to MAPPED_TYPES;
+  // this one ties the COVERAGE to the type set, which is the thing that can
+  // now grow silently: a composite type added to COMPOSITE_TYPES without a
+  // shape rule is unchecked in exactly the way these five were, and no other
+  // cell would turn red.
+  it('every composite type has a shape rule', () => {
+    const unchecked = [...COMPOSITE_TYPES].filter((type) => {
+      // 🔴 Driven through parseDocument, not by reading the source: a cell that
+      // greps for a `case` label stays green when the case returns null. `42`
+      // cannot be a valid value for ANY composite type, so a parser that says
+      // nothing about it is a parser that is not looking.
+      const errors = parseDocument({ t: { $type: type, $value: 42 } }).errors
+      return !errors.some((e) => e.code === 'value_shape')
+    })
     expect(
-      mappedComposites,
-      `A composite type (${mappedComposites.join(', ')}) is now mapped, so the ${COMPOSITE_SHAPE_GAP.length} unchecked composite sub-value fixtures can reach a saved token. Close KH-1179 before mapping it.`,
+      unchecked,
+      `${unchecked.join(', ')} is in COMPOSITE_TYPES with no shape rule — a reference to a sub-value of the wrong shape would pass, which is exactly what KH-1179 was.`,
     ).toEqual([])
+  })
+
+  it("leaves Studio's mapped set alone: closing the gap is not a licence to map composites", () => {
+    // Mapping a new type is a Studio decision with its own import cells; this
+    // riff only made the PACKAGE honest about DTCG documents.
     expect([...MAPPED_TYPES].sort()).toEqual(['color', 'dimension', 'fontFamily', 'fontWeight'])
   })
 
   it('every listed fixture is a real fixture in the structural set', () => {
     const inputs = structuralNegatives.map((t) => t.input)
-    for (const input of COMPOSITE_SHAPE_GAP) expect(inputs).toContain(input)
+    for (const input of CLOSED_BY_THE_PARSER) expect(inputs).toContain(input)
   })
 })
 
