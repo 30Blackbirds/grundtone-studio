@@ -1,8 +1,9 @@
 # @grundtone-studio/dtcg
 
 Converts a Studio token set to [DTCG 2025.10](https://www.designtokens.org/TR/2025.10/format/)
-files. The package has no app dependencies. The Studio server uses it for the Export tab and for
-`grundtone-tokens export`. Import (DTCG → Studio draft) is planned and not part of this package yet.
+files. The package has no app dependencies. …and back: it also maps a DTCG document onto a Studio
+draft. The Studio server uses it for the Export and Import tabs and for `grundtone-tokens export` /
+`grundtone-tokens import`.
 
 ## Files
 

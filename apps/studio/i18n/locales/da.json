@@ -434,6 +434,31 @@
       "hue_normalised": "farvetone lagt ind i 0–360"
     }
   },
+  "dtcgImport": {
+    "intro": "Hent tokens ind fra en DTCG 2025.10-fil. Du ser altid en rapport først, og intet gemmes før du siger til.",
+    "baseLabel": "Token-fil",
+    "baseHelp": "Den fil dine lyse tokens står i (.json).",
+    "darkLabel": "Mørk fil (valgfri)",
+    "darkHelp": "Vælg kun en fil her, hvis den indeholder dine mørke farver.",
+    "analyse": "Se hvad filen indeholder",
+    "notJson": "{file} kunne ikke læses som JSON.",
+    "failed": "Filen kunne ikke importeres.",
+    "summary": "{total} tokens i filen: {mapped} kan importeres, {notMapped} hører ikke til i Studio, {invalid} kan ikke gemmes.",
+    "overwrites": "{n} værdier i din kladde bliver overskrevet.",
+    "invalidSummary": "{n} tokens kan ikke gemmes",
+    "notMappedSummary": "{n} tokens hører ikke til i Studio",
+    "convertedSummary": "{n} værdier blev lavet om undervejs",
+    "tokenCount": "{n} token | {n} tokens",
+    "droppedHeading": "Oplysninger fra filen, som Studio ikke gemmer",
+    "saveDraft": "Gem som udkast",
+    "chooseOther": "Vælg en anden fil",
+    "needsEditor": "Du kan se rapporten, men det kræver editor-adgang at gemme.",
+    "savedHeading": "Gemt som udkast (version {version})",
+    "savedBody": "Intet er publiceret. Gennemse kladden og publicér, når den ser rigtig ud.",
+    "importAnother": "Importér en fil mere",
+    "action": "Importér (DTCG)",
+    "title": "Import (DTCG)"
+  },
   "tokens": {
     "colors": "Farver",
     "typography": "Typografi",

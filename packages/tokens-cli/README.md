@@ -40,6 +40,7 @@ grundtone-tokens set <projectId> --set colors.primary=#0059b3
 grundtone-tokens set <projectId> --file tokens.json     # replace from a file
 grundtone-tokens publish <projectId>                    # publish the current draft
 grundtone-tokens export <projectId> --format dtcg --source active --out tokens/
+grundtone-tokens import <projectId> --file tokens.json [--dark dark.json] [--dry-run]
 ```
 
 `set` without `--file` starts from the current draft, so `--set` tweaks one slot without resending
@@ -51,6 +52,18 @@ field error on invalid input).
 say whether you want the draft or the published set. The server does the conversion (the same files
 as the Export tab in Studio) and the command prints what was left out or converted. See
 [`packages/dtcg`](../dtcg/README.md) for the mapping.
+
+`import` reads DTCG 2025.10 files and saves the result as a **draft** — it never publishes. The
+server does the mapping, so the CLI and the Import tab in Studio report the same four categories:
+mapped (with the ones whose value was converted), outside Studio's model, and refused.
+
+`--dry-run` prints the report and writes nothing, including how many existing draft values a real
+run would overwrite. Run it first.
+
+**Exit codes:** `0` clean, `1` the command failed (bad file, HTTP error), `2` the import was written
+but the file carried tokens Studio refused — the reasons are on stdout above it. Tokens merely
+_outside_ Studio's model do not fail the command: a file from another tool nearly always has some,
+and failing on those would make every real import red.
 
 ## Build / run
 
