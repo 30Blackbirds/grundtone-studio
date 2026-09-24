@@ -1,0 +1,7 @@
+<!-- Positive-control probe for the host half of scripts/sdk-url-guard.mjs
+     (KH-1178). It must match BOTH host rules, so a scan that silently stops
+     matching is caught by the cell rather than by a customer. -->
+<script>
+  const base = 'https://cdn.grundtone.com'
+  const other = useRuntimeConfig().public.cdnBase
+</script>

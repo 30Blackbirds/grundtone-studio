@@ -4,8 +4,8 @@
   const props = defineProps<{ apiKey: string | null }>()
   const { t } = useI18n()
 
-  const runtimeConfig = useRuntimeConfig()
-  const cdnBase = computed(() => runtimeConfig.public.cdnBase || window.location.origin)
+  // One source with the guide (KH-1178).
+  const cdnBase = useCdnBase()
 
   const sampleKey = computed(() => props.apiKey ?? 'pk_live_<your-key>')
 
