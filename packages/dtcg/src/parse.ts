@@ -156,7 +156,10 @@ const CONTAINS_BRACE = /[{}]/
 // sub-values. In a color's or dimension's own value object a `{…}` is a
 // malformed reference, not a nested alias (negative fixtures
 // {color,dimension,duration,cubicBezier}-curly-brace-in-subvalue).
-const COMPOSITE_TYPES = new Set([
+// Exported so a cell can assert that EVERY composite type has a shape rule
+// (KH-1179). A new type added here without one would be unchecked in exactly
+// the way the five reference fixtures were, and nothing else would notice.
+export const COMPOSITE_TYPES = new Set([
   'border',
   'transition',
   'shadow',
@@ -173,11 +176,11 @@ const COMPOSITE_TYPES = new Set([
 // and never sees what it points at. The parser is the only place that has the
 // RESOLVED value, so if it does not check the shape, nothing does.
 //
-// Composite sub-values (a shadow whose colour is an array, a gradient stop of
-// the wrong type) are NOT checked here — that needs a full composite value
-// model, which Studio never maps. Those 5 fixtures are named in the cells and
-// tracked; see the riff. This function deliberately covers exactly the types
-// an import can map, plus the primitives they can be confused with.
+// Composite sub-values are checked too (KH-1179), by the SAME primitive rules:
+// a shadow's colour is a colour, a border's width is a dimension, a dashArray
+// entry is a dimension. Reusing shapeOf() recursively rather than restating the
+// primitive shapes is the point — a second copy of "what a dimension is" would
+// drift from the first, and the sub-value copy is the one nobody looks at.
 function shapeOf(type: string, value: unknown): string | null {
   const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v)
   switch (type) {
@@ -211,9 +214,122 @@ function shapeOf(type: string, value: unknown): string | null {
       return Array.isArray(value) && value.length === 4 && value.every(isNum)
         ? null
         : 'a cubicBezier is four numbers'
+    case 'border':
+    case 'shadow':
+    case 'gradient':
+    case 'strokeStyle':
+    case 'transition':
+    case 'typography':
+      return compositeShape(type, value)
     default:
-      // Composite types and anything else: not checked here (see above).
+      // A type this package does not model: not checked. Saying so beats
+      // returning null as if it had been examined.
       return null
+  }
+}
+
+/**
+ * The parts of each composite type, and the PRIMITIVE each part must be.
+ *
+ * 🔴 Required vs optional was decided by MEASUREMENT, not by reading the spec
+ * alone: every part below is marked required only if the 93 positive fixtures
+ * still pass with it required. A rule stricter than the suite would reject
+ * documents the spec allows, and the suite is the instrument we have.
+ */
+const COMPOSITE_PARTS: Record<string, Record<string, { type: string; required: boolean }>> = {
+  border: {
+    color: { type: 'color', required: true },
+    width: { type: 'dimension', required: true },
+    style: { type: 'strokeStyle', required: true },
+  },
+  shadow: {
+    color: { type: 'color', required: true },
+    offsetX: { type: 'dimension', required: true },
+    offsetY: { type: 'dimension', required: true },
+    blur: { type: 'dimension', required: false },
+    spread: { type: 'dimension', required: false },
+  },
+  transition: {
+    duration: { type: 'duration', required: true },
+    delay: { type: 'duration', required: false },
+    timingFunction: { type: 'cubicBezier', required: false },
+  },
+  typography: {
+    fontFamily: { type: 'fontFamily', required: true },
+    fontSize: { type: 'dimension', required: true },
+    fontWeight: { type: 'fontWeight', required: false },
+    letterSpacing: { type: 'dimension', required: false },
+    lineHeight: { type: 'number', required: false },
+  },
+}
+
+/** A gradient stop: its own tiny composite, so it gets the same treatment. */
+const GRADIENT_STOP: Record<string, { type: string; required: boolean }> = {
+  color: { type: 'color', required: true },
+  position: { type: 'number', required: false },
+}
+
+function partsShape(
+  parts: Record<string, { type: string; required: boolean }>,
+  value: unknown,
+  label: string,
+): string | null {
+  if (!isObject(value)) return `${label} must be an object`
+  for (const [name, part] of Object.entries(parts)) {
+    const sub = value[name]
+    if (sub === undefined) {
+      if (part.required) return `${label} is missing "${name}"`
+      continue
+    }
+    const wrong = shapeOf(part.type, sub)
+    if (wrong) return `${label}'s "${name}" is not a ${part.type}: ${wrong}`
+  }
+  return null
+}
+
+function compositeShape(type: string, value: unknown): string | null {
+  switch (type) {
+    case 'shadow': {
+      // One shadow or a stack of them; both are ordinary in the suite.
+      const layers = Array.isArray(value) ? value : [value]
+      if (layers.length === 0) return 'a shadow array has no layers'
+      for (const [i, layer] of layers.entries()) {
+        const wrong = partsShape(
+          COMPOSITE_PARTS.shadow!,
+          layer,
+          Array.isArray(value) ? `shadow layer ${i}` : 'a shadow',
+        )
+        if (wrong) return wrong
+      }
+      return null
+    }
+    case 'gradient': {
+      if (!Array.isArray(value)) return 'a gradient is an array of stops'
+      if (value.length === 0) return 'a gradient has no stops'
+      for (const [i, stop] of value.entries()) {
+        const wrong = partsShape(GRADIENT_STOP, stop, `gradient stop ${i}`)
+        if (wrong) return wrong
+      }
+      return null
+    }
+    case 'strokeStyle': {
+      // Either a keyword, or a dash specification. The keyword set is not
+      // checked here: the schema already rejects an unknown one, and a $ref
+      // cannot smuggle a string past it the way it can an object.
+      if (typeof value === 'string') return null
+      if (!isObject(value)) return 'a strokeStyle is a keyword or a dash object'
+      const dashArray = value.dashArray
+      if (dashArray !== undefined) {
+        if (!Array.isArray(dashArray)) return "a strokeStyle's dashArray is an array"
+        for (const [i, dash] of dashArray.entries()) {
+          const wrong = shapeOf('dimension', dash)
+          if (wrong) return `dashArray entry ${i} is not a dimension: ${wrong}`
+        }
+      }
+      return null
+    }
+    default:
+      return partsShape(COMPOSITE_PARTS[type]!, value, `a ${type}`)
   }
 }
 

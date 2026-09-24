@@ -11,12 +11,15 @@ import { EXTENSION_KEY, type StudioFontSlot, type StudioTokens } from './export'
 
 // 🔴 THE TYPES STUDIO CAN MAP — load-bearing, not documentation. Every token
 // whose $type is outside this set is reported as not-mapped before any path
-// matching, so the set is what actually decides. It is also the denominator the
-// KH-1179 guard watches: the five composite sub-value fixtures that neither the
-// parser nor the official schema rejects are harmless ONLY while composite
-// types cannot be mapped. The day a fifth type is added here, that stops being
-// true, and a cell in parse.test.ts fails for exactly that reason rather than
-// letting the gap go live in silence.
+// matching, so the set is what actually decides.
+//
+// This used to carry the KH-1179 condition: the five composite sub-value
+// fixtures were harmless ONLY while no composite type could be mapped, and a
+// cell failed if one was added. That gap is CLOSED — the parser now checks
+// composite sub-value shapes against the same primitive rules — so the
+// condition is gone. What remains is an ordinary product decision: adding a
+// type here means the import must be able to render and save it, which is more
+// than the parser being able to validate it.
 export const MAPPED_TYPES: ReadonlySet<string> = new Set([
   'color',
   'dimension',
