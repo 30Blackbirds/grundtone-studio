@@ -11,6 +11,14 @@ import {
   type ResolvedConfig,
 } from './config.js'
 import {
+  importBody,
+  importExitCode,
+  importPath,
+  importReportLines,
+  parseTokenFile,
+  type ImportResponse,
+} from './import.js'
+import {
   checkExportOptions,
   exportPath,
   filesToFetch,
@@ -133,6 +141,34 @@ program
       console.log(`✓ wrote ${join(outDir, file.name)}`)
     }
     for (const line of reportLines(res)) console.log(line)
+  })
+
+program
+  .command('import <projectId>')
+  .description('import a DTCG 2025.10 file as a DRAFT (never publishes)')
+  .requiredOption('--file <path>', 'the base tokens file')
+  .option('--dark <path>', 'a second file to import as the dark theme')
+  .option('--dry-run', 'print the report and write nothing', false)
+  .action(async (projectId: string, opts: { file: string; dark?: string; dryRun: boolean }) => {
+    const cfg = configFor(projectId, program.opts())
+    const base = parseTokenFile('base', opts.file, readFileSync(opts.file, 'utf8'))
+    const dark = opts.dark
+      ? parseTokenFile('dark', opts.dark, readFileSync(opts.dark, 'utf8'))
+      : undefined
+
+    const res = (await api(
+      cfg,
+      'POST',
+      importPath(projectId),
+      importBody(base, dark, opts.dryRun),
+    )) as ImportResponse
+
+    for (const line of importReportLines(res, opts.dryRun)) console.log(line)
+    // 🔴 The report is printed BEFORE the exit code is applied: a non-zero exit
+    // after a successful write means "saved, and here is what I refused", and
+    // that is unreadable if the reasons never reach the log.
+    const code = importExitCode(res.report, opts.dryRun)
+    if (code !== 0) process.exitCode = code
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

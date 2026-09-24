@@ -129,6 +129,10 @@
 
   // Export lives in a modal opened from the header action above.
   const showExport = ref(false)
+  // Import is editor-only all the way through: the endpoint demands editor even
+  // for the dry run, so a viewer would get a 403 on the analyse step rather
+  // than a report.
+  const showImport = ref(false)
 </script>
 
 <template>
@@ -178,6 +182,9 @@
              behind `canEdit`: the tokens are the customer's. -->
         <GTButton variant="secondary" @click="showExport = true">
           {{ t('dtcgExport.action') }}
+        </GTButton>
+        <GTButton v-if="canEdit" variant="secondary" @click="showImport = true">
+          {{ t('dtcgImport.action') }}
         </GTButton>
       </div>
     </header>
@@ -282,6 +289,19 @@
         <ProjectMembersManager :project-id="project.id" :can-manage="canManage" />
       </GTTabPanel>
     </GTTabs>
+
+    <!-- Import: upload → report → save as draft, in a modal for the same reason
+         as export — the report is the point, and it is read without leaving the
+         project (KH-1044 I11). A save refreshes the page's config so the draft
+         it just wrote is the one on screen. -->
+    <GTModal :open="showImport" :title="t('dtcgImport.title')" @update:open="showImport = $event">
+      <DtcgImport
+        v-if="project"
+        :project-id="project.id"
+        :can-edit="canEdit"
+        @saved="() => refreshConfig()"
+      />
+    </GTModal>
 
     <!-- The export report is the point of the action, so it opens where it can
          be read without leaving the project (KH-1005 E8). -->

@@ -434,6 +434,31 @@
       "hue_normalised": "hue wrapped into 0–360"
     }
   },
+  "dtcgImport": {
+    "intro": "Bring tokens in from a DTCG 2025.10 file. You always see a report first, and nothing is saved until you say so.",
+    "baseLabel": "Token file",
+    "baseHelp": "The file your light tokens live in (.json).",
+    "darkLabel": "Dark file (optional)",
+    "darkHelp": "Only choose a file here if it holds your dark colours.",
+    "analyse": "See what the file contains",
+    "notJson": "{file} could not be read as JSON.",
+    "failed": "The file could not be imported.",
+    "summary": "{total} tokens in the file: {mapped} can be imported, {notMapped} do not belong in Studio, {invalid} cannot be saved.",
+    "overwrites": "{n} values in your draft will be overwritten.",
+    "invalidSummary": "{n} tokens cannot be saved",
+    "notMappedSummary": "{n} tokens do not belong in Studio",
+    "convertedSummary": "{n} values were converted on the way",
+    "tokenCount": "{n} token | {n} tokens",
+    "droppedHeading": "Information in the file that Studio does not store",
+    "saveDraft": "Save as draft",
+    "chooseOther": "Choose another file",
+    "needsEditor": "You can see the report, but saving needs editor access.",
+    "savedHeading": "Saved as draft (version {version})",
+    "savedBody": "Nothing is published. Review the draft and publish when it looks right.",
+    "importAnother": "Import another file",
+    "action": "Import (DTCG)",
+    "title": "Import (DTCG)"
+  },
   "tokens": {
     "colors": "Colors",
     "typography": "Typography",
