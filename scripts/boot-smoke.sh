@@ -59,9 +59,48 @@ done
 # Dummy-env: appen booter uden rigtige backends og renderer SSR-skaller.
 # OTel-endpointet sættes TIL, så telemetri-stien øves frem for at springes over
 # — det var præcis den sti, v0.2.11 knækkede på.
+# 🔴 FREMKALD FØRST: bevis at værnet KAN fyre, før vi stoler på at det er tyst.
+# Uden CDN-hosten skal produktions-imaget NÆGTE at starte (KH-1178,
+# server/plugins/assert-cdn-base.ts). Fyrer den ikke, er resten af CDN-målingen
+# herunder værdiløs — så vi bevæbner den mod ingenting og ville ikke vide det.
+CDN_HOST=${BOOT_SMOKE_CDN_HOST:-cdn.grundtone.com}
+docker run -d --name "$APP-nocdn" --network "$NET" \
+  -e DATABASE_URL="postgres://postgres:smoke@$DB:5432/postgres" \
+  -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
+  "$IMAGE" >/dev/null
+#
+# 🔴 WAIT FOR IT TO EXIT; DO NOT SAMPLE "is it running?" AFTER A FIXED SLEEP.
+# The first version slept 3s and read State.Running, and called the guard inert
+# because the container was still up — it was still running MIGRATIONS
+# (docker/entrypoint.sh runs them BEFORE the server starts), so it had not yet
+# reached the Nitro plugin. The measurement was impatient, not the guard.
+nocdn_exited=false
+for _ in $(seq 1 30); do
+  if [ "$(docker inspect -f '{{.State.Running}}' "$APP-nocdn")" != 'true' ]; then
+    nocdn_exited=true
+    break
+  fi
+  sleep 2
+done
+if [ "$nocdn_exited" != 'true' ]; then
+  log "✗ the image was STILL RUNNING 60s after starting with NUXT_PUBLIC_CDN_BASE unset — the boot"
+  log "  refusal is inert, so every CDN host assertion below would pass on an app that had fallen"
+  log "  back to the request origin"
+  docker logs "$APP-nocdn" 2>&1 | tail -20 >&2
+  docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
+  exit 1
+fi
+docker logs "$APP-nocdn" 2>&1 | grep -q 'NUXT_PUBLIC_CDN_BASE' \
+  || { log "✗ the image refused to start, but not for the reason we are testing — its log never names NUXT_PUBLIC_CDN_BASE"; docker logs "$APP-nocdn" 2>&1 | tail -20 >&2; docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true; exit 1; }
+docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
+log "✓ the image refuses to start without NUXT_PUBLIC_CDN_BASE, and says so"
+
+# …and now the real run, configured the way production is: the host is SET, not
+# fallen back to. That is the shape being measured.
 docker run -d --name "$APP" --network "$NET" -p "$PORT:3000" \
   -e DATABASE_URL="postgres://postgres:smoke@$DB:5432/postgres" \
   -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
+  -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST" \
   -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
   "$IMAGE" >/dev/null
 
@@ -183,9 +222,15 @@ done
 # this block stripped the host and measured the path alone — so a guide
 # pointing customers at the WRONG HOST would have passed green, which is the
 # very class this check exists to catch ([sikkerhed], KH-857). Every /client
-# URL on the page must carry EXPECTED_CDN_HOST. The smoke runs the image with
-# NUXT_PUBLIC_CDN_BASE unset, so the page renders the production default.
-EXPECTED_CDN_HOST=${BOOT_SMOKE_CDN_HOST:-cdn.grundtone.com}
+# URL on the page must carry EXPECTED_CDN_HOST.
+#
+# The container is started with NUXT_PUBLIC_CDN_BASE SET (see the run above).
+# This comment used to say the opposite — that the smoke left it unset "so the
+# page renders the production default". That default no longer exists: the guide
+# falls back to the request origin now, and production refuses to boot without
+# an explicit host (KH-1178). A smoke measuring the fallback would have measured
+# a shape production never runs in.
+EXPECTED_CDN_HOST=$CDN_HOST
 code=$(curl -s -o "$SDK_TMP/install.html" -w '%{http_code}' "http://127.0.0.1:$PORT/docs/install")
 [ "$code" = '200' ] || { log "✗ /docs/install returned $code in boot-smoke"; exit 1; }
 doc_urls=$(grep -oE 'https?://[A-Za-z0-9.:-]+/client/v[0-9][0-9A-Za-z.]*' "$SDK_TMP/install.html" | sort -u)
@@ -208,6 +253,27 @@ for path in $doc_paths; do
   ndoc=$((ndoc + 1))
 done
 log "✓ /docs/install: all $ndoc /client/ URL(s) it shows answer 200: $(echo "$doc_paths" | tr '\n' ' ')"
+
+# 🔴 THE IN-APP SNIPPET, WHICH NO GREEN ABOVE SAYS ANYTHING ABOUT (KH-1178).
+# components/InstallSnippet.vue sits BEHIND LOGIN and renders on the client, so
+# /docs/install cannot speak for it — that was the whole finding: a guard that
+# measures the surface someone remembered, not the one the class contains.
+#
+# The surface that reaches it without a session: Nuxt serialises
+# runtimeConfig.public into the payload of EVERY page. Both screens now read the
+# host from that one value (composables/useCdnBase.ts), so asserting on it
+# covers the snippet's INPUT. What it does NOT cover: that the component renders
+# that value rather than ignoring it — the unit cells do that.
+# It is read from the page already fetched above, whose 200 is already
+# asserted: the payload is identical on every page, so there is no reason to
+# reach for a second URL whose status this smoke has never measured.
+payload_host=$(grep -oE 'cdnBase:"[^"]*"' "$SDK_TMP/install.html" | head -1 | sed -E 's/cdnBase:"(.*)"/\1/')
+[ -n "$payload_host" ] \
+  || { log "✗ no cdnBase in the page payload at all — either the value stopped being public, or this grep no longer sees it, and the check below would pass on nothing"; exit 1; }
+[ "$payload_host" = "https://$EXPECTED_CDN_HOST" ] \
+  || { log "✗ the payload every page ships announces '$payload_host', not 'https://$EXPECTED_CDN_HOST' — the in-app snippet would send customers there"; exit 1; }
+log "✓ page payload: the in-app snippet's host is $payload_host"
+
 rm -rf "$SDK_TMP"
 
 # Sidste linje på stdout, og den eneste: ID'et på det image containeren

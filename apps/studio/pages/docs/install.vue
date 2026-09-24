@@ -4,8 +4,10 @@
   definePageMeta({ layout: 'auth' })
   const { t } = useI18n()
 
-  const runtimeConfig = useRuntimeConfig()
-  const cdnBase = computed(() => runtimeConfig.public.cdnBase || 'https://cdn.grundtone.com')
+  // One source with the in-app snippet (KH-1178). The production host is NOT
+  // spelled out here any more: prod refuses to boot without an explicit
+  // cdnBase, so the fallback inside is only ever a dev/self-host value.
+  const cdnBase = useCdnBase()
   const sampleKey = 'pk_live_<your-key>'
 
   // The snippets live in utils/install-snippets.ts so the recommendation (SSR
