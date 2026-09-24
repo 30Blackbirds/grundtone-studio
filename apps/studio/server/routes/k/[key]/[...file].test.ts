@@ -48,6 +48,14 @@ vi.mock('~~/server/db/schema', () => ({
   project: { id: 'id', organizationId: 'organization_id' },
   orgSuspension: { organizationId: 'organization_id', cdnGraceUntil: 'cdn_grace_until' },
 }))
+// KH-987: the usage signal is mocked so the cell can read WHETHER the route
+// records the use, not how the record is stored — that is key-usage.test.ts.
+const recordedUses: string[] = []
+vi.mock('~~/server/lib/key-usage', () => ({
+  recordKeyUse: (hash: string) => {
+    recordedUses.push(hash)
+  },
+}))
 vi.mock('~~/server/lib/storage', () => ({
   paths: (projectId: string) => ({
     currentJson: `p/${projectId}/current.json`,
@@ -383,5 +391,48 @@ describe('GET /k/[key]/[file]', () => {
         }),
       ),
     ).rejects.toMatchObject({ statusCode: 403 })
+  })
+})
+
+describe('usage signal (KH-987)', () => {
+  beforeEach(() => {
+    recordedUses.length = 0
+  })
+
+  it('🔴 a request with a known key records the key as used', () => {
+    // The riff's own accept criterion. Before this, `last_used_at` was read in
+    // the key screen and written NOWHERE, so every key read "never used" — a
+    // confident wrong answer, not an empty one.
+    const { key, projectId, row } = fresh()
+    nextDbRows = [row]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    return handler(fakeEvent({ params: { key, file: 'tokens.json' } })).then(() => {
+      expect(recordedUses).toHaveLength(1)
+      // By hash, never the plaintext key that sits in the URL.
+      expect(recordedUses[0]).not.toBe(key)
+      expect(recordedUses[0]).toMatch(/^[a-f0-9]{64}$/)
+    })
+  })
+
+  it('does NOT record a use for an unknown key', async () => {
+    // The negative control. Without it the cell above passes on a route that
+    // records every request, including the 401s — which would turn the column
+    // into a record of guessing, not of use.
+    nextDbRows = []
+    await expect(
+      handler(fakeEvent({ params: { key: 'pk_live_nope', file: 'tokens.json' } })),
+    ).rejects.toThrow()
+    expect(recordedUses).toEqual([])
+  })
+
+  it('records a use even when the request is then rate limited', async () => {
+    // A key hammered past its limit is a key IN USE, and that is exactly what a
+    // leaked-key investigation asks. Recording after the limiter would answer
+    // "not used" about the loudest possible use.
+    const { key, projectId, row } = fresh()
+    nextDbRows = [{ ...row, rateLimit: 0 }]
+    storage.set(`p/${projectId}/current.json`, '{}')
+    await expect(handler(fakeEvent({ params: { key, file: 'tokens.json' } }))).rejects.toThrow()
+    expect(recordedUses).toHaveLength(1)
   })
 })

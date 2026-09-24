@@ -3,6 +3,7 @@ import { getRequestHeader, type H3Event } from 'h3'
 import { db } from '~~/server/db'
 import { apiKey, project } from '~~/server/db/schema'
 import { hashApiKey } from './api-keys'
+import { recordKeyUse } from './key-usage'
 
 // A secret key arrives as `Authorization: Bearer sk_...` (never in a URL, unlike
 // the publishable `pk_` CDN keys).
@@ -37,6 +38,11 @@ export async function authenticateMachineKey(event: H3Event): Promise<void> {
     .innerJoin(project, eq(project.id, apiKey.projectId))
     .where(and(eq(apiKey.keyHash, keyHash), eq(apiKey.keyType, 'secret'), isNull(apiKey.revokedAt)))
   if (!row) return
+
+  // Same signal as the CDN path (KH-987). Without this the `sk_` rows on the
+  // key screen keep reading "never used" while the `pk_` rows next to them are
+  // right — a wrong answer made harder to spot, not easier.
+  recordKeyUse(keyHash)
 
   const authUrl = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
   const serviceSecret = process.env.MACHINE_TOKEN_SERVICE_SECRET

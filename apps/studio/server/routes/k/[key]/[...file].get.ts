@@ -11,6 +11,7 @@ import {
 import { db } from '~~/server/db'
 import { apiKey, orgSuspension, project } from '~~/server/db/schema'
 import { hashApiKey } from '~~/server/lib/api-keys'
+import { recordKeyUse } from '~~/server/lib/key-usage'
 import { recordCdnGraceCut } from '~~/server/lib/metrics'
 import { paths, getObjectAsBuffer, getObjectAsString } from '~~/server/lib/storage'
 import { TTLCache } from '~~/server/lib/ttl-cache'
@@ -137,6 +138,12 @@ export default defineEventHandler(async (event) => {
     meta = row
     keyCache.set(hash, row)
   }
+
+  // The key was presented and accepted — that is what "used" means, so it is
+  // recorded here rather than after the rate limit: a key being hammered past
+  // its limit is a key in USE, and that is exactly the question a leaked-key
+  // investigation asks (KH-987). Throttled and fire-and-forget; never awaited.
+  recordKeyUse(hash)
 
   const limit = rateLimiter.check(hash, meta.rateLimit)
   if (!limit.ok) {
