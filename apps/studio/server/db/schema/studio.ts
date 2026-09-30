@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -100,9 +101,18 @@ export const apiKey = pgTable(
   'api_key',
   {
     id: uuid().primaryKey().defaultRandom(),
-    projectId: uuid()
-      .notNull()
-      .references(() => project.id, { onDelete: 'cascade' }),
+    // 🔴 NULLABLE since KH-964, and the nullability is the whole point. A
+    // provisioning key is ORG-scoped: it exists to CREATE projects, so it
+    // cannot belong to one. `pk_`/`sk_` keys still carry a projectId; a
+    // provisioning key carries an organizationId instead. Exactly one of the
+    // two is set — enforced by the check constraint below, not by convention,
+    // because a key belonging to both or to neither is a key nobody can reason
+    // about.
+    projectId: uuid().references(() => project.id, { onDelete: 'cascade' }),
+    // Set only for provisioning keys. Orgs live in the central auth service, so
+    // this is the same untyped id that `project.organizationId` carries — there
+    // is no local table to reference.
+    organizationId: text(),
     keyHash: text().notNull(),
     keyPrefix: text().notNull(),
     keyType: text().notNull().default('publishable'),
@@ -120,7 +130,18 @@ export const apiKey = pgTable(
     createdByEmail: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('api_key_hash_idx').on(t.keyHash)],
+  (t) => [
+    uniqueIndex('api_key_hash_idx').on(t.keyHash),
+    // A key is scoped to exactly one thing. Without this, a provisioning key
+    // with a stray projectId would be adjudicated as a project key by every
+    // existing guard — the failure would look like a permission bug rather
+    // than a data bug.
+    check(
+      'api_key_scope_exclusive',
+      sql`(${t.projectId} IS NOT NULL AND ${t.organizationId} IS NULL)
+          OR (${t.projectId} IS NULL AND ${t.organizationId} IS NOT NULL)`,
+    ),
+  ],
 )
 
 export const configVersion = pgTable(

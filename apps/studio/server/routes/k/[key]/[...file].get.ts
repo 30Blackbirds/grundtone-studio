@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { eq, isNull, and } from 'drizzle-orm'
+import { eq, isNull, isNotNull, and } from 'drizzle-orm'
 import {
   createError,
   defineEventHandler,
@@ -133,10 +133,21 @@ export default defineEventHandler(async (event) => {
       })
       .from(apiKey)
       .innerJoin(project, eq(project.id, apiKey.projectId))
-      .where(and(eq(apiKey.keyHash, hash), isNull(apiKey.revokedAt)))
-    if (!row) throw createError({ statusCode: 401, statusMessage: 'Invalid API key' })
-    meta = row
-    keyCache.set(hash, row)
+      // 🔴 `isNotNull(projectId)` is redundant against the inner join TODAY and
+      // is here anyway (KH-964). Provisioning keys are org-scoped and carry no
+      // projectId; today the join drops them, but that safety is a property of
+      // the JOIN, not of this line. Someone changing it to a left join would
+      // remove the refusal silently, and a provisioning key — the
+      // highest-privilege key we mint — would reach the CDN path.
+      .where(and(eq(apiKey.keyHash, hash), isNull(apiKey.revokedAt), isNotNull(apiKey.projectId)))
+    // Refused at runtime rather than narrowed with a cast: the type says the
+    // column is nullable because it IS, and a cast would assert what the cell
+    // below actually measures.
+    if (!row || row.projectId === null) {
+      throw createError({ statusCode: 401, statusMessage: 'Invalid API key' })
+    }
+    meta = { ...row, projectId: row.projectId }
+    keyCache.set(hash, meta)
   }
 
   // The key was presented and accepted — that is what "used" means, so it is

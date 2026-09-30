@@ -24,6 +24,7 @@ vi.mock('drizzle-orm', () => ({
   and: () => null,
   eq: () => null,
   isNull: () => null,
+  isNotNull: () => null,
 }))
 vi.mock('~~/server/db', () => ({
   db: {
@@ -434,5 +435,27 @@ describe('usage signal (KH-987)', () => {
     storage.set(`p/${projectId}/current.json`, '{}')
     await expect(handler(fakeEvent({ params: { key, file: 'tokens.json' } }))).rejects.toThrow()
     expect(recordedUses).toHaveLength(1)
+  })
+})
+
+describe('org-scoped keys never reach the CDN path (KH-964)', () => {
+  it('🔴 401s for a key with no projectId, even if the row is returned', () => {
+    // A provisioning key (`prov_`) is org-scoped and the highest-privilege key
+    // we mint. Today the inner join on `project` already drops it — but that
+    // safety is a property of the JOIN, not of the handler, and a left join
+    // would remove it silently. This drives the handler with a row that HAS no
+    // projectId, which is what a broken query would hand it.
+    const { key } = fresh()
+    nextDbRows = [
+      {
+        projectId: null,
+        organizationId: 'org-1',
+        allowedOrigins: [],
+        rateLimit: 1000,
+      } as unknown as KeyRow,
+    ]
+    return expect(
+      handler(fakeEvent({ params: { key, file: 'tokens.json' } })),
+    ).rejects.toMatchObject({ statusCode: 401 })
   })
 })
