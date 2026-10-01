@@ -17,6 +17,7 @@ export type AuditAction =
   | 'project.member.role_changed'
   | 'api_key.created'
   | 'provisioning_key.created'
+  | 'provisioning_key.revoked'
   | 'api_key.revoked'
   | 'config.published'
   | 'config.activated'
@@ -42,6 +43,7 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'project.member.role_changed',
   'api_key.created',
   'provisioning_key.created',
+  'provisioning_key.revoked',
   'api_key.revoked',
   'config.published',
   'config.activated',
