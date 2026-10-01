@@ -185,7 +185,7 @@ jobs:
       # intet at bygge og intet at logge ind for. Uden `if:` her ville
       # "spring over"-grenen stadig koste buildx-opsaetning + registry-login,
       # og saa er besparelsen kun halv.
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.gate.outputs.relevant == 'true'
 
       - name: Log in to ghcr.io
