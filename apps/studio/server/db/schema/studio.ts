@@ -27,10 +27,32 @@ export const project = pgTable(
     organizationId: text().notNull(),
     slug: text().notNull(),
     name: text().notNull(),
+    // The caller's OWN id for this project, supplied when it is created through
+    // a provisioning key (KH-964 AC-B). It is what makes creation idempotent:
+    // a beachhead builder that retries after a timeout must get the same
+    // project back, not a second one. Null for projects created in the UI,
+    // which has a human to notice a duplicate.
+    externalRef: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('project_org_slug_idx').on(t.organizationId, t.slug)],
+  (t) => [
+    uniqueIndex('project_org_slug_idx').on(t.organizationId, t.slug),
+    // 🔴 THE IDEMPOTENCY IS THE DATABASE'S, NOT THE HANDLER'S (AC-B3). Two
+    // concurrent calls with the same externalRef must leave exactly one
+    // project. A read-then-write in the handler cannot promise that — both
+    // reads can miss before either writes. This index is what makes the second
+    // INSERT lose, and the handler then returns the winner's row.
+    //
+    // Partial, because NULL is not a value: without the WHERE, every UI-created
+    // project would share the NULL "ref" and only the first would be allowed
+    // in Postgres' eyes — no, worse: NULLs do not conflict in a unique index,
+    // so the index would be inert for them and nobody would notice. Stating it
+    // explicitly keeps the rule readable instead of resting on NULL semantics.
+    uniqueIndex('project_org_external_ref_idx')
+      .on(t.organizationId, t.externalRef)
+      .where(sql`${t.externalRef} IS NOT NULL`),
+  ],
 )
 
 // Org suspension mirror (kontrakt §8a/§9 + ToS §10.2): account's

@@ -92,6 +92,13 @@
       "when": 1790800600737,
       "tag": "0012_chemical_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790964189953,
+      "tag": "0013_round_wildside",
+      "breakpoints": true
     }
   ]
 }

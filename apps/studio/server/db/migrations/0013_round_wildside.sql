@@ -1,0 +1,2 @@
+ALTER TABLE "project" ADD COLUMN "external_ref" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "project_org_external_ref_idx" ON "project" USING btree ("organization_id","external_ref") WHERE "project"."external_ref" IS NOT NULL;
