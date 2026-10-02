@@ -65,4 +65,33 @@ export async function authenticateProvisioningKey(event: H3Event): Promise<void>
     keyId: row.id,
     organizationId: row.organizationId,
   } satisfies ProvisioningPrincipal
+
+  // 🔴 ALSO a machine principal, for the same reason `sk_` is one: the PDP is
+  // what enforces least privilege, and it can only do that if it is asked. With
+  // `auth` set, the existing editor-gated endpoints (write tokens, publish,
+  // activate) work unchanged, and the PDP refuses this key on every project it
+  // holds no tuple for — which is every project it did not create — and on
+  // every `project.admin` operation (AC-D2/AC-D4). Hiding the principal from
+  // those call sites instead would have meant duplicating each endpoint, and a
+  // second copy of an authorisation path is how the two drift.
+  //
+  // Minted PER REQUEST and never stored: the token's own lifetime is then
+  // irrelevant to revocation, which is what AC-A3 is about. An exchange that
+  // cannot be reached leaves `auth` unset and the route answers 401 — the key
+  // is still recorded as used, because it WAS presented and accepted.
+  const authUrl = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
+  const serviceSecret = process.env.MACHINE_TOKEN_SERVICE_SECRET
+  if (!authUrl || !serviceSecret) return
+
+  try {
+    const res = await $fetch<{ token: string }>(`${authUrl}/api/auth/machine-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${serviceSecret}` },
+      body: { keyId: row.id, org: row.organizationId },
+    })
+    event.context.authToken = res.token
+    event.context.auth = { sub: `machine:${row.id}`, tenant: row.organizationId }
+  } catch {
+    // Exchange unreachable/failed — leave unauthenticated; the guard 401s.
+  }
 }
