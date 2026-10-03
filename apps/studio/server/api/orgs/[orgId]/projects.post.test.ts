@@ -21,6 +21,7 @@ vi.mock('drizzle-orm', () => ({
 let insertRows: Record<string, unknown>[] = []
 let insertThrows: unknown = null
 let selectRows: Record<string, unknown>[] = []
+let projectCount = 0
 const deleted: unknown[] = []
 vi.mock('~~/server/db', () => ({
   db: {
@@ -35,6 +36,7 @@ vi.mock('~~/server/db', () => ({
       }),
     }),
     select: () => ({ from: () => ({ where: () => Promise.resolve(selectRows) }) }),
+    $count: () => Promise.resolve(projectCount),
     delete: () => ({
       where: (w: unknown) => {
         deleted.push(w)
@@ -46,6 +48,34 @@ vi.mock('~~/server/db', () => ({
 vi.mock('~~/server/db/schema', () => ({
   project: { id: 'id', organizationId: 'organizationId', externalRef: 'externalRef' },
 }))
+
+// 🔴 ONLY THE NETWORK CALL IS MOCKED. `evaluateProjectQuota` is the REAL one,
+// imported through importOriginal, because it carries the contract's fail matrix
+// (§4: lifecycle + limit). Mocking the evaluator would make these cells measure
+// my own stub instead of the ruling they exist to pin.
+let entitlements: Record<string, unknown> | null = null
+vi.mock('~~/server/lib/entitlements', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('~~/server/lib/entitlements')>()),
+  getStudioEntitlements: () => Promise.resolve(entitlements),
+}))
+
+const metrics: string[] = []
+vi.mock('~~/server/lib/metrics', () => ({
+  recordQuotaFailOpen: (k: string, r: string) => metrics.push(`failopen:${k}:${r}`),
+  recordQuotaDenial: (k: string) => metrics.push(`denial:${k}`),
+}))
+
+function plan(over: Record<string, unknown> = {}) {
+  return {
+    planKey: 'studio-free',
+    planState: 'active',
+    graceUntil: null,
+    features: [],
+    limits: { 'studio.projects': 2 },
+    asOf: '2026-10-03T00:00:00Z',
+    ...over,
+  }
+}
 
 let pdpThrows = false
 const pdpCalls: string[] = []
@@ -92,6 +122,10 @@ beforeEach(() => {
   pdpThrows = false
   pdpCalls.length = 0
   audits.length = 0
+  projectCount = 0
+  entitlements = null
+  metrics.length = 0
+  delete process.env.ACCOUNT_URL
 })
 
 describe('AC-B1: creating a project', () => {
@@ -197,5 +231,78 @@ describe('body validation', () => {
     await expect(call({ body })).rejects.toMatchObject({ statusCode: 400 })
     expect(audits).toEqual([])
     expect(pdpCalls).toEqual([])
+  })
+})
+
+describe('🔴 AC-E: the project quota applies to the machine path too (869fbg1x4)', () => {
+  // The hole this block closes: the human endpoint enforced the free-tier quota
+  // and this one did not, so a provisioning key could create projects without
+  // limit. Measured with a positive control — the search that found 15
+  // entitlement references in api/projects.post.ts found 0 here.
+
+  it('creates normally while the org is under its limit', async () => {
+    entitlements = plan({ limits: { 'studio.projects': 2 } })
+    projectCount = 1
+    await expect(call()).resolves.toMatchObject({ id: 'p-1' })
+    expect(metrics).toEqual([])
+  })
+
+  it('refuses at the limit with a distinguishable code AND the limit', async () => {
+    entitlements = plan({ limits: { 'studio.projects': 2 } })
+    projectCount = 2
+    await expect(call()).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'quota_exceeded', limit: 2, planKey: 'studio-free' },
+    })
+    expect(metrics).toEqual(['denial:studio.projects'])
+  })
+
+  it('refuses a suspended org, and does NOT count that as a quota denial', async () => {
+    // Suspension is a governance decision, not an outage, and not a quota
+    // event. Counting it would inflate the denial series with something the
+    // limit had no say in.
+    entitlements = plan({ planState: 'suspended' })
+    projectCount = 0
+    await expect(call()).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'suspended' },
+    })
+    expect(metrics).toEqual([])
+  })
+
+  it('🔴 FAILS OPEN when entitlements are unavailable — the contract says so', async () => {
+    // §4 of STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md is a FINAL ruling: a quota
+    // gate never blocks on infrastructure failure, because the lockout
+    // prohibition wins. This cell exists so nobody "hardens" it into
+    // fail-closed without reopening the contract. My own instinct was
+    // fail-closed; this is what overruled it.
+    process.env.ACCOUNT_URL = 'http://account.invalid'
+    entitlements = null
+    projectCount = 99
+    await expect(call()).resolves.toMatchObject({ id: 'p-1' })
+    expect(metrics).toEqual(['failopen:studio.projects:entitlements_unavailable'])
+  })
+
+  it('does not raise the fail-open alarm when entitlements are simply unconfigured', async () => {
+    // Both states return null. Only "configured but unreachable" is a true
+    // unavailability; counting the dormant state would false-alarm the series
+    // every single request in any deployment without billing.
+    entitlements = null
+    projectCount = 99
+    await expect(call()).resolves.toMatchObject({ id: 'p-1' })
+    expect(metrics).toEqual([])
+  })
+
+  it('🔴 an idempotent retry still succeeds at the limit — the quota gates CREATION', async () => {
+    // AC-B3 promises both callers a success with the same id. If the org
+    // crossed its limit between the first call and the retry, a 403 on the
+    // retry would break that promise and leave the caller unable to learn that
+    // its project exists. Nothing is created here, so nothing is gated.
+    entitlements = plan({ limits: { 'studio.projects': 2 } })
+    projectCount = 5
+    selectRows = [PROJECT]
+    await expect(call()).resolves.toMatchObject({ id: 'p-1', externalRef: 'tenant-7' })
+    expect(audits).toHaveLength(0)
+    expect(metrics).toEqual([])
   })
 })

@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { db } from '~~/server/db'
 import { project } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
+import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 import { grantMachineProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
 
 // Create a project with a provisioning key (KH-964 AC-B).
@@ -78,6 +80,63 @@ export default defineEventHandler(async (event) => {
     })
   }
   const data = parsed.data
+
+  // Free-tier project quota — kontrakt:
+  // .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md. This MIRRORS
+  // api/projects.post.ts on purpose: same helpers, same fail-open, same codes,
+  // so the human and machine creation paths cannot drift apart. The absence of
+  // this gate was the whole of 869fbg1x4 — the machine path was less restricted
+  // than the human one, and the criterion had been recorded as "unmeasured"
+  // when it was in fact ABSENT.
+  //
+  // 🔴 FAIL-OPEN IS THE CONTRACT'S RULING, NOT AN OVERSIGHT. §4 is final
+  // ([account] owns it): a quota gate fails OPEN when entitlements are
+  // unavailable, because the lockout prohibition wins and a bypass is at most
+  // temporary free usage. My own instinct here was fail-closed; the contract
+  // overrules it. Written down so the next reader does not "fix" it back —
+  // fail-CLOSED belongs to paid bool-features and to `suspended`, both of which
+  // evaluateProjectQuota already handles.
+  //
+  // 🔴 ONLY CREATION IS GATED, AND ON THIS PATH THAT IS LOAD-BEARING. An
+  // idempotent retry creates nothing, and AC-B3 promises both callers a success
+  // with the same id. If the org crossed its limit between the first call and
+  // the retry, refusing the retry would break that promise and leave the caller
+  // unable to learn that its project exists. So a refusal looks for the
+  // idempotent row FIRST and answers with it when it is there.
+  const entitlements = await getStudioEntitlements(orgId)
+  const verdict = evaluateProjectQuota(
+    entitlements,
+    await db.$count(project, eq(project.organizationId, orgId)),
+  )
+  // Metrics-spec: fail_open counts only TRUE unavailability (configured but
+  // unreachable). The unconfigured state returns the same null and would
+  // false-alarm the series, so ACCOUNT_URL is what separates them.
+  if (entitlements === null && process.env.ACCOUNT_URL) {
+    recordQuotaFailOpen('studio.projects', 'entitlements_unavailable')
+  }
+  if (!verdict.allowed) {
+    const [already] = await db
+      .select()
+      .from(project)
+      .where(and(eq(project.organizationId, orgId), eq(project.externalRef, data.externalRef)))
+    if (already) {
+      setResponseStatus(event, 200)
+      return already
+    }
+    if (verdict.reason === 'quota_exceeded') recordQuotaDenial('studio.projects')
+    throw createError({
+      statusCode: 403,
+      statusMessage:
+        verdict.reason === 'quota_exceeded'
+          ? 'Project quota reached for this plan'
+          : 'Organization is suspended',
+      data: {
+        code: verdict.reason,
+        limit: verdict.reason === 'quota_exceeded' ? verdict.limit : undefined,
+        planKey: entitlements?.planKey,
+      },
+    })
+  }
 
   let inserted: typeof project.$inferSelect | undefined
   try {
