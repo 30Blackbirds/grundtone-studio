@@ -1,15 +1,33 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { getRequestHeader, type H3Event } from 'h3'
+import { createError, getRequestHeader, setHeader, type H3Event } from 'h3'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { hashApiKey } from './api-keys'
 import { recordKeyUse } from './key-usage'
+import { SlidingWindowRateLimiter } from './rate-limit'
 
 // Authenticate an ORG-scoped provisioning key (KH-964).
 //
 // A provisioning key arrives as `Authorization: Bearer prov_…` — never in a URL,
 // like `sk_` and unlike the publishable `pk_` CDN keys.
 const PROVISIONING_BEARER_PREFIX = 'Bearer prov_'
+
+// 🔴 ENFORCED HERE, AT THE AUTHENTICATION LAYER, AND NOT PER ENDPOINT. The limit
+// is a property of the KEY, so the place that resolves the key is the place that
+// can apply it to every route the key can reach — the four provisioning
+// endpoints today, and whatever is added next without anyone remembering.
+//
+// Before this, `api_key.rateLimit` was WRITTEN by five endpoints and READ for
+// enforcement by exactly one: the CDN route. And that route refuses provisioning
+// keys (`isNotNull(projectId)` plus a runtime check), so a provisioning key's
+// stored limit was enforced on NO path it could use — armed against nothing by
+// construction, while `provisioning_key.created` recorded `rateLimit` in the
+// audit event as if it bound something.
+//
+// 60 s window, same as the CDN route, so "rateLimit" means the same thing on
+// both paths rather than two units sharing a column name.
+const WINDOW_MS = 60_000
+const provisioningLimiter = new SlidingWindowRateLimiter(WINDOW_MS)
 
 export interface ProvisioningPrincipal {
   keyId: string
@@ -44,7 +62,7 @@ export async function authenticateProvisioningKey(event: H3Event): Promise<void>
   const keyHash = hashApiKey(plaintext)
 
   const [row] = await db
-    .select({ id: apiKey.id, organizationId: apiKey.organizationId })
+    .select({ id: apiKey.id, organizationId: apiKey.organizationId, rateLimit: apiKey.rateLimit })
     .from(apiKey)
     .where(
       and(
@@ -59,7 +77,24 @@ export async function authenticateProvisioningKey(event: H3Event): Promise<void>
   // and if it ever is reached the answer must be "no", not "undefined".
   if (!row || row.organizationId === null) return
 
+  // 🔴 RECORDED BEFORE THE LIMIT IS CHECKED, mirroring the CDN route and for the
+  // same reason: a key being hammered past its limit is a key in USE, and that
+  // is exactly the question a leaked-key investigation asks (KH-987). Throttled
+  // and fire-and-forget; never awaited.
   recordKeyUse(keyHash)
+
+  // Keyed on the HASH, not the plaintext — the plaintext has no business
+  // outliving this function, and the hash is what every other per-key record
+  // here is keyed on.
+  const limit = provisioningLimiter.check(keyHash, row.rateLimit)
+  if (!limit.ok) {
+    setHeader(event, 'Retry-After', Math.ceil((limit.resetAt - Date.now()) / 1000))
+    throw createError({
+      statusCode: 429,
+      statusMessage: 'Rate limit exceeded',
+      data: { code: 'rate_limit_exceeded', limit: row.rateLimit },
+    })
+  }
 
   event.context.provisioning = {
     keyId: row.id,

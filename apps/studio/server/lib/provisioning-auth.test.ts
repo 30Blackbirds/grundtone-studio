@@ -11,11 +11,16 @@ vi.mock('drizzle-orm', () => ({
 }))
 
 let headers: Record<string, string> = {}
+let setHeaders: Record<string, unknown> = {}
 vi.mock('h3', () => ({
   getRequestHeader: (_e: unknown, name: string) => headers[name],
+  setHeader: (_e: unknown, name: string, value: unknown) => {
+    setHeaders[name] = value
+  },
+  createError: (o: Record<string, unknown>) => Object.assign(new Error(String(o.statusMessage)), o),
 }))
 
-let rows: { id: string; organizationId: string | null }[] = []
+let rows: { id: string; organizationId: string | null; rateLimit?: number }[] = []
 const wheres: unknown[] = []
 vi.mock('~~/server/db', () => ({
   db: {
@@ -23,7 +28,13 @@ vi.mock('~~/server/db', () => ({
       from: () => ({
         where: (w: unknown) => {
           wheres.push(w)
-          return Promise.resolve(rows)
+          // The schema default (1000) is filled in so the cells written before
+          // the limit existed keep describing the same key. A cell that cares
+          // sets it explicitly — and the `rateLimit: 1` cell below is what
+          // proves the value really travels from the row into the limiter,
+          // because a select that dropped the column would hand `check` an
+          // undefined limit and every request would pass.
+          return Promise.resolve(rows.map((r) => ({ rateLimit: 1000, ...r })))
         },
       }),
     }),
@@ -36,6 +47,7 @@ vi.mock('~~/server/db/schema', () => ({
     keyHash: 'keyHash',
     keyType: 'keyType',
     revokedAt: 'revokedAt',
+    rateLimit: 'rateLimit',
   },
 }))
 vi.mock('./api-keys', () => ({ hashApiKey: (p: string) => `hash(${p})` }))
@@ -81,6 +93,7 @@ beforeEach(() => {
   used.length = 0
   exchange = 'ok'
   exchanges.length = 0
+  setHeaders = {}
   process.env.AUTH_INTERNAL_URL = 'http://auth:3000'
   process.env.MACHINE_TOKEN_SERVICE_SECRET = 's3cret'
 })
@@ -231,5 +244,85 @@ describe('🔴 the machine principal — added after the first cells, and they d
     await authenticateProvisioningKey(e)
     expect(exchanges).toEqual([])
     expect(e.context.auth).toBeUndefined()
+  })
+})
+
+describe('🔴 AC-F: the per-key rate limit is actually enforced', () => {
+  // Before this, `api_key.rateLimit` was WRITTEN by five endpoints and READ for
+  // enforcement by exactly one — the CDN route — and that route REFUSES
+  // provisioning keys. So a provisioning key's stored limit bound nothing on
+  // any path it could use, while `provisioning_key.created` recorded it in the
+  // audit event as if it did.
+  //
+  // 🔴 EVERY CELL HERE USES ITS OWN KEY. The limiter is module-level, so its
+  // buckets outlive a test. Giving each cell a distinct bearer (and therefore a
+  // distinct hash) isolates them without reaching into the limiter's state —
+  // and the isolation is itself part of what cell 3 measures.
+  const present = (token: string) => {
+    headers = { authorization: `Bearer prov_${token}` }
+  }
+
+  it('lets a request through while the key is under its limit', async () => {
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 5 }]
+    present('under-limit')
+    const e = event()
+    await authenticateProvisioningKey(e)
+    expect((e.context as Record<string, unknown>).provisioning).toMatchObject({ keyId: 'k1' })
+  })
+
+  it('refuses with 429, a distinguishable code, the limit, and Retry-After', async () => {
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 2 }]
+    present('at-limit')
+    await authenticateProvisioningKey(event())
+    await authenticateProvisioningKey(event())
+    await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({
+      statusCode: 429,
+      data: { code: 'rate_limit_exceeded', limit: 2 },
+    })
+    // A 429 without Retry-After tells a machine to back off but not how far,
+    // and a provisioning client is exactly the caller that will retry blind.
+    expect(setHeaders['Retry-After']).toBeGreaterThan(0)
+  })
+
+  it('🔴 counts PER KEY, not globally — a global limiter would fail this', async () => {
+    // The discriminating cell. A limiter keyed on anything shared (a constant,
+    // the org, the route) passes every cell above and fails this one: one noisy
+    // tenant would throttle every other tenant's provisioning.
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 1 }]
+    present('noisy-neighbour')
+    await authenticateProvisioningKey(event())
+    await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({ statusCode: 429 })
+
+    // A different key, same org, same moment.
+    rows = [{ id: 'k2', organizationId: 'org-1', rateLimit: 1 }]
+    present('quiet-neighbour')
+    const e = event()
+    await authenticateProvisioningKey(e)
+    expect((e.context as Record<string, unknown>).provisioning).toMatchObject({ keyId: 'k2' })
+  })
+
+  it('🔴 reads the limit from the ROW, not from a constant', async () => {
+    // This is also what proves `rateLimit` survives the SELECT. A select that
+    // dropped the column would hand `check` an undefined limit, every
+    // comparison would be false, and this cell would pass a second call.
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 1 }]
+    present('limit-of-one')
+    await authenticateProvisioningKey(event())
+    await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({
+      statusCode: 429,
+      data: { limit: 1 },
+    })
+  })
+
+  it('records the use even when the request is throttled', async () => {
+    // Mirrors the CDN route, and for the same reason: a key being hammered past
+    // its limit is a key IN USE, which is exactly what a leaked-key
+    // investigation asks about (KH-987).
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 1 }]
+    present('throttled-but-used')
+    await authenticateProvisioningKey(event())
+    used.length = 0
+    await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({ statusCode: 429 })
+    expect(used).toEqual(['hash(prov_throttled-but-used)'])
   })
 })
