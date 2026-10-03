@@ -49,7 +49,17 @@ export const SESSION: FakeSession = {
 export interface FakeAuthActor {
   sub: string
   tenant: string
-  email: string
+  // 🔴 OPTIONAL, BECAUSE THE REAL AuthActor HAS IT OPTIONAL. A machine
+  // principal (server/lib/provisioning-auth.ts) is `{ sub: 'machine:{id}',
+  // tenant: orgId }` with no email at all, so a required field here made this
+  // helper unable to express an actor production really produces — and a
+  // harness that cannot express a real shape cannot have a cell about it.
+  //
+  // Still narrower than production in one way, left alone deliberately: the
+  // real type is `tenant: string | null` (a user with no active organization).
+  // Widening that too would change what every existing consumer must handle,
+  // and the blast radius is unmeasured — so it is recorded, not done.
+  email?: string
 }
 
 export interface FakeEvent {
