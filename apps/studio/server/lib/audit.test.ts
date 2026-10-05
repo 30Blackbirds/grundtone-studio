@@ -315,10 +315,7 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     // api-keys/[keyId].delete now have their own cells; config.post's AUDIT is
     // proven in save-draft.test.ts, which had no file either and is where the
     // event for BOTH delegating doors actually lives.
-    const UNPROVEN = [
-      '/projects/[projectId]/api-keys.post.ts',
-      '/projects/[projectId]/tokens/import.post.ts',
-    ]
+    const UNPROVEN = ['/projects/[projectId]/tokens/import.post.ts']
     // 🔴 A DELEGATING ENDPOINT IS PROVEN ONE LEVEL DOWN, and asking the wrong
     // question here produced a false entry. config.post.ts has its own cells
     // but deliberately no audit assertion: it hands off to lib/save-draft.ts,
