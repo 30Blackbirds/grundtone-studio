@@ -318,7 +318,6 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     const UNPROVEN = [
       '/projects/[projectId]/activate.post.ts',
       '/projects/[projectId]/api-keys.post.ts',
-      '/projects/[projectId]/publish.post.ts',
       '/projects/[projectId]/tokens/import.post.ts',
     ]
     // 🔴 A DELEGATING ENDPOINT IS PROVEN ONE LEVEL DOWN, and asking the wrong
