@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -26,10 +27,32 @@ export const project = pgTable(
     organizationId: text().notNull(),
     slug: text().notNull(),
     name: text().notNull(),
+    // The caller's OWN id for this project, supplied when it is created through
+    // a provisioning key (KH-964 AC-B). It is what makes creation idempotent:
+    // a beachhead builder that retries after a timeout must get the same
+    // project back, not a second one. Null for projects created in the UI,
+    // which has a human to notice a duplicate.
+    externalRef: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('project_org_slug_idx').on(t.organizationId, t.slug)],
+  (t) => [
+    uniqueIndex('project_org_slug_idx').on(t.organizationId, t.slug),
+    // 🔴 THE IDEMPOTENCY IS THE DATABASE'S, NOT THE HANDLER'S (AC-B3). Two
+    // concurrent calls with the same externalRef must leave exactly one
+    // project. A read-then-write in the handler cannot promise that — both
+    // reads can miss before either writes. This index is what makes the second
+    // INSERT lose, and the handler then returns the winner's row.
+    //
+    // Partial, because NULL is not a value: without the WHERE, every UI-created
+    // project would share the NULL "ref" and only the first would be allowed
+    // in Postgres' eyes — no, worse: NULLs do not conflict in a unique index,
+    // so the index would be inert for them and nobody would notice. Stating it
+    // explicitly keeps the rule readable instead of resting on NULL semantics.
+    uniqueIndex('project_org_external_ref_idx')
+      .on(t.organizationId, t.externalRef)
+      .where(sql`${t.externalRef} IS NOT NULL`),
+  ],
 )
 
 // Org suspension mirror (kontrakt §8a/§9 + ToS §10.2): account's
@@ -100,9 +123,18 @@ export const apiKey = pgTable(
   'api_key',
   {
     id: uuid().primaryKey().defaultRandom(),
-    projectId: uuid()
-      .notNull()
-      .references(() => project.id, { onDelete: 'cascade' }),
+    // 🔴 NULLABLE since KH-964, and the nullability is the whole point. A
+    // provisioning key is ORG-scoped: it exists to CREATE projects, so it
+    // cannot belong to one. `pk_`/`sk_` keys still carry a projectId; a
+    // provisioning key carries an organizationId instead. Exactly one of the
+    // two is set — enforced by the check constraint below, not by convention,
+    // because a key belonging to both or to neither is a key nobody can reason
+    // about.
+    projectId: uuid().references(() => project.id, { onDelete: 'cascade' }),
+    // Set only for provisioning keys. Orgs live in the central auth service, so
+    // this is the same untyped id that `project.organizationId` carries — there
+    // is no local table to reference.
+    organizationId: text(),
     keyHash: text().notNull(),
     keyPrefix: text().notNull(),
     keyType: text().notNull().default('publishable'),
@@ -120,7 +152,18 @@ export const apiKey = pgTable(
     createdByEmail: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('api_key_hash_idx').on(t.keyHash)],
+  (t) => [
+    uniqueIndex('api_key_hash_idx').on(t.keyHash),
+    // A key is scoped to exactly one thing. Without this, a provisioning key
+    // with a stray projectId would be adjudicated as a project key by every
+    // existing guard — the failure would look like a permission bug rather
+    // than a data bug.
+    check(
+      'api_key_scope_exclusive',
+      sql`(${t.projectId} IS NOT NULL AND ${t.organizationId} IS NULL)
+          OR (${t.projectId} IS NULL AND ${t.organizationId} IS NOT NULL)`,
+    ),
+  ],
 )
 
 export const configVersion = pgTable(

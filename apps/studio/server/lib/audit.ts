@@ -1,6 +1,7 @@
 import { getRequestHeader, getRequestIP, type H3Event } from 'h3'
 import { db } from '../db'
 import { auditLog } from '../db/schema'
+import { recordAuditWriteFailed } from './metrics'
 
 // Canonical action names. Add new ones at the bottom — these strings appear
 // in the database forever, so renames require a data migration.
@@ -16,6 +17,8 @@ export type AuditAction =
   | 'project.member.removed'
   | 'project.member.role_changed'
   | 'api_key.created'
+  | 'provisioning_key.created'
+  | 'provisioning_key.revoked'
   | 'api_key.revoked'
   | 'config.published'
   | 'config.activated'
@@ -40,6 +43,8 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'project.member.removed',
   'project.member.role_changed',
   'api_key.created',
+  'provisioning_key.created',
+  'provisioning_key.revoked',
   'api_key.revoked',
   'config.published',
   'config.activated',
@@ -117,6 +122,13 @@ export async function recordAuditEvent(
       userAgent,
     })
   } catch (err) {
+    // 🔴 STILL SWALLOWED, AND NOW COUNTED. Swallowing is deliberate: a failed
+    // audit insert must not break the publish that caused it. But a failure
+    // that only reaches console.error is a gap in the log that nobody learns
+    // about, and "is the audit log complete?" then has no answer. The counter
+    // makes the gap a number; whether a failed audit should instead FAIL the
+    // request is a decision about 18 call sites, not something to change here.
     console.error('[audit] failed to record event', input.action, err)
+    recordAuditWriteFailed(input.action)
   }
 }

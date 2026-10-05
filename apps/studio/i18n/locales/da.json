@@ -784,6 +784,8 @@
       "project.member.removed": "Fjernede projektmedlem",
       "project.member.role_changed": "Ændrede projektmedlems rolle",
       "api_key.created": "Oprettede API-nøgle",
+      "provisioning_key.created": "Oprettede provisioning-nøgle",
+      "provisioning_key.revoked": "Tilbagekaldte provisioning-nøgle",
       "api_key.revoked": "Tilbagekaldte API-nøgle",
       "config.published": "Publicerede konfiguration",
       "config.activated": "Aktiverede version",

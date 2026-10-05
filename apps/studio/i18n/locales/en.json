@@ -784,6 +784,8 @@
       "project.member.removed": "Removed project member",
       "project.member.role_changed": "Changed project member role",
       "api_key.created": "Created API key",
+      "provisioning_key.created": "Created provisioning key",
+      "provisioning_key.revoked": "Revoked provisioning key",
       "api_key.revoked": "Revoked API key",
       "config.published": "Published configuration",
       "config.activated": "Activated version",

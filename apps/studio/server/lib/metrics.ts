@@ -90,6 +90,29 @@ export function recordCdnGraceCut(): void {
 // name or `transport` — a small closed set, no per-tenant attributes.
 let pdpUnavailable: Counter | undefined
 
+// 🔴 AN AUDIT WRITE THAT FAILS IS A GAP NOBODY CAN SEE. recordAuditEvent
+// swallows every error by design — a failed insert must not break a publish —
+// but that means the log can be incomplete with no signal at any of its 18 call
+// sites. This counter is what turns that silence into a number.
+//
+// Additive under spec rule 1 (names/types/labels are locked against RENAMES;
+// new metrics are explicitly allowed), and `action` is one of 23 known values,
+// so rule 2's per-tenant cardinality ban does not apply. Fire-and-forget per
+// rule 4: an emitter error must never reach the business flow.
+export function recordAuditWriteFailed(action: string): void {
+  try {
+    ensureInstruments()
+    meter!
+      .createCounter('klanghaus.studio.audit.write_failed', {
+        unit: '{event}',
+        description: 'Audit-hændelser der IKKE blev skrevet (insert fejlede; requesten lykkedes)',
+      })
+      .add(1, { action })
+  } catch {
+    /* fire-and-forget */
+  }
+}
+
 export function recordPdpUnavailable(reason: string): void {
   try {
     pdpUnavailable ??= metrics

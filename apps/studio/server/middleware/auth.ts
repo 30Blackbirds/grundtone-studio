@@ -1,6 +1,7 @@
 import { createJwtVerifier } from '@klanghaus/auth-jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
+import { authenticateProvisioningKey } from '~~/server/lib/provisioning-auth'
 // 🔴 THIS IMPORT MUST STAY EAGER AND UNCONDITIONAL — it is load-bearing, and
 // not for the symbols it brings in.
 //
@@ -126,6 +127,11 @@ export default defineEventHandler(async (event) => {
     // No browser session — a headless client may present a per-project secret
     // key (`Authorization: Bearer sk_...`). Resolve it to a machine principal.
     await authenticateMachineKey(event)
+    // …and an org-scoped provisioning key (KH-964), which is a different
+    // principal class: it acts on an ORGANISATION, not on one project, so it
+    // populates its own context slot rather than context.auth. Both are
+    // attempted because each is a no-op unless its own prefix is present.
+    await authenticateProvisioningKey(event)
     return
   }
 
