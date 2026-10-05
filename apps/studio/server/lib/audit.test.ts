@@ -315,7 +315,12 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     // api-keys/[keyId].delete now have their own cells; config.post's AUDIT is
     // proven in save-draft.test.ts, which had no file either and is where the
     // event for BOTH delegating doors actually lives.
-    const UNPROVEN = ['/projects/[projectId]/tokens/import.post.ts']
+    // 🔴 EMPTY, AND THAT IS THE POINT. All six endpoints that had no test file
+    // now have one, and the two that delegate are covered through
+    // save-draft.test.ts. The cell stays as a tripwire in the other direction:
+    // add a reachable mutation without an audit assertion and it turns red with
+    // the new path named.
+    const UNPROVEN: string[] = []
     // 🔴 A DELEGATING ENDPOINT IS PROVEN ONE LEVEL DOWN, and asking the wrong
     // question here produced a false entry. config.post.ts has its own cells
     // but deliberately no audit assertion: it hands off to lib/save-draft.ts,
