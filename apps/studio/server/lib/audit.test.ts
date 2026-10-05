@@ -316,7 +316,6 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     // proven in save-draft.test.ts, which had no file either and is where the
     // event for BOTH delegating doors actually lives.
     const UNPROVEN = [
-      '/projects/[projectId]/activate.post.ts',
       '/projects/[projectId]/api-keys.post.ts',
       '/projects/[projectId]/tokens/import.post.ts',
     ]
