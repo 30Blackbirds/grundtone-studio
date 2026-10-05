@@ -199,9 +199,18 @@ describe('🔴 869fbzc8a ANSWERED, and the answer is the bad one', () => {
     //   mapper output      colors: { primaryLigt } <- value is carried
     //   after tokensSchema colors: {}              <- value is GONE
     //
-    // tokensSchema accepts the document (success: true) because colorGroup is
-    // `.partial()` and not `.strict()`, so an unknown slot is stripped rather
-    // than refused. The result is user-visible and worse than either half
+    // 🔴 THE CAUSE IS THE ABSENCE OF `.strict()`, NOT THE PRESENCE OF
+    // `.partial()` — corrected after [projektleder] read the source. Measured
+    // directly: `z.object` STRIPS unknown keys by default, with and without
+    // `.partial()`; only `.strict()` refuses. `.partial()` merely makes the
+    // declared slots optional and has nothing to do with the loss. Wording it
+    // as "`.partial()` instead of `.strict()`" invites someone to delete the
+    // `.partial()` and believe it is fixed.
+    //
+    // The asymmetry is visible in tokens.ts: the `dark` wrapper (l.283) and
+    // tokensSchema itself ARE `.strict()`, so the outer layers refuse unknown
+    // keys while the inner colour group drops them. The result is user-visible
+    // and worse than either half
     // alone: the DRY RUN shows the value and reports it mapped, the COMMIT
     // succeeds with no error, and the saved draft contains nothing. The preview
     // and the saved result disagree, and the report actively claims success.
