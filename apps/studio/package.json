@@ -24,7 +24,7 @@
     "bundle:size": "node scripts/bundle-size.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1140.0",
+    "@aws-sdk/client-s3": "^3.1145.0",
     "@bufbuild/protobuf": "^1.10.0",
     "@connectrpc/connect": "^1.6.0",
     "@connectrpc/connect-node": "^1.6.0",
@@ -50,7 +50,7 @@
     "@opentelemetry/sdk-metrics": "^2.11.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@sentry/nuxt": "^10.75.0",
-    "better-auth": "^1.7.6",
+    "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.3",
     "h3": "^1.15.11",
     "marked": "^18.0.14",
