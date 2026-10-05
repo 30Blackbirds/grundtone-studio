@@ -311,19 +311,37 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     // My first count said ELEVEN, and that was my own instrument: the pattern
     // looked for `audits` and these files use `auditEvents`. Corrected before
     // it reached a tracker.
+    // Shrinking as the files land (869fbuf68). config.post and
+    // api-keys/[keyId].delete now have their own cells; config.post's AUDIT is
+    // proven in save-draft.test.ts, which had no file either and is where the
+    // event for BOTH delegating doors actually lives.
     const UNPROVEN = [
       '/projects/[projectId]/activate.post.ts',
       '/projects/[projectId]/api-keys.post.ts',
-      '/projects/[projectId]/api-keys/[keyId].delete.ts',
-      '/projects/[projectId]/config.post.ts',
       '/projects/[projectId]/publish.post.ts',
       '/projects/[projectId]/tokens/import.post.ts',
     ]
+    // 🔴 A DELEGATING ENDPOINT IS PROVEN ONE LEVEL DOWN, and asking the wrong
+    // question here produced a false entry. config.post.ts has its own cells
+    // but deliberately no audit assertion: it hands off to lib/save-draft.ts,
+    // and `config.draft_saved` is asserted in save-draft.test.ts. Counting only
+    // the endpoint's own file called that unproven when it is not. Delete
+    // save-draft.test.ts and both delegating doors return to this list, which is
+    // the behaviour that makes the shortcut safe.
+    const DELEGATE_PROVEN = /expect\(\s*audit\w*/i.test(
+      existsSync(join(import.meta.dirname, 'save-draft.test.ts'))
+        ? readFileSync(join(import.meta.dirname, 'save-draft.test.ts'), 'utf8')
+        : '',
+    )
     const unproven = reachable()
       .filter((p) => {
+        const src = readFileSync(p, 'utf8')
         const t = p.replace(/\.ts$/, '.test.ts')
-        if (!existsSync(t)) return true
-        return !/expect\(\s*audit\w*/i.test(readFileSync(t, 'utf8'))
+        const own = existsSync(t) && /expect\(\s*audit\w*/i.test(readFileSync(t, 'utf8'))
+        if (own) return false
+        // Delegates to saveDraft AND has cells of its own proving it delegates.
+        if (src.includes('saveDraft(') && existsSync(t) && DELEGATE_PROVEN) return false
+        return true
       })
       .map((p) => p.replace(API, ''))
       .sort()
