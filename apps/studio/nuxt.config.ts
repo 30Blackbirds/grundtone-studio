@@ -173,8 +173,16 @@ export default defineNuxtConfig({
     org: 'klanghaus',
     project: 'grundtone-studio',
     sourcemaps: {
-      // The maps exist ONLY for Sentry — never ship them in the image where
+      // The maps exist ONLY for Sentry, and must never ship in the image where
       // they'd be publicly fetchable (source disclosure for a private SaaS).
+      //
+      // 🔴 THIS IS NOT WHAT PROTECTS THE IMAGE, and the previous wording read
+      // as if it were. Measured: a token-less build leaves ZERO .map files in
+      // .output and 122 in .nuxt, and the image is guarded twice without this
+      // option — Dockerfile l.51 runs `find apps/studio/.output -name '*.map'
+      // -delete`, and .dockerignore l.8 excludes `**/.nuxt` so those 122 never
+      // enter the build context. So removing this line would not leak maps;
+      // it only keeps Sentry's own upload from leaving them behind.
       filesToDeleteAfterUpload: ['.output/**/*.map'],
     },
   },
