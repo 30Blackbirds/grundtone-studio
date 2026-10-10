@@ -35,13 +35,60 @@ overrides:
   vue: ^3.5.41
   # GHSA-77vg-94rm-hx3p — DoS via sparse-array deserialization in 5.6.3–5.8.0.
   # Pulled in by @nuxtjs/i18n; remove when that package bumps.
-  devalue: ^5.8.1
+  #
+  # 🔴 RAISED 2026-10-08 from ^5.8.1 to ^5.9.3. Three newer advisories —
+  # GHSA-j22f-vq7h-c4qm, GHSA-mcm9-63f2-9j32, GHSA-x5rw-q4pp-hg5g (high) — are
+  # all patched in 5.9.3, and the old floor was resolving 5.8.1, i.e. exactly
+  # the version it had been raised to. Same stale-floor class as shell-quote
+  # above. Also now reached via @sentry/nuxt > nuxt > devalue, not only i18n.
+  devalue: ^5.9.3
   # GHSA-w7jw-789q-3m8p — critical: shell-quote quote() does not escape
   # newlines in object .op values (patched 1.8.4). Plus a later quadratic-
   # complexity DoS in parse() patched in 1.9.0 — floor raised to cover both.
   # Pulled in by @nuxt/devtools > launch-editor (transitive through
   # @sentry/nuxt > nuxt).
-  shell-quote: ^1.9.0
+  #
+  # 🔴 RAISED 2026-10-08 from ^1.9.0 to ^1.11.0. GHSA-pqg4-j6r4-53mv (critical)
+  # is patched in 1.11.0, and the old floor happily resolved 1.10.0 — which is
+  # inside the new advisory's range. Same failure as the fast-uri note below:
+  # a floor written against one advisory is not a guard against the next, and
+  # this one had been standing green while the tree was vulnerable. Measured:
+  # `pnpm audit --prod` reported shell-quote 1.10.0 critical on 2026-10-08.
+  # Bounded to 1.x by the caret, deliberately.
+  shell-quote: ^1.11.0
+  # 🔴 NO OVERRIDE FOR simple-git — TRIED 2026-10-08 AND IT BREAKS THE BUILD.
+  # GHSA-x6jw-m9v5-85vh (critical), GHSA-v5rq-49vh-5v5c (critical, in
+  # @simple-git/argv-parser) and GHSA-g4wm-2vf7-vfgr + GHSA-858h-whjf-mvg5
+  # (high) all need simple-git >=4.0.1, reached via
+  # @sentry/nuxt > nuxt > @nuxt/devtools > simple-git.
+  #
+  # `simple-git: '>=4.0.1 <5'` resolves cleanly (4.0.2, and argv-parser lands
+  # on 2.0.1 by itself) and then FAILS AT INSTALL TIME:
+  #
+  #   ERROR  The requested module 'simple-git' does not provide an export
+  #          named 'default'
+  #
+  # simple-git 4 dropped the default export; @nuxt/devtools imports it. The
+  # failure is in apps/studio's postinstall (`nuxt prepare`), so it is not
+  # confined to the devtools panel in dev as I first assumed when writing this
+  # override — prepare runs on every install and in CI. Confirmed by reverting
+  # this one line while keeping the others: install goes green again.
+  #
+  # There is no upstream cure either: measured against the registry, every
+  # published @nuxt/devtools up to 3.4.2 declares `simple-git: ^3.36.0`. That is
+  # also why Dependabot's four security-update runs for this chain fail instead
+  # of opening PRs.
+  #
+  # So these two criticals are NOT an override problem. The real defect is that
+  # dev tooling sits in the --prod closure at all: `nuxt` declares @nuxt/devtools
+  # as a regular dependency, and nuxt arrives through @sentry/nuxt. Routes, none
+  # of which is a one-line fix: a nuxt/devtools release that moves to simple-git
+  # 4, a patchedDependencies patch against 3.36.0, or a documented
+  # `pnpm audit --ignore` for the devtools chain. Tracked, not silently dropped.
+  # GHSA-jp82-f5mq-hwhp — high: seroval unbounded string length in JSON
+  # deserialization; patched in 1.6.3. Pulled in via
+  # @sentry/nuxt > nuxt > @nuxt/vite-builder > seroval. Bounded to 1.x.
+  seroval: '>=1.6.3 <2'
   # GHSA — critical node-tar decompression/parse DoS (unlimited input) plus a
   # high infinite-loop on negative entry size; both patched in 7.5.19. Pulled
   # in via @sentry/nuxt > nuxt > nitropack > @vercel/nft > @mapbox/node-pre-gyp.
@@ -83,7 +130,12 @@ overrides:
   # til 5.0.8 frem for 5.0.9. Samme operator, modsat udfald — dér fandtes ingen
   # hoejere version at hoppe til, her findes tre majors. Begge er sande.
   'brace-expansion@<1.1.18': '^1.1.18'
-  'brace-expansion@>=2.0.0 <2.1.4': '^2.1.4'
+  # 🔴 2.x line raised 2026-10-08: <2.1.4 -> <2.1.6. Two further advisories,
+  # GHSA-6j4f-fj2g-mc7p (patched 2.1.5) and GHSA-qhr7-859c-m2p7 (patched
+  # 2.1.6), land above the old floor, so the tree sat on 2.1.4 — the exact
+  # version this line had been written to reach. The per-line form below is
+  # unchanged; only the 2.x interval moved.
+  'brace-expansion@>=2.0.0 <2.1.6': '^2.1.6'
   'brace-expansion@>=3.0.0 <3.0.6': '^3.0.6'
   'brace-expansion@>=4.0.0 <5.0.9': '^5.0.9'
   # GHSA — high (x2): Immutable.js List 32-bit trie overflow + Map/Set hash-
