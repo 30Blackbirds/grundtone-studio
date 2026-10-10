@@ -217,6 +217,44 @@ overrides:
 # bundle, delete its line here and treat it as a live finding.
 auditConfig:
   ignoreGhsas:
+    # 🔴 THE simple-git CHAIN, added 2026-10-10. Four ids, and the reason is a
+    # BUILD BREAK, not a judgement that the advisory is unimportant.
+    #
+    # All four need simple-git >=4.0.1, reached via
+    # @sentry/nuxt > nuxt > @nuxt/devtools > simple-git. The override resolves
+    # cleanly (4.0.2, and argv-parser lands on 2.0.1 by itself) and then FAILS AT
+    # INSTALL: simple-git 4 dropped the default export @nuxt/devtools imports, so
+    # apps/studio's postinstall (`nuxt prepare`) dies with "does not provide an
+    # export named 'default'". Confirmed by reverting that one line while keeping
+    # the other floors — install goes green again. The reasoning is kept beside
+    # the floors above, where the next person will look.
+    #
+    # No upstream cure either: measured against the registry, every published
+    # @nuxt/devtools up to 3.4.2 declares `simple-git: ^3.36.0`. That is also why
+    # Dependabot's four security-update runs for this chain fail instead of
+    # opening PRs.
+    #
+    # REACHABILITY, measured on a CLEAN build of main 6db1d96 (not an
+    # accumulated .output): `simple-git` has **0 occurrences in the whole
+    # .output** — not just node_modules — and 0 string hits in index.mjs and the
+    # chunks. @nuxt/devtools is not in the artifact either. Positive controls in
+    # the same run: devalue, nodemailer and @sentry are all present, and
+    # nodemailer gives 1 string hit, so the search does find what is there.
+    #
+    # ⚠️ One correction worth keeping, because it nearly went the other way: a
+    # first pass reported "3 @nuxt/devtools occurrences" in the artifact. Those
+    # were `@vue/devtools-api` — a different package the glob matched on the
+    # basename. The vulnerable chain is absent; the neighbour is not.
+    #
+    # NAMED, not `--ignore-unfixable`: the blanket flag would absorb the next
+    # unfixable critical with nobody deciding to. 🔴 DELETE THESE FOUR when
+    # @nuxt/devtools ships simple-git 4 — this is the one blocker left in BOTH
+    # grundtone and grundtone-studio, and the same four ids are excepted in
+    # grundtone (#259).
+    - GHSA-x6jw-m9v5-85vh
+    - GHSA-v5rq-49vh-5v5c
+    - GHSA-g4wm-2vf7-vfgr
+    - GHSA-858h-whjf-mvg5
     # braces stack-exhaustion DoS via deeply nested patterns (CVE-2026-93687).
     # Path: @nuxtjs/i18n > @intlify/unplugin-vue-i18n > fast-glob > micromatch.
     # Glob expansion over our own file paths at build time; the patterns are not
