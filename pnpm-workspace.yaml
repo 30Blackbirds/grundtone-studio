@@ -192,3 +192,40 @@ overrides:
   'undici@<6.28.0': '^6.28.0'
   'valibot@<=1.4.1': '^1.4.2'
   '@nuxt/devtools@<3.3.1': '^3.3.1'
+
+# Named exceptions to the prod audit gate (pnpm audit --prod --audit-level=high
+# in .github/workflows/ci.yml). Two advisories, and ONLY two, because neither has
+# a version to move to: measured 2026-10-08 against the registry, the newest
+# published braces IS 3.0.3 and the newest node-forge IS 1.4.0, both inside their
+# own advisory ranges. The audit's "patched_versions: <0.0.0" says the same thing;
+# the registry was checked so the claim does not rest on one encoding.
+#
+# 🔴 NAMED, NOT `--ignore-unfixable`. The blanket flag would also absorb the next
+# unfixable advisory, including a CRITICAL one, without anyone deciding to. These
+# two entries let a third advisory turn the gate red, which is the whole point of
+# keeping the gate.
+#
+# Reachability, measured in .output/server/node_modules (the shipped Nitro
+# closure, 40 top-level packages): braces, node-forge and their entire chains
+# (micromatch, fast-glob, listhen) are absent — 0 occurrences each, against a
+# positive control of devalue, which IS present. The directory accumulates across
+# builds (it held devalue@5.8.1 and @5.9.4 side by side), and accumulation can
+# only add entries, never remove them, so a zero there is a strong absence.
+#
+# Re-evaluate when either package publishes a fix, or when the dependency path
+# changes. Both are build/dev-time only today; if either ever enters the server
+# bundle, delete its line here and treat it as a live finding.
+auditConfig:
+  ignoreGhsas:
+    # braces stack-exhaustion DoS via deeply nested patterns (CVE-2026-93687).
+    # Path: @nuxtjs/i18n > @intlify/unplugin-vue-i18n > fast-glob > micromatch.
+    # Glob expansion over our own file paths at build time; the patterns are not
+    # attacker-controlled.
+    - GHSA-vfj7-8cjw-p6xm
+    # node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested
+    # DigestAlgorithm elements (CVE-2026-85393). Path: nuxt > @nuxt/cli >
+    # listhen, which uses it to mint a self-signed cert for the dev server.
+    # 🔴 This is a signature-verification weakness, not a DoS — a heavier class
+    # than the braces one. It is excepted on reachability alone: @nuxt/cli is not
+    # in the production image.
+    - GHSA-86w9-cpqp-85rv
