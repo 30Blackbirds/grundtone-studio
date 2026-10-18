@@ -27,21 +27,23 @@
 //    until each has been measured on its own. A thin start is not a partial
 //    port: it is one name at a time, where disagreements can be attributed.
 //
-// 🔴 `jenkins/Test` IS NOT EXPECTED TO BE GREEN YET — DO NOT FLIP ON IT.
-//    Measured 2026-09-14: jenkins-library `6fb3c0a` `klanghausServices.declare()`
-//    only sets `KH_SVC_POSTGRES17_HOST=localhost` plus the catalog port and
-//    echoes that the service is declared; it STARTS nothing. infra `4d54fa8`
-//    has 0 occurrences of `postgres17`. The mechanism that would start the
-//    sidecar does not exist yet (riff mt07g5mckqfv4tubau7mym3v). Until it
-//    does, the TCP control in `cmd` is meant to fail this check loudly.
+// 🔴 POSTGRES COMES FROM `KH_TEST_PG_DSN`, NOT FROM `services:`. The library's
+//    `services:` catalog only DECLARES a sidecar (`klanghausServices.declare()`
+//    sets KH_SVC_*_HOST/PORT and starts nothing); the controller-side mechanism
+//    that would start it does not exist, and the two consumers that relied on
+//    it were red on exactly that check (this repo on main `a21bf06`, permissions'
+//    `Integration assertions`). What DOES exist is infra#395 (2026-09-30): every
+//    agent gets `KH_TEST_PG_DSN` to the shared `ci-postgres` (jenkins.yaml), the
+//    role `ci` owns the cluster, and each build must create and drop its own
+//    database. resonans' `Tenant isolation` is green on that contract; here the
+//    per-build database is made by `apps/studio/server/db/ci-db.ts`.
 //
 // ⚠️ A DECLARED DIFFERENCE, so a disagreement during the parallel week is not
-//    attributed to the port: Actions runs postgres with `grundtone/grundtone_ci`
-//    and the database `grundtone_studio`. The library's catalog is a CLOSED
-//    set — a repo declares a KEY, never an image or its `env` — so here it is
-//    `postgres/postgres` against the default database. Schema and tests are
-//    the same; only user name and database name differ. Should a test one day
-//    depend on the database NAME, this is where the disagreement comes from.
+//    attributed to the port: Actions runs `postgres:17-alpine` as
+//    `grundtone/grundtone_ci`, database `grundtone_studio`; ci-postgres is
+//    `postgres:16-alpine` as `ci`, database `studio_<BUILD_TAG>`. Schema and
+//    tests are the same. Should a test one day depend on the database NAME or
+//    on a postgres-17-only feature, this is where the disagreement comes from.
 //
 // 🔴 IF THE CATALOG DOES NOT COVER a future stack: open a PR to
 //    jenkins-library with image AND digest. That is the ONLY way.
@@ -112,40 +114,18 @@ klanghausPipeline(
       // without the binding `pnpm install` gets 401 on @klanghaus/permissions-client.
       npmAuth: true,
 
-      // The library only DECLARES this key: it sets KH_SVC_POSTGRES17_HOST/PORT
-      // and starts nothing. Starting the sidecar is [infra]'s controller-side
-      // mechanism, which does not exist yet (see the note at the top). The key
-      // is digest-pinned in the catalog and corresponds to the
-      // `postgres:17-alpine` that Actions runs.
-      services: ['postgres17'],
-
       cmd: '''
         set -euo pipefail
 
-        # 🔴 POSITIVE CONTROL BEFORE THE MEASUREMENT. Without it, "the tests
-        # passed" cannot be told apart from "no sidecar was ever started and
-        # nothing touched a database".
-        # The two `:?` lines prove only that the key was DECLARED: the library
-        # sets both variables whether or not anything runs, so they cannot
-        # fail once `services:` names the key. The TCP loop is the actual
-        # control, and it has a limit too: it proves that SOMETHING accepts
-        # connections on that host:port, not that it is the catalog's
-        # postgres17. `db:migrate` with the catalog credentials is the
-        # stronger signal that follows.
-        : "${KH_SVC_POSTGRES17_HOST:?sidecaren postgres17 er ikke deklareret}"
-        : "${KH_SVC_POSTGRES17_PORT:?sidecaren postgres17 mangler port}"
-        for i in $(seq 1 30); do
-          if (exec 3<>"/dev/tcp/${KH_SVC_POSTGRES17_HOST}/${KH_SVC_POSTGRES17_PORT}") 2>/dev/null; then
-            exec 3<&- 2>/dev/null || true
-            break
-          fi
-          [ "$i" = 30 ] && { echo "🔴 postgres17 svarer ikke paa ${KH_SVC_POSTGRES17_HOST}:${KH_SVC_POSTGRES17_PORT} efter 30 forsoeg"; exit 1; }
-          sleep 1
-        done
-        echo "postgres17 naaet paa ${KH_SVC_POSTGRES17_HOST}:${KH_SVC_POSTGRES17_PORT}"
-
-        # See the declared difference at the top: the catalog's credentials are fixed.
-        export DATABASE_URL="postgresql://postgres:postgres@${KH_SVC_POSTGRES17_HOST}:${KH_SVC_POSTGRES17_PORT}/postgres"
+        # Fail closed and NAME the gap. An unset DSN means the facility was
+        # renamed or removed; a check that quietly passes on no database is the
+        # silence this check exists to end.
+        test -n "${KH_TEST_PG_DSN:-}" || {
+          echo "KH_TEST_PG_DSN is unset — this check needs the CI postgres from"
+          echo "infra compose/prod/ci (ci-postgres, agent env via jenkins.yaml)."
+          echo "Refusing to pass: no database is a wiring error, not a green."
+          exit 1
+        }
 
         # Same values as Actions' test job. They are CI placeholders, not
         # secrets — they are in plain text in ci.yml for the same reason.
@@ -163,6 +143,16 @@ klanghausPipeline(
         # self-contained; Actions' artifact hand-off (setup uploads, four jobs
         # download) does not exist here.
         pnpm install --frozen-lockfile
+
+        # 🔴 POSITIVE CONTROL BEFORE THE MEASUREMENT: creating the per-build
+        # database (see the note at the top) is it. With no reachable postgres
+        # the script throws, so "the tests passed" cannot be told apart from
+        # "nothing touched a database". The DSN carries a password and is only
+        # ever captured, never echoed. The drop runs on every exit, so a red
+        # migrate or test does not leave a database behind.
+        DATABASE_URL="$(pnpm --filter @grundtone-studio/studio exec tsx server/db/ci-db.ts create)"
+        export DATABASE_URL
+        trap 'pnpm --filter @grundtone-studio/studio exec tsx server/db/ci-db.ts drop' EXIT
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
       ''',
