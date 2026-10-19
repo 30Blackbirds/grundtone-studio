@@ -38,12 +38,12 @@
 //    database. resonans' `Tenant isolation` is green on that contract; here the
 //    per-build database is made by `apps/studio/server/db/ci-db.ts`.
 //
-// ⚠️ A DECLARED DIFFERENCE, so a disagreement during the parallel week is not
-//    attributed to the port: Actions runs `postgres:17-alpine` as
-//    `grundtone/grundtone_ci`, database `grundtone_studio`; ci-postgres is
-//    `postgres:16-alpine` as `ci`, database `studio_<BUILD_TAG>`. Schema and
-//    tests are the same. Should a test one day depend on the database NAME or
-//    on a postgres-17-only feature, this is where the disagreement comes from.
+// ✅ POSTGRES 16 IS PROD'S MAJOR, not a declared difference: ci-postgres is
+//    `postgres:16-alpine`, and so is prod (infra `3002874`,
+//    compose/prod/platform/compose.yml l.70 + l.347; 0 compose files run 17).
+//    The old Actions job tested `postgres:17-alpine`, a major prod does not run.
+//    Remaining difference: role `ci` and database `studio_<BUILD_TAG>` instead
+//    of `grundtone/grundtone_ci` and `grundtone_studio`.
 //
 // 🔴 IF THE CATALOG DOES NOT COVER a future stack: open a PR to
 //    jenkins-library with image AND digest. That is the ONLY way.
@@ -92,27 +92,48 @@ klanghausPipeline(
   //    has one node 24, 24.20.0 (infra compose/prod/ci/agent/Dockerfile), so
   //    the two sides run different patch versions until `.nvmrc` moves to
   //    24.20.0 (blog did that in the same commit as its pin).
-  //    pnpm matches: both sides take `packageManager` (pnpm@10.14.0); blog's
-  //    green builds with a 10.0.0 pin show the agent honours that field.
+  //    pnpm: `packageManager` is pinned to the AGENT's pnpm (10.17.1, infra
+  //    compose/prod/ci/agent/Dockerfile `npm install -g pnpm@10.17.1`), because
+  //    `npmFetch` switches pnpm's version switching OFF and refuses a repo whose
+  //    packageManager names another pnpm — the token is only ever bound to the
+  //    pnpm whose tree digest it verified.
   toolchains: ['node': [exact: '24.20.0']],
   tools: [
     'node': [exact: '24.20.0', cmd: 'node --version'],
     // `2>/dev/null | tail -1`: pnpm warns on stderr about the unset
     // ${NODE_AUTH_TOKEN} in `.npmrc`, which would hide the version line.
-    'pnpm': [exact: '10.14.0', cmd: 'pnpm --version 2>/dev/null | tail -1'],
+    'pnpm': [exact: '10.17.1', cmd: 'pnpm --version 2>/dev/null | tail -1'],
   ],
 
   pnpmCache: true,
+
+  // 🔴 PRIVATE PACKAGES COME FROM `npmFetch`, NOT `npmAuth`. `npmAuth` is
+  //    withdrawn and binds NOTHING (jenkins-library `6cdb872`,
+  //    klanghausPipeline.groovy l.698): it put a checks:write App token into
+  //    `cmd`, and npm.pkg.github.com rejects App installation tokens anyway.
+  //    PR-347#1 died on exactly that: ERR_PNPM_FETCH_401 on
+  //    @klanghaus/permissions-client ([infra]'s reading of the log).
+  //    `npmFetch` fetches ONCE, before any check, with a read:packages
+  //    credential bound to the variable `.npmrc` reads (NODE_AUTH_TOKEN); no
+  //    check ever sees the token, and checks install offline.
+  //    `credentialsId`: the classic read:packages PAT on a machine user that
+  //    the library names as Allan's to create (klanghausFetch.groovy header).
+  //    Until it exists in JCasC this build fails closed on the binding — red
+  //    with a name, not green on nothing.
+  //    `pnpmSha256`: the library's own VERIFY_SCRIPT run on `npm install -g
+  //    pnpm@10.17.1` (the agent's install command), measured 2026-10-19 with
+  //    npm 10.9.8 and with npm of node 24.21: same digest both times. It was
+  //    computed OFF the agent; if the agent's tree differs, verify() fails
+  //    closed and prints the measured digest — it never binds the token.
+  npmFetch: [
+    credentialsId: 'klanghaus-npm-read',
+    pnpmSha256: '0d328f56da46d9258f0fe00c27a9497a6c6dd663726f08262c791c8863665f40',
+  ],
 
   checks: [
     [
       // The exact required name. See the note on the prefix above.
       context: 'Test',
-
-      // 🔴 The token is SCOPED to this check, not ambient. studio's .npmrc
-      // points the @klanghaus scope at npm.pkg.github.com via ${NODE_AUTH_TOKEN};
-      // without the binding `pnpm install` gets 401 on @klanghaus/permissions-client.
-      npmAuth: true,
 
       cmd: '''
         set -euo pipefail
@@ -142,7 +163,8 @@ klanghausPipeline(
         # all checks share one workspace. That is why each `cmd` is
         # self-contained; Actions' artifact hand-off (setup uploads, four jobs
         # download) does not exist here.
-        pnpm install --frozen-lockfile
+        # Offline: npmFetch filled the store before any check ran.
+        pnpm install --offline --frozen-lockfile
 
         # 🔴 POSITIVE CONTROL BEFORE THE MEASUREMENT: creating the per-build
         # database (see the note at the top) is it. With no reachable postgres
