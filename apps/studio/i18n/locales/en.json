@@ -820,6 +820,13 @@
       "action": "Action",
       "object": "Object",
       "time": "Time"
+    },
+    "keyActor": "{type} {prefix}…",
+    "deletedKeyActor": "Deleted key",
+    "keyTypes": {
+      "provisioning": "Provisioning key",
+      "secret": "Secret key",
+      "publishable": "Publishable key"
     }
   },
   "invitation": {

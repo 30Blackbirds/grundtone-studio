@@ -820,6 +820,13 @@
       "action": "Handling",
       "object": "Objekt",
       "time": "Tid"
+    },
+    "keyActor": "{type} {prefix}…",
+    "deletedKeyActor": "Slettet nøgle",
+    "keyTypes": {
+      "provisioning": "Provisioning-nøgle",
+      "secret": "Hemmelig nøgle",
+      "publishable": "Publicerbar nøgle"
     }
   },
   "invitation": {

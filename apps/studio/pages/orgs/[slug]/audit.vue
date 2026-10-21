@@ -7,6 +7,7 @@
     dayLabel,
     fullTimestamp,
     initials,
+    machineActor,
     periodStart,
     timeOfDay,
     type PeriodFilter,
@@ -14,7 +15,7 @@
 
   definePageMeta({ layout: 'app' })
 
-  const { t, locale } = useI18n()
+  const { t, te, locale } = useI18n()
   const { activeOrg, canManageOrgMembers } = useOrgContext()
 
   interface AuditRow {
@@ -31,6 +32,7 @@
     ipAddress: string | null
     userAgent: string | null
     createdAt: string
+    actorKey: { keyPrefix: string; keyType: string } | null
   }
 
   interface AuditPage {
@@ -161,6 +163,14 @@
   const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   function actorOf(row: AuditRow): string {
+    // A key is an actor too (AC-G1): name it rather than calling it "System".
+    const key = machineActor(row)
+    if (key?.known) {
+      const typeKey = `audit.keyTypes.${key.keyType}`
+      const type = te(typeKey) ? t(typeKey) : key.keyType
+      return t('audit.keyActor', { prefix: key.keyPrefix, type })
+    }
+    if (key) return t('audit.deletedKeyActor')
     const name = row.actorUserId ? nameByUserId.value.get(row.actorUserId) : null
     return actorLabel({ actorName: name, actorEmail: row.actorEmail }) ?? t('audit.systemActor')
   }
