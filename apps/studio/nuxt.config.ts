@@ -81,7 +81,11 @@ export default defineNuxtConfig({
       ],
     },
     // Auto-genereret OpenAPI-spec (dev-only DX på /_openapi.json + doc-UI'er).
-    experimental: { openAPI: true },
+    // `tasks` for the audit_log retention job (server/tasks/audit/retention.ts):
+    // hourly, so the 90-day and 12-month deadlines hold with a one-day margin
+    // (server/lib/audit-retention.ts explains the cut-offs).
+    experimental: { openAPI: true, tasks: true },
+    scheduledTasks: { '17 * * * *': ['audit:retention'] },
     // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
     // /_scalar var OFFENTLIGE i prod (loadede cdn.jsdelivr.net = consent-
     // brud) og /_openapi.json udstillede 36 interne API-stier. api.klanghaus.
