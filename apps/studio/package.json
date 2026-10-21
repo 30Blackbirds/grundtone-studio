@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage --exclude '**/*.race.test.ts'",
+    "test:coverage": "vitest run --coverage --exclude '**/*.{race,pg}.test.ts'",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx server/db/migrate.ts",
     "db:migrate:local": "tsx --env-file=.env server/db/migrate.ts",

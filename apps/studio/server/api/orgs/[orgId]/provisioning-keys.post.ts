@@ -34,7 +34,7 @@ defineRouteMeta({
     summary:
       'Minter en org-scopet provisioning-nøgle (prov_) og returnerer plaintext én gang. Kræver org-admin eller højere.',
     description:
-      'Genererer en provisioning-nøgle for organisationen. Plaintext vises præcis én gang; kun hash gemmes. Kræver den samme rolle som projekt-oprettelse (owner, manager eller admin).',
+      'Genererer en provisioning-nøgle for organisationen. Plaintext vises præcis én gang; kun hash gemmes. Kræver den samme rolle som projekt-oprettelse (owner, manager eller admin). Body.rateLimit = kald pr. 60 s-vindue (default 1000); grænsen håndhæves ved autentificeringen og gælder derfor på hver rute nøglen når. Over grænsen: 429 med Retry-After-header og code: rate_limit_exceeded.',
     tags: ['Org', 'API-keys'],
   },
 })

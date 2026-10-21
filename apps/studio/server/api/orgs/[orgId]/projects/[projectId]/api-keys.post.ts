@@ -39,7 +39,7 @@ defineRouteMeta({
     summary:
       'Minter en publishable (pk_) nøgle for et projekt via en provisioning-nøgle. Projektet skal tilhøre nøglens org.',
     description:
-      'Genererer en pk_-nøgle til projektet og returnerer plaintext én gang. Autorisationen er provisioning-nøglen plus at projektet tilhører dens organisation — ikke en projekt-rolle, da en maskine aldrig holder project.admin.',
+      'Genererer en pk_-nøgle til projektet og returnerer plaintext én gang. Autorisationen er provisioning-nøglen plus at projektet tilhører dens organisation — ikke en projekt-rolle, da en maskine aldrig holder project.admin. Rate-limit: nøglens rateLimit-kald pr. 60 s-vindue (default 1000, sættes pr. nøgle ved oprettelse); over grænsen svares 429 med Retry-After-header og code: rate_limit_exceeded.',
     tags: ['Org', 'Provisioning', 'API-keys'],
   },
 })

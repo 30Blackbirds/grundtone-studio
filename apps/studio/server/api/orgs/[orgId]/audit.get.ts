@@ -1,6 +1,7 @@
 import { and, desc } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { auditLog } from '~~/server/db/schema'
+import { resolveMachineActors } from '~~/server/lib/audit-actors'
 import { auditConditions, auditFilterSchema } from '~~/server/lib/audit-query'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
@@ -55,7 +56,17 @@ export default defineEventHandler(async (event) => {
     .limit(PAGE_SIZE + 1)
 
   const hasMore = rows.length > PAGE_SIZE
-  const items = hasMore ? rows.slice(0, PAGE_SIZE) : rows
+  const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows
+  // A key acts as `machine:{keyId}` with no email; name it so the page does not
+  // fall back to "System" for an action a key performed (KH-964, AC-G1).
+  const keys = await resolveMachineActors(
+    orgId,
+    page.map((r) => r.actorUserId),
+  )
+  const items = page.map((r) => ({
+    ...r,
+    actorKey: (r.actorUserId && keys.get(r.actorUserId)) || null,
+  }))
   const last = items[items.length - 1]
   const nextBefore = hasMore && last ? last.createdAt.toISOString() : null
   const nextBeforeId = hasMore && last ? last.id : null

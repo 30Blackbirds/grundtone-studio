@@ -5,6 +5,7 @@ import {
   changeSummary,
   dayLabel,
   initials,
+  machineActor,
   periodStart,
   timeOfDay,
 } from './audit-view'
@@ -78,5 +79,25 @@ describe('periodStart', () => {
   it('bounds 7/30/90 days back', () => {
     expect(periodStart('7d', now)?.toISOString()).toBe('2026-09-10T12:00:00.000Z')
     expect(periodStart('90d', now)?.toISOString()).toBe('2026-06-19T12:00:00.000Z')
+  })
+})
+
+describe('🔴 machineActor: a key is an actor, never "System" (KH-964, AC-G1)', () => {
+  it('returns the resolved key when the API named it', () => {
+    expect(
+      machineActor({
+        actorUserId: 'machine:11111111-1111-4111-8111-111111111111',
+        actorKey: { keyPrefix: 'prov_ab12', keyType: 'provisioning' },
+      }),
+    ).toEqual({ known: true, keyPrefix: 'prov_ab12', keyType: 'provisioning' })
+  })
+
+  it('still marks a machine actor whose key could not be resolved (deleted)', () => {
+    expect(machineActor({ actorUserId: 'machine:gone', actorKey: null })).toEqual({ known: false })
+  })
+
+  it('leaves human and system rows alone', () => {
+    expect(machineActor({ actorUserId: 'user-1', actorKey: null })).toBeNull()
+    expect(machineActor({ actorUserId: null })).toBeNull()
   })
 })

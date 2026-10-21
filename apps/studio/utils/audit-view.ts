@@ -29,6 +29,20 @@ export function auditObject(row: AuditViewRow): string {
   return row.targetLabel || summary
 }
 
+/**
+ * The key behind a machine actor, if the row has one. `known` means the API
+ * resolved it within this org; a `machine:` actor it could not resolve (the key
+ * was deleted) is still a key and must not be shown as "System".
+ */
+export function machineActor(row: {
+  actorUserId: string | null
+  actorKey?: { keyPrefix: string; keyType: string } | null
+}): { known: true; keyPrefix: string; keyType: string } | { known: false } | null {
+  if (row.actorKey) return { known: true, ...row.actorKey }
+  if (row.actorUserId?.startsWith('machine:')) return { known: false }
+  return null
+}
+
 /** Actor shown as name when present, else email; null for system events. */
 export function actorLabel(row: Pick<AuditViewRow, 'actorEmail' | 'actorName'>): string | null {
   return row.actorName || row.actorEmail || null
