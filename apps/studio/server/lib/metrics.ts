@@ -127,3 +127,32 @@ export function recordPdpUnavailable(reason: string): void {
     /* fire-and-forget */
   }
 }
+
+// One run of the audit_log retention task (server/tasks/audit/retention.ts).
+// `outcome` is ok|failed, two values, so no cardinality concern. A failed run
+// is the event that matters: the retention periods are promises in the
+// privacy policy, and a job that stops running breaks them silently. The
+// absence of `ok` runs is what an alert should watch, not only `failed`.
+let auditRetentionRuns: Counter | undefined
+let auditRetentionRows: Counter | undefined
+export function recordAuditRetentionRun(
+  outcome: 'ok' | 'failed',
+  rows: { stripped: number; deleted: number } = { stripped: 0, deleted: 0 },
+): void {
+  try {
+    const m = metrics.getMeter('grundtone-studio.audit')
+    auditRetentionRuns ??= m.createCounter('klanghaus.studio.audit.retention_runs', {
+      unit: '{run}',
+      description: 'Kørsler af audit_log-retention (IP/UA efter 90 dage, rækker efter 12 måneder)',
+    })
+    auditRetentionRows ??= m.createCounter('klanghaus.studio.audit.retention_rows', {
+      unit: '{row}',
+      description: 'Rækker berørt af audit_log-retention, pr. handling (stripped|deleted)',
+    })
+    auditRetentionRuns.add(1, { outcome })
+    if (rows.stripped) auditRetentionRows.add(rows.stripped, { action: 'stripped' })
+    if (rows.deleted) auditRetentionRows.add(rows.deleted, { action: 'deleted' })
+  } catch {
+    /* fire-and-forget */
+  }
+}

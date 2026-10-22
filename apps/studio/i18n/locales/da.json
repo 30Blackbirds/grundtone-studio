@@ -72,7 +72,7 @@
     "s7r2cat": "Indhold (projekter/tokens)",
     "s7r2val": "Til ophør + 30 dages eksportvindue, jf. abonnementsvilkårene §12",
     "s7r3cat": "Audit-log",
-    "s7r3val": "12 måneder",
+    "s7r3val": "12 måneder fra handlingen. IP-adresse og browseroplysninger (user-agent) dog højst 90 dage, hvorefter de fjernes fra logposten, mens resten af posten består perioden ud. Rækkerne slettes ikke straks ved kontosletning, men udløber efter samme periode",
     "s7r4cat": "Bogføringsmateriale (fakturaer mv.)",
     "s7r4val": "5 år fra regnskabsårets udløb (bogføringsloven)",
     "s7r5cat": "Fejl-events (Sentry)",
@@ -820,6 +820,13 @@
       "action": "Handling",
       "object": "Objekt",
       "time": "Tid"
+    },
+    "keyActor": "{type} {prefix}…",
+    "deletedKeyActor": "Slettet nøgle",
+    "keyTypes": {
+      "provisioning": "Provisioning-nøgle",
+      "secret": "Hemmelig nøgle",
+      "publishable": "Publicerbar nøgle"
     }
   },
   "invitation": {

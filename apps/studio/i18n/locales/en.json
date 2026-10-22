@@ -72,7 +72,7 @@
     "s7r2cat": "Content (projects/tokens)",
     "s7r2val": "Until termination + 30-day export window, cf. Terms §12",
     "s7r3cat": "Audit log",
-    "s7r3val": "12 months",
+    "s7r3val": "12 months from the action. IP address and browser information (user agent) at most 90 days, after which they are removed from the log entry while the rest of the entry remains for the full period. Entries are not deleted immediately on account closure but expire after the same period",
     "s7r4cat": "Accounting records (invoices etc.)",
     "s7r4val": "5 years from end of financial year (Danish Bookkeeping Act)",
     "s7r5cat": "Error events (Sentry)",
@@ -820,6 +820,13 @@
       "action": "Action",
       "object": "Object",
       "time": "Time"
+    },
+    "keyActor": "{type} {prefix}…",
+    "deletedKeyActor": "Deleted key",
+    "keyTypes": {
+      "provisioning": "Provisioning key",
+      "secret": "Secret key",
+      "publishable": "Publishable key"
     }
   },
   "invitation": {

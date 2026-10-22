@@ -40,7 +40,7 @@ defineRouteMeta({
     summary:
       'Opretter et projekt med en provisioning-nøgle; idempotent på externalRef. Kræver en prov_-nøgle for DENNE org.',
     description:
-      'Opretter et projekt i nøglens organisation. Gentages kaldet med samme externalRef, returneres det eksisterende projekt (200) uden dublet og uden nyt created-audit-event. Et slug der allerede er i brug med et ANDET externalRef afvises med 409 og code=slug_taken.',
+      'Opretter et projekt i nøglens organisation. Gentages kaldet med samme externalRef, returneres det eksisterende projekt (200) uden dublet og uden nyt created-audit-event. Et slug der allerede er i brug med et ANDET externalRef afvises med 409 og code=slug_taken. Rate-limit: nøglens rateLimit-kald pr. 60 s-vindue (default 1000, sættes pr. nøgle ved oprettelse); over grænsen svares 429 med Retry-After-header og code: rate_limit_exceeded.',
     tags: ['Org', 'Provisioning'],
   },
 })
