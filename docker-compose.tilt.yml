@@ -31,6 +31,14 @@ services:
       NUXT_PUBLIC_AUTH_URL: http://localhost:8000
       # Central permissions PDP (Connect-RPC, container-intern)
       PERMISSIONS_URL: http://permissions:3001
+      # Studio refuses to write permission tuples without a SERVICE token
+      # (server/lib/pdp.ts serviceClient: 503 otherwise, which projects.post
+      # turns into "Failed to register project permissions"). In Tilt the
+      # permissions service runs with JWT verification DISABLED (no
+      # PERMISSIONS_JWT_ISSUER/JWKS_URL), so any non-empty value passes here.
+      # DEV-ONLY placeholder, not a credential: prod mints a real token with
+      # auth's mint-s2s CLI (sub=service:grundtone-studio, aud=klanghaus-pdp).
+      PDP_S2S_TOKEN: tilt-local-placeholder-not-a-credential
       # S3 → MinIO i backing-infra
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
