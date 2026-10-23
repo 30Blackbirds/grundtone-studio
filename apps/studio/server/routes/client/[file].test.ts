@@ -10,7 +10,7 @@ import { fakeEvent, mockH3, type FakeEvent } from '~~/tests/helpers/endpoint-fix
 //              whole file, as it would be for one running image.
 const readFileMock = vi.fn<(path: string, encoding: string) => Promise<string>>()
 const COMMITTED = [
-  ...['1.0.0', '1.0.1'].flatMap((v) =>
+  ...['1.0.0', '1.0.1', '1.0.2'].flatMap((v) =>
     ['js', 'mjs', 'js.map', 'mjs.map', 'js.sri', 'mjs.sri'].map((e) => `v${v}.${e}`),
   ),
   // A stray file in the directory must never become servable: the route only
@@ -58,7 +58,7 @@ describe('GET /client/[file]', () => {
     'evil.js',
     'v2.js',
     'v0.9.0.js', // a version that was never committed
-    'v1.0.2.js', // a version that does not exist yet
+    'v1.0.99.js', // a version that does not exist
     'v1.0.0.css', // a committed version, an extension the contract does not have
     'notes.txt', // a stray file that IS in the directory listing
     '../v1.js',
@@ -109,9 +109,17 @@ describe('published contract versions (v<x.y.z>.*) — KH-991', () => {
     expect(event.responseHeaders['cache-control']).toBe(IMMUTABLE_CACHE)
   })
 
-  it('serves the current version (v1.0.1) from its committed file too', async () => {
-    const { path } = await serve('v1.0.1.js')
-    expect(path).toBe(resolve(CONTRACT_DIR, 'v1.0.1.js'))
+  // Same property one bump later: 1.0.1 -> 1.0.2 (vite 8.3.3 changed the ESM
+  // bundle's comments) must not turn a v1.0.1 pin into a 404 either.
+  it('keeps serving v1.0.1.mjs after the bump to 1.0.2, from the committed file', async () => {
+    const { event, path } = await serve('v1.0.1.mjs')
+    expect(path).toBe(resolve(CONTRACT_DIR, 'v1.0.1.mjs'))
+    expect(event.responseHeaders['cache-control']).toBe(IMMUTABLE_CACHE)
+  })
+
+  it('serves the current version (v1.0.2) from its committed file too', async () => {
+    const { path } = await serve('v1.0.2.js')
+    expect(path).toBe(resolve(CONTRACT_DIR, 'v1.0.2.js'))
   })
 
   it.each([
