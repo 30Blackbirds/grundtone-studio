@@ -28,10 +28,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/studio/package.json ./apps/studio/
 COPY packages/saas-client/package.json ./packages/saas-client/
-# .npmrc auth'er @klanghaus-scope (privat GitHub Packages: auth-jwt + permissions-client)
-# — token som BuildKit-secret (samme mønster som auth-repoet).
-RUN --mount=type=secret,id=node_auth_token \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" pnpm install --frozen-lockfile --prod=false
+# No registry token: @klanghaus/auth-jwt and permissions-client are vendored in
+# apps/studio/server/vendor/ (KH-944, 2026-10-24), so every dependency is public.
+RUN pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 WORKDIR /app
@@ -71,11 +70,8 @@ RUN --mount=type=secret,id=sentry_auth_token \
 # nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
 # på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
 # konfigureres til fully-inline output (nitro.rollupConfig.external = []).
-# deploy re-resolver workspace-deps inkl. private @klanghaus-pakker → samme
-# build-secret som deps-stagen (ellers falder den tilbage til npmjs.org → 404).
-RUN --mount=type=secret,id=node_auth_token \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
-    pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+# deploy re-resolves workspace deps; all of them are public since the vendoring.
+RUN pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
 
 # Assertion-only (deref sker nu in-place i build-RUN'et ovenfor, så pnpm
 # deploy kopierer rigtige filer fra fødslen): de tre multi-versions-pakker
