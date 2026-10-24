@@ -4,6 +4,7 @@ import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { generateApiKey } from '~~/server/lib/api-keys'
 import { recordAuditEvent } from '~~/server/lib/audit'
+import { requireProvisioningFeature } from '~~/server/lib/entitlements'
 import { API_KEY_ENVIRONMENTS } from '~~/server/lib/constants'
 import { orgRoleHelpers, requireOrgRole } from '~~/server/lib/project-access'
 
@@ -52,6 +53,10 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Requires an org role that can create projects (owner, manager or admin)',
     })
   }
+
+  // AC-E1: an org whose plan lacks the provisioning API cannot MINT a key
+  // either, not only use one — a key it could never use would be a lie.
+  await requireProvisioningFeature(orgId)
 
   const parsed = bodySchema.safeParse((await readBody(event)) ?? {})
   if (!parsed.success) {

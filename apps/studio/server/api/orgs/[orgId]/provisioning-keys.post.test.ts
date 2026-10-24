@@ -59,6 +59,18 @@ vi.mock('~~/server/lib/audit', () => ({
   },
 }))
 
+// The plan gate (KH-964 AC-E1). Its verdicts are measured in entitlements.test.ts.
+let gateRefusal: { statusCode: number; data: { code: string } } | null = null
+const gateAsked: string[] = []
+vi.mock('~~/server/lib/entitlements', () => ({
+  requireProvisioningFeature: (orgId: string) => {
+    gateAsked.push(orgId)
+    return gateRefusal
+      ? Promise.reject(Object.assign(new Error('gate'), gateRefusal))
+      : Promise.resolve()
+  },
+}))
+
 const handler = (await import('./provisioning-keys.post')).default as unknown as (
   e: ReturnType<typeof fakeEvent>,
 ) => Promise<Record<string, unknown>>
@@ -71,6 +83,8 @@ beforeEach(() => {
   audits.length = 0
   orgRole = 'owner'
   pdpDown = false
+  gateRefusal = null
+  gateAsked.length = 0
 })
 
 describe('AC-A1: who may mint one — the ACCEPT set', () => {
@@ -151,5 +165,29 @@ describe('what is stored and returned', () => {
   it('rejects a rate limit outside the allowed range, before writing', async () => {
     await expect(call({ rateLimit: 0 })).rejects.toMatchObject({ statusCode: 400 })
     expect(inserted).toEqual([])
+  })
+})
+
+describe('🔴 AC-E1: an org without the provisioning API cannot mint a key', () => {
+  it.each([
+    [403, 'feature_not_enabled'],
+    [403, 'suspended'],
+    [503, 'entitlements_unavailable'],
+  ])('a %i %s refusal mints nothing and audits nothing', async (statusCode, code) => {
+    gateRefusal = { statusCode, data: { code } }
+    await expect(call()).rejects.toMatchObject({ statusCode, data: { code } })
+    expect(inserted).toHaveLength(0)
+    expect(audits).toHaveLength(0)
+  })
+
+  it('asks about the org in the path', async () => {
+    await call()
+    expect(gateAsked).toEqual(['org-1'])
+  })
+
+  it('the role check answers before the plan — a member hears 403 for the role, not the plan', async () => {
+    orgRole = 'member'
+    await expect(call()).rejects.toMatchObject({ statusCode: 403 })
+    expect(gateAsked).toHaveLength(0)
   })
 })
