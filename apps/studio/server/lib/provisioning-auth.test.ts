@@ -59,6 +59,20 @@ vi.mock('./key-usage', () => ({
   },
 }))
 
+// The plan gate (KH-964 AC-E). Its verdicts are measured in entitlements.test.ts;
+// here only WHERE it sits: which org it is asked about, and that a refusal stops
+// the key before it becomes a principal. `null` = the org may provision.
+let gateRefusal: { statusCode: number; data: { code: string } } | null = null
+const gateAsked: string[] = []
+vi.mock('./entitlements', () => ({
+  requireProvisioningFeature: (orgId: string) => {
+    gateAsked.push(orgId)
+    return gateRefusal
+      ? Promise.reject(Object.assign(new Error('gate'), gateRefusal))
+      : Promise.resolve()
+  },
+}))
+
 let exchange: 'ok' | 'fail' = 'ok'
 const exchanges: Record<string, unknown>[] = []
 vi.stubGlobal('$fetch', (_url: string, opts: { body: Record<string, unknown> }) => {
@@ -94,6 +108,8 @@ beforeEach(() => {
   exchange = 'ok'
   exchanges.length = 0
   setHeaders = {}
+  gateRefusal = null
+  gateAsked.length = 0
   process.env.AUTH_INTERNAL_URL = 'http://auth:3000'
   process.env.MACHINE_TOKEN_SERVICE_SECRET = 's3cret'
 })
@@ -324,5 +340,58 @@ describe('🔴 AC-F: the per-key rate limit is actually enforced', () => {
     used.length = 0
     await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({ statusCode: 429 })
     expect(used).toEqual(['hash(prov_throttled-but-used)'])
+  })
+})
+
+describe('🔴 AC-E: the plan gate sits at authentication', () => {
+  // Distinct bearers per cell, like the AC-F block: the limiter outlives a test.
+  const present = (token: string) => {
+    headers = { authorization: `Bearer prov_gate_${token}` }
+  }
+
+  it("asks about the KEY'S org, not one from the request", async () => {
+    rows = [{ id: 'k1', organizationId: 'org-of-key' }]
+    present('gated')
+    await authenticateProvisioningKey(event())
+    expect(gateAsked).toEqual(['org-of-key'])
+  })
+
+  it.each([
+    [403, 'feature_not_enabled'],
+    [403, 'suspended'],
+    [503, 'entitlements_unavailable'],
+  ])(
+    'a %i %s refusal propagates and the key never becomes a principal',
+    async (statusCode, code) => {
+      rows = [{ id: 'k1', organizationId: 'org-1' }]
+      gateRefusal = { statusCode, data: { code } }
+      present(`refused-${code}`)
+      const e = event()
+      await expect(authenticateProvisioningKey(e)).rejects.toMatchObject({
+        statusCode,
+        data: { code },
+      })
+      // Neither principal is set and no machine token is minted: the editor-gated
+      // routes a key reaches through `auth` are closed too, not only the four
+      // provisioning routes.
+      expect(e.context.provisioning).toBeUndefined()
+      expect(e.context.auth).toBeUndefined()
+      expect(exchanges).toHaveLength(0)
+    },
+  )
+
+  it('a throttled key does not reach the gate — the rate limit answers first', async () => {
+    rows = [{ id: 'k1', organizationId: 'org-1', rateLimit: 1 }]
+    present('throttled-before-gate')
+    await authenticateProvisioningKey(event())
+    await expect(authenticateProvisioningKey(event())).rejects.toMatchObject({ statusCode: 429 })
+    expect(gateAsked).toHaveLength(1)
+  })
+
+  it('an unknown key does not reach the gate', async () => {
+    rows = []
+    present('unknown')
+    await authenticateProvisioningKey(event())
+    expect(gateAsked).toHaveLength(0)
   })
 })

@@ -1,3 +1,4 @@
+import { createError } from 'h3'
 import { z } from 'zod'
 
 // Studio-side client for account's entitlements-API, per the locked contract
@@ -195,4 +196,69 @@ export function evaluateBrandQuota(
   if (limit === undefined) return { allowed: true }
   if (activeBrandCount < limit) return { allowed: true }
   return { allowed: false, reason: 'brand_quota_exceeded', limit }
+}
+
+/** The bool feature that unlocks org-scoped provisioning keys (KH-964). Same
+ *  string as account's `STUDIO_PROVISIONING_API` and the PDP tuple object. */
+export const PROVISIONING_FEATURE = 'studio.provisioning_api'
+
+export type FeatureVerdict =
+  | { allowed: true }
+  | { allowed: false; status: 503; code: 'entitlements_unavailable' }
+  | { allowed: false; status: 403; code: 'suspended' }
+  | { allowed: false; status: 403; code: 'feature_not_enabled' }
+
+/**
+ * Contract §4 for a PAID BOOL FEATURE (KH-964 AC-E1–E3), as a pure function.
+ *
+ * 🔴 THIS FAILS CLOSED, AND THE QUOTA GATES ABOVE FAIL OPEN — ON PURPOSE. §4
+ * splits the two: a quota bypass is at most temporary free usage, so quotas
+ * never block on an infrastructure fault (Allan's lockout ban). A paid feature
+ * is revenue and access, so "account could not answer" is a refusal. Do not
+ * "harmonise" this with `lifecycleVerdict`'s null = allowed.
+ *
+ * Three refusals, each with its own code so a caller can tell them apart
+ * (AC-E2 requires unavailable to be distinguishable from not-enabled):
+ *
+ *   - `entitlements_unavailable` (503): no answer from account. That includes
+ *     an UNCONFIGURED client (no ACCOUNT_URL) — `getStudioEntitlements` returns
+ *     null for both, and for a paid feature both mean "we do not know", which
+ *     is not "yes". A stale answer inside the 24 h window is an answer.
+ *   - `suspended` (403): suspended, an expired grace, or `canceled` (§4: a
+ *     portal without a default plan is treated as suspended for paid features).
+ *     Checked before the feature, so a suspended org on a paid plan hears
+ *     "suspended" and not "upgrade".
+ *   - `feature_not_enabled` (403): the effective plan does not carry the key —
+ *     `studio-free` and `studio-legacy` today.
+ */
+export function evaluateProvisioningFeature(entitlements: Entitlements | null): FeatureVerdict {
+  if (!entitlements) return { allowed: false, status: 503, code: 'entitlements_unavailable' }
+  if (entitlements.planState === 'canceled')
+    return { allowed: false, status: 403, code: 'suspended' }
+  const lifecycle = lifecycleVerdict(entitlements)
+  if (lifecycle && !lifecycle.allowed) return { allowed: false, status: 403, code: 'suspended' }
+  if (!entitlements.features.includes(PROVISIONING_FEATURE)) {
+    return { allowed: false, status: 403, code: 'feature_not_enabled' }
+  }
+  return { allowed: true }
+}
+
+const FEATURE_MESSAGES: Record<Exclude<FeatureVerdict, { allowed: true }>['code'], string> = {
+  entitlements_unavailable: 'Plan entitlements are unavailable; the provisioning API fails closed',
+  suspended: 'The organization is suspended',
+  feature_not_enabled: "The organization's plan does not include the provisioning API",
+}
+
+/** Throws the verdict as an H3 error; returns when the org may use provisioning. */
+export async function requireProvisioningFeature(orgId: string): Promise<void> {
+  const verdict = evaluateProvisioningFeature(await getStudioEntitlements(orgId))
+  if (verdict.allowed) return
+  if (verdict.code === 'entitlements_unavailable') {
+    console.error(`[entitlements] provisioning refused for org ${orgId}: entitlements unavailable`)
+  }
+  throw createError({
+    statusCode: verdict.status,
+    statusMessage: FEATURE_MESSAGES[verdict.code],
+    data: { code: verdict.code },
+  })
 }
