@@ -15,14 +15,20 @@
 //
 //   2. UPSTREAM (`--upstream [ref]`): does the source repo at `ref` (default
 //      `main`) still hold the same bytes? Catches an upstream change studio has
-//      not taken. Needs read access to the private source repos through `gh`, so
-//      it is NOT in the test suite.
+//      not taken. Needs read access to the private source repos (GITHUB_TOKEN,
+//      or a logged-in `gh`), so it runs as a Jenkins check on main, not in the
+//      test suite. The check first fetches every file at the manifest's own
+//      `sourceCommit`, which must exist and match: that is the positive
+//      control. A 404 there means the check cannot see upstream (exit 2), and
+//      if every file 404s at `ref`, nothing was compared — exit 2 too, never
+//      "drift" and never "identical".
 //
 // Exit 0 = identical, 1 = drift (every differing file listed), 2 = the check
-// itself could not run. A check that could not run must never read as "no
-// drift": an empty answer from `gh` is exit 2, not 0.
+// itself could not run.
 //
-// Ported from account's scripts/eventcontract-drift.mjs (account#169).
+// The upstream half is auth#183's scripts/permissions-client-drift.mjs,
+// taken verbatim ([sikkerhed], #354 verdict); the multi-package loop is
+// studio's own. Local half ported from account's eventcontract-drift.mjs.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -35,7 +41,11 @@ export const MANIFEST_NAME = 'manifest.json'
 /**
  * @typedef {{ package: string, sourceRepo: string, sourcePath: string, sourceCommit: string, files: Record<string, string> }} Manifest
  * @typedef {Record<string, string | null>} Hashes path → sha256, null = missing on that side
+ * @typedef {(path: string, ref: string) => Promise<Buffer | null>} FetchFile null = 404; throws on anything else
  */
+
+/** Thrown when the check could not measure; maps to exit 2. */
+export class CouldNotRun extends Error {}
 
 /** @param {string | Buffer} bytes */
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
@@ -104,39 +114,77 @@ export function localProblems(dir) {
 }
 
 /**
- * @param {string} dir
+ * @param {Manifest} manifest
+ * @param {FetchFile} fetchFile
  * @param {string} ref
+ * @returns {Promise<string[]>}
  */
-function upstreamProblems(dir, ref) {
-  const manifest = readManifest(dir)
+export async function upstreamProblems(manifest, fetchFile, ref) {
+  const paths = Object.keys(manifest.files)
+  if (paths.length === 0) return compare(manifest.files, {})
+
+  // Positive control: the pinned commit must be readable and match.
+  for (const path of paths) {
+    const body = await fetchFile(path, manifest.sourceCommit)
+    if (body === null) {
+      throw new CouldNotRun(
+        `${path} is 404 at the pinned sourceCommit ${manifest.sourceCommit.slice(0, 12)}: ` +
+          'the token cannot see the source repo, or the commit is gone — not drift',
+      )
+    }
+    if (sha256(body) !== manifest.files[path]) {
+      throw new CouldNotRun(`${path} at sourceCommit does not match the manifest: the pin is wrong`)
+    }
+  }
+
   /** @type {Hashes} */
   const actual = {}
-  for (const path of Object.keys(manifest.files)) {
-    const apiPath = `repos/${manifest.sourceRepo}/contents/${manifest.sourcePath}/${path}?ref=${encodeURIComponent(ref)}`
-    let body
-    try {
-      body = execFileSync('gh', ['api', '-H', 'Accept: application/vnd.github.raw', apiPath], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
-    } catch (e) {
-      const err = /** @type {Error & { stderr?: Buffer }} */ (e)
-      const stderr = err.stderr?.toString() ?? ''
-      // 404 on one file is drift (the file moved or was deleted upstream).
-      // Anything else (auth, network) means the check did not run.
-      if (/HTTP 404/.test(stderr)) {
-        actual[path] = null
-        continue
-      }
-      throw new Error(`gh api ${apiPath} failed: ${stderr.trim() || err.message}`, { cause: e })
-    }
-    if (body.length === 0) throw new Error(`gh api ${apiPath} returned 0 bytes`)
-    actual[path] = sha256(body)
+  for (const path of paths) {
+    const body = await fetchFile(path, ref)
+    actual[path] = body === null ? null : sha256(body)
+  }
+  if (Object.values(actual).every((h) => h === null)) {
+    throw new CouldNotRun(`every file is 404 at ref ${JSON.stringify(ref)}: nothing was compared`)
   }
   return compare(manifest.files, actual)
 }
 
+function resolveToken() {
+  const env = process.env['GITHUB_TOKEN']?.trim()
+  if (env) return env
+  try {
+    const t = execFileSync('gh', ['auth', 'token'], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+    if (t) return t
+  } catch {
+    // fall through
+  }
+  throw new CouldNotRun('no GITHUB_TOKEN and no logged-in gh: cannot read the private source repo')
+}
+
+/** @param {Manifest} manifest @returns {FetchFile} */
+function githubFetcher(manifest) {
+  const token = resolveToken()
+  return async (path, ref) => {
+    const url = `https://api.github.com/repos/${manifest.sourceRepo}/contents/${manifest.sourcePath}/${path}?ref=${encodeURIComponent(ref)}`
+    const res = await globalThis.fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github.raw',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+    if (res.status === 404) return null
+    if (!res.ok) throw new CouldNotRun(`GET ${url} answered ${res.status}`)
+    const body = Buffer.from(await res.arrayBuffer())
+    if (body.length === 0) throw new CouldNotRun(`GET ${url} returned 0 bytes`)
+    return body
+  }
+}
+
 /** @param {string[]} argv */
-function main(argv) {
+async function main(argv) {
   const i = argv.indexOf('--upstream')
   const mode = i === -1 ? 'local' : 'upstream'
   const ref = argv[i + 1] ?? 'main'
@@ -156,7 +204,11 @@ function main(argv) {
     const dir = join(VENDOR_ROOT, name)
     let problems
     try {
-      problems = mode === 'local' ? localProblems(dir) : upstreamProblems(dir, ref)
+      if (mode === 'local') problems = localProblems(dir)
+      else {
+        const manifest = readManifest(dir)
+        problems = await upstreamProblems(manifest, githubFetcher(manifest), ref)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error(`${name}: drift check could not run (${mode}): ${message}`)
@@ -175,5 +227,5 @@ function main(argv) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  process.exit(main(process.argv.slice(2)))
+  process.exit(await main(process.argv.slice(2)))
 }

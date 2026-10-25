@@ -4,10 +4,12 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   compare,
+  CouldNotRun,
   listPackages,
   listVendored,
   localProblems,
   readManifest,
+  upstreamProblems,
   VENDOR_ROOT,
 } from '../scripts/vendor-drift.mjs'
 
@@ -73,5 +75,52 @@ describe('vendored @klanghaus packages', () => {
 
   it('compare treats a null hash (deleted upstream) as missing', () => {
     expect(compare({ 'a.ts': 'x' }, { 'a.ts': null })).toEqual(['missing: a.ts'])
+  })
+
+  // The upstream mode, provoked with an injected fetcher so every outcome —
+  // identical, drift, cannot see, nothing compared — runs without network.
+  // Cells taken from auth#183 ([sikkerhed], #354 verdict). Its live run
+  // against the source repos is the Jenkins check on main.
+  describe.each(['auth-jwt', 'permissions-client'])('upstream: %s', (name) => {
+    const dir = join(VENDOR_ROOT, name)
+    const manifest = readManifest(dir)
+    const bytes = (path: string) => readFileSync(join(dir, path))
+    const sameEverywhere = (path: string) => Promise.resolve(bytes(path))
+    const [first, second] = Object.keys(manifest.files)
+
+    it('identical at ref → no problems', async () => {
+      expect(await upstreamProblems(manifest, sameEverywhere, 'main')).toEqual([])
+    })
+
+    it('changed or deleted at ref → drift, named per file', async () => {
+      const fetchFile = (path: string, ref: string) => {
+        if (ref === manifest.sourceCommit) return Promise.resolve(bytes(path))
+        if (path === first) return Promise.resolve(Buffer.from('changed'))
+        if (path === second) return Promise.resolve(null)
+        return Promise.resolve(bytes(path))
+      }
+      expect((await upstreamProblems(manifest, fetchFile, 'main')).sort()).toEqual(
+        [expect.stringMatching(new RegExp(`^changed: ${first}`)), `missing: ${second}`].sort(),
+      )
+    })
+
+    it('CONTROL: 404 at the pinned commit means "cannot see", not drift', async () => {
+      const blind = () => Promise.resolve(null)
+      await expect(upstreamProblems(manifest, blind, 'main')).rejects.toThrow(CouldNotRun)
+      await expect(upstreamProblems(manifest, blind, 'main')).rejects.toThrow(/pinned sourceCommit/)
+    })
+
+    it('CONTROL: every file 404 at an unknown ref means nothing was compared (exit 2, not 1)', async () => {
+      const fetchFile = (path: string, ref: string) =>
+        Promise.resolve(ref === manifest.sourceCommit ? bytes(path) : null)
+      await expect(upstreamProblems(manifest, fetchFile, 'no-such-ref')).rejects.toThrow(
+        /every file is 404/,
+      )
+    })
+
+    it('CONTROL: a pin whose bytes do not match the manifest is refused', async () => {
+      const wrongPin = () => Promise.resolve(Buffer.from('not the pinned bytes'))
+      await expect(upstreamProblems(manifest, wrongPin, 'main')).rejects.toThrow(/pin is wrong/)
+    })
   })
 })
