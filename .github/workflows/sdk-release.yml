@@ -28,10 +28,10 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      id-token: write
-    # No packages: read and no NODE_AUTH_TOKEN: since #354 every dependency is
-    # public, and `release:sdk` publishes nothing to a registry (saas-client is
-    # private; it builds and tags).
+    # No packages: read, no NODE_AUTH_TOKEN and no id-token: write: since #354
+    # every dependency is public, and `release:sdk` publishes nothing to a
+    # registry (saas-client is private; it builds and tags), so nothing here
+    # consumes an OIDC token ([sikkerhed], #360 verdict).
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
