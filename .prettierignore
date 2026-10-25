@@ -6,6 +6,10 @@ dist
 coverage
 pnpm-lock.yaml
 
+# Vendored @klanghaus packages, byte-identical to their source tags; the manifests pin
+# every file's sha256 (apps/studio/tests/vendored-packages.test.ts turns red on a reformat).
+apps/studio/server/vendor
+
 # Official DTCG schemas and test suite, kept byte-identical to upstream (SOURCE.md there).
 packages/dtcg/vendor/dtcg-community-group
 

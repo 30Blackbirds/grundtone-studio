@@ -1,0 +1,13 @@
+{
+  "package": "@klanghaus/permissions-client",
+  "version": "0.3.0",
+  "sourceRepo": "KlangHaus/platform",
+  "sourcePath": "packages/permissions-client",
+  "sourceTag": "@klanghaus/permissions-client@0.3.0",
+  "sourceCommit": "ee0c3142124efa4fe2503a6a19aaff450450947a",
+  "files": {
+    "gen/klanghaus/permissions/v1/permissions_connect.ts": "6eb8518c6227bea185973e37b68d5a39ad332d778326095125528514535e2888",
+    "gen/klanghaus/permissions/v1/permissions_pb.ts": "3e43c8b3314a4e48663014ff82403e5979e5402c42f446ed8d3c43739ee1c5e8",
+    "src/connect.ts": "0b02b6b6f27241ef804e44bcebf333f74ef3f64a134e32fc01dd3f608434ec97"
+  }
+}

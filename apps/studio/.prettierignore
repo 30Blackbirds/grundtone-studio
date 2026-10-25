@@ -1,0 +1,4 @@
+# Vendored @klanghaus packages are byte-identical to their source tags (sha256 in
+# server/vendor/*/manifest.json). Studio's lint-staged runs prettier from THIS directory,
+# where the root .prettierignore is not read — so the exclusion must live here too.
+server/vendor

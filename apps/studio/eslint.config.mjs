@@ -13,7 +13,9 @@ export default withNuxt({
   // so an autofix here would change a hash someone depends on. They are built
   // output in any case — minified UMD/ESM bundles, which is why eslint reports
   // `define is not defined` and an exported `var`. Ignored rather than fixed.
-  ignores: ['sdk-contract/**'],
+  // Vendored @klanghaus packages are byte-identical copies pinned by sha256
+  // (server/vendor/*/manifest.json); a lint autofix would break the manifest.
+  ignores: ['sdk-contract/**', 'server/vendor/**'],
 })
   .append({
     rules: {

@@ -95,8 +95,8 @@ klanghausPipeline(
   toolchains: ['node': [exact: '24.20.0']],
   tools: [
     'node': [exact: '24.20.0', cmd: 'node --version'],
-    // `2>/dev/null | tail -1`: pnpm warns on stderr about the unset
-    // ${NODE_AUTH_TOKEN} in `.npmrc`, which would hide the version line.
+    // `2>/dev/null | tail -1`: keeps the version line clean of any pnpm
+    // warning on stderr.
     'pnpm': [exact: '10.14.0', cmd: 'pnpm --version 2>/dev/null | tail -1'],
   ],
 
@@ -107,10 +107,10 @@ klanghausPipeline(
       // The exact required name. See the note on the prefix above.
       context: 'Test',
 
-      // 🔴 The token is SCOPED to this check, not ambient. studio's .npmrc
-      // points the @klanghaus scope at npm.pkg.github.com via ${NODE_AUTH_TOKEN};
-      // without the binding `pnpm install` gets 401 on @klanghaus/permissions-client.
-      npmAuth: true,
+      // No registry token: @klanghaus/auth-jwt and permissions-client are
+      // vendored in apps/studio/server/vendor/ (KH-944, #354), so every
+      // dependency is public. (`npmAuth:` would bind nothing anyway — the
+      // library withdrew it.)
 
       // The library only DECLARES this key: it sets KH_SVC_POSTGRES17_HOST/PORT
       // and starts nothing. Starting the sidecar is [infra]'s controller-side
@@ -166,6 +166,29 @@ klanghausPipeline(
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
       ''',
+    ],
+
+    // ─── vendored @klanghaus packages upstream ──────────────────────────────
+    [
+      // Do auth's packages/jwt and platform's packages/permissions-client on
+      // main still hold the bytes studio vendored? (The LOCAL half — copy vs
+      // manifest — runs in the test suite.) auth-jwt/src/verify.ts is the token
+      // verifier, so studio carries a copy of a security control and must hear
+      // when the original changes ([sikkerhed], #354 verdict). Same check as
+      // auth#183. Needs to read the private source repos, so the App token; the
+      // library binds it only on `defaultBranch`, hence main pushes only.
+      // The token reaches ONLY this cmd: plain node, no install, no dependency
+      // code. The script's positive control is each manifest's own
+      // sourceCommit: a 404 there is "cannot see the source repo" (exit 2),
+      // never drift. Exit 1 = drift: take the upstream change into
+      // server/vendor or say why not.
+      // Not a required context. UNMEASURED: that the App's installation can
+      // read KlangHaus/auth and KlangHaus/platform — a 404 at a pin would show
+      // it, as exit 2.
+      context: 'vendored @klanghaus upstream',
+      githubToken: true,
+      cmd: 'set -euo pipefail\nnode apps/studio/scripts/vendor-drift.mjs --upstream main',
+      when: { ctx -> !ctx.isPR },
     ],
   ],
 )
