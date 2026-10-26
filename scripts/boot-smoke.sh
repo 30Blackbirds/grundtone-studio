@@ -97,7 +97,10 @@ fi
 # (measured 2026-10-23: same image, red once, green on the next run).
 nocdn_log="$(docker logs "$APP-nocdn" 2>&1)"
 grep -qF 'NUXT_PUBLIC_CDN_BASE' <<<"$nocdn_log" \
-  || { log "✗ the image refused to start, but not for the reason we are testing — its log never names NUXT_PUBLIC_CDN_BASE"; docker logs "$APP-nocdn" 2>&1 | tail -20 >&2; docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true; exit 1; }
+  || { log "✗ the image refused to start, but not for the reason we are testing — its log never names NUXT_PUBLIC_CDN_BASE"; tail -20 <<<"$nocdn_log" >&2; docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true; exit 1; }
+# ↑ The failure branch prints THE READ THAT WAS JUDGED, not a second `docker logs`:
+# a second read is a different object, and it is empty if the container has gone
+# in between ([sikkerhed], #353 verdict).
 docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
 log "✓ the image refuses to start without NUXT_PUBLIC_CDN_BASE, and says so"
 
