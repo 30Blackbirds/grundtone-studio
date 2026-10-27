@@ -5,6 +5,7 @@ import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
 import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
+import { provisionNow } from '~~/server/lib/tenant-outbox'
 
 // §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
 // aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
@@ -60,6 +61,18 @@ export default defineEventHandler(async (event) => {
   // Dormant-503 FØR runtime-config og body: et usat ACCOUNT_URL skal
   // rapportere sig som dormant, ikke som en fejl længere inde.
   const accountUrl = requireAccountUrl()
+
+  // account#179 answers 404 unknown_tenant for an org it has no company for,
+  // and the company comes from Studio's tenantProvisioned. Deliver it now
+  // rather than leave a first-time buyer to the scheduled outbox run.
+  if (!(await provisionNow(org))) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Billing is not available yet',
+      data: { code: 'tenant_not_provisioned' },
+    })
+  }
+
   const appUrl = useRuntimeConfig(event).public.appUrl
 
   const { checkoutUrl } = await postToAccount<{ checkoutUrl: string }>(

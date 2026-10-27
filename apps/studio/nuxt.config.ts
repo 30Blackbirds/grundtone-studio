@@ -85,7 +85,9 @@ export default defineNuxtConfig({
     // hourly, so the 90-day and 12-month deadlines hold with a one-day margin
     // (server/lib/audit-retention.ts explains the cut-offs).
     experimental: { openAPI: true, tasks: true },
-    scheduledTasks: { '17 * * * *': ['audit:retention'] },
+    // `outbox:deliver` every minute: tenantProvisioned to account
+    // (server/lib/tenant-outbox.ts); checkout also delivers synchronously.
+    scheduledTasks: { '17 * * * *': ['audit:retention'], '* * * * *': ['outbox:deliver'] },
     // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
     // /_scalar var OFFENTLIGE i prod (loadede cdn.jsdelivr.net = consent-
     // brud) og /_openapi.json udstillede 36 interne API-stier. api.klanghaus.
