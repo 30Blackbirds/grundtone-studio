@@ -92,7 +92,7 @@ function needsCount(claim: BrandClaim): boolean {
   return claim.hardCap && claim.entitlements?.limits['studio.brands'] !== undefined
 }
 
-function countActiveBrands(q: Db | Tx, organizationId: string): Promise<number> {
+export function countActiveBrands(q: Db | Tx, organizationId: string): Promise<number> {
   return q.$count(
     activeVersion,
     inArray(
