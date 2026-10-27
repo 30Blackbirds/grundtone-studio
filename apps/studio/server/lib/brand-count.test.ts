@@ -22,7 +22,11 @@ describe('classifyBrandCountResponse', () => {
       kind: 'applied',
       activeBrands: 12,
       billedExtraBrands: 2,
+      previousActiveBrands: null,
     })
+    expect(
+      classifyBrandCountResponse(200, { activeBrands: 12, previousActiveBrands: 9 }),
+    ).toMatchObject({ previousActiveBrands: 9 })
   })
 
   it("🔴 reads account's error form `{ error }`, not `{ code }`", () => {

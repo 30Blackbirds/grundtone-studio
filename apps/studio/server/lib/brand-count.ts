@@ -20,7 +20,13 @@ import { PORTAL_KEY } from './entitlements'
 // billing could not be told. The reconcile catches up.
 
 export type BrandCountOutcome =
-  | { kind: 'applied'; activeBrands: number; billedExtraBrands: number | null }
+  | {
+      kind: 'applied'
+      activeBrands: number
+      billedExtraBrands: number | null
+      /** The count account held before this PUT; null when it had none or did not say. */
+      previousActiveBrands: number | null
+    }
   | { kind: 'stale' }
   | { kind: 'no_subscription' }
   | { kind: 'dormant' }
@@ -35,12 +41,19 @@ export type BrandCountOutcome =
  * hide every failed report.
  */
 export function classifyBrandCountResponse(status: number, body: unknown): BrandCountOutcome {
-  const b = (body ?? {}) as { error?: unknown; activeBrands?: unknown; billedExtraBrands?: unknown }
+  const b = (body ?? {}) as {
+    error?: unknown
+    activeBrands?: unknown
+    billedExtraBrands?: unknown
+    previousActiveBrands?: unknown
+  }
   if (status === 200 && typeof b.activeBrands === 'number') {
     return {
       kind: 'applied',
       activeBrands: b.activeBrands,
       billedExtraBrands: typeof b.billedExtraBrands === 'number' ? b.billedExtraBrands : null,
+      previousActiveBrands:
+        typeof b.previousActiveBrands === 'number' ? b.previousActiveBrands : null,
     }
   }
   if (status === 409 && b.error === 'stale') return { kind: 'stale' }

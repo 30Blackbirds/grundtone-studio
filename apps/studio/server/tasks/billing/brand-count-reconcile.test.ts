@@ -30,4 +30,16 @@ describe('billing:brand-count-reconcile', () => {
     })
     expect(reportBrandCount.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'c'])
   })
+
+  it('🔴 logs every count it changes, with org and old → new, and counts them', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    reportBrandCount
+      .mockResolvedValueOnce({ kind: 'applied', activeBrands: 13, previousActiveBrands: 11 })
+      .mockResolvedValueOnce({ kind: 'applied', activeBrands: 4, previousActiveBrands: 4 })
+      .mockResolvedValueOnce({ kind: 'applied', activeBrands: 2, previousActiveBrands: null })
+    await expect(task.run()).resolves.toEqual({ result: { applied: 3, changed: 1 } })
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toBe('[brand-count-reconcile] org a: billed count 11 → 13')
+  })
 })
