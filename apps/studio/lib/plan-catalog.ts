@@ -9,11 +9,7 @@
 // Checkout only ever sends the plan KEY across the account boundary (C3).
 
 export type PlanKey =
-  | 'studio_free'
-  | 'studio_solo'
-  | 'studio_studio'
-  | 'studio_scale'
-  | 'studio_enterprise'
+  'studio_free' | 'studio_solo' | 'studio_studio' | 'studio_scale' | 'studio_enterprise'
 
 export interface PlanFeature {
   /** i18n key under plans.features.* */
@@ -169,6 +165,61 @@ export const BETA_MODE = true
 
 export function getPlan(key: PlanKey): PlanDef {
   return PLAN_CATALOG.find((p) => p.key === key)!
+}
+
+/**
+ * Every plan_key account can return for grundtone-studio, spelled exactly as
+ * account spells it. Account's FeatureCatalog owns plan_key and is MIXED:
+ * its default/legacy/internal plans use a hyphen, the three paid plans the
+ * underscore of their Stripe lookup_key ([account] 2026-10-27, measured in
+ * account src/entitlements/service.ts). Renaming there is a prod data
+ * migration, so Studio maps here, in one place.
+ *
+ * 🔴 Comparing account's key to `PlanKey` directly is the bug this replaces:
+ * `studio-free` matched no catalog entry, so brand-quota saw no hard cap and a
+ * free org could activate brands without limit.
+ */
+export const ACCOUNT_PLAN_KEYS = [
+  'studio-free',
+  'studio-legacy',
+  'studio-internal',
+  'studio_solo',
+  'studio_studio',
+  'studio_scale',
+] as const
+export type AccountPlanKey = (typeof ACCOUNT_PLAN_KEYS)[number]
+
+// null = a plan account assigns but Studio does not sell: legacy (unlimited,
+// every org that predates the free tier) and internal (KlangHaus' own org).
+// Neither has a catalog entry, so neither has a cap or an overage rate.
+const CATALOG_KEY_BY_ACCOUNT_KEY: Record<AccountPlanKey, PlanKey | null> = {
+  'studio-free': 'studio_free',
+  'studio-legacy': null,
+  'studio-internal': null,
+  studio_solo: 'studio_solo',
+  studio_studio: 'studio_studio',
+  studio_scale: 'studio_scale',
+}
+
+function isAccountPlanKey(key: string): key is AccountPlanKey {
+  return (ACCOUNT_PLAN_KEYS as readonly string[]).includes(key)
+}
+
+/** Studio's catalog entry for a plan_key from account, or null when it has none. */
+export function planForAccountKey(key: string | null | undefined): PlanDef | null {
+  if (!key || !isAccountPlanKey(key)) return null
+  const catalogKey = CATALOG_KEY_BY_ACCOUNT_KEY[key]
+  return catalogKey ? getPlan(catalogKey) : null
+}
+
+/**
+ * The `plans.names.*` i18n key to show for a plan_key from account, including
+ * legacy and internal, which have a name but no catalog entry. null for a key
+ * account is not known to return; the caller shows the raw key.
+ */
+export function planNameKeyForAccountKey(key: string | null | undefined): string | null {
+  if (!key || !isAccountPlanKey(key)) return null
+  return CATALOG_KEY_BY_ACCOUNT_KEY[key] ?? key.replace('-', '_')
 }
 
 // Jura/Allan-låst loft 2026-08-04: "4 fontfiler i alt" på tværs af de to
