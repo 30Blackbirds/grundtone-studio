@@ -25,12 +25,19 @@ describe('classifyBrandCountResponse', () => {
     })
   })
 
+  it("🔴 reads account's error form `{ error }`, not `{ code }`", () => {
+    // Measured on account#182: `{"error":"no_subscription","message":"…"}`.
+    expect(classifyBrandCountResponse(404, { code: 'no_subscription' })).toMatchObject({
+      kind: 'failed',
+    })
+  })
+
   it('409 stale → stale (a newer reading is already applied)', () => {
-    expect(classifyBrandCountResponse(409, { code: 'stale' })).toEqual({ kind: 'stale' })
+    expect(classifyBrandCountResponse(409, { error: 'stale' })).toEqual({ kind: 'stale' })
   })
 
   it('404 no_subscription → nothing to bill', () => {
-    expect(classifyBrandCountResponse(404, { code: 'no_subscription' })).toEqual({
+    expect(classifyBrandCountResponse(404, { error: 'no_subscription' })).toEqual({
       kind: 'no_subscription',
     })
   })
@@ -38,13 +45,13 @@ describe('classifyBrandCountResponse', () => {
   it('🔴 a 404 WITHOUT account\'s code is a failure, not "nothing to bill"', () => {
     // An account that does not serve the route yet answers a bare 404.
     expect(classifyBrandCountResponse(404, null)).toMatchObject({ kind: 'failed' })
-    expect(classifyBrandCountResponse(404, { code: 'not_found' })).toMatchObject({
+    expect(classifyBrandCountResponse(404, { error: 'not_found' })).toMatchObject({
       kind: 'failed',
     })
   })
 
   it('422 over_cap and 5xx are failures', () => {
-    expect(classifyBrandCountResponse(422, { code: 'over_cap' })).toMatchObject({ kind: 'failed' })
+    expect(classifyBrandCountResponse(422, { error: 'over_cap' })).toMatchObject({ kind: 'failed' })
     expect(classifyBrandCountResponse(503, null)).toMatchObject({ kind: 'failed' })
   })
 

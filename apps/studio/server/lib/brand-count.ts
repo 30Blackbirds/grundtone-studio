@@ -27,13 +27,15 @@ export type BrandCountOutcome =
   | { kind: 'failed'; error: string }
 
 /**
- * How account's answer is read. 🔴 A 404 counts as "no subscription" ONLY with
- * account's own code: a 404 without it is a missing route (an account that
+ * How account's answer is read. Account's HTTP errors are `{ error, message }`
+ * (account src/http/errors.ts) — `error`, not `code`; measured against
+ * account#182's route, where a `code` reader classed every 404/409 as a
+ * failure. 🔴 A 404 counts as "no subscription" ONLY with account's own code: a 404 without it is a missing route (an account that
  * does not serve brand-count yet), and reading that as "nothing to bill" would
  * hide every failed report.
  */
 export function classifyBrandCountResponse(status: number, body: unknown): BrandCountOutcome {
-  const b = (body ?? {}) as { code?: unknown; activeBrands?: unknown; billedExtraBrands?: unknown }
+  const b = (body ?? {}) as { error?: unknown; activeBrands?: unknown; billedExtraBrands?: unknown }
   if (status === 200 && typeof b.activeBrands === 'number') {
     return {
       kind: 'applied',
@@ -41,8 +43,8 @@ export function classifyBrandCountResponse(status: number, body: unknown): Brand
       billedExtraBrands: typeof b.billedExtraBrands === 'number' ? b.billedExtraBrands : null,
     }
   }
-  if (status === 409 && b.code === 'stale') return { kind: 'stale' }
-  if (status === 404 && b.code === 'no_subscription') return { kind: 'no_subscription' }
+  if (status === 409 && b.error === 'stale') return { kind: 'stale' }
+  if (status === 404 && b.error === 'no_subscription') return { kind: 'no_subscription' }
   return { kind: 'failed', error: `${status}: ${JSON.stringify(body)}` }
 }
 
