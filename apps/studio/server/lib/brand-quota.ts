@@ -2,7 +2,7 @@ import { createError } from 'h3'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { db, type Db } from '~~/server/db'
 import { activeVersion, project } from '~~/server/db/schema'
-import { PLAN_CATALOG } from '~~/lib/plan-catalog'
+import { planForAccountKey } from '~~/lib/plan-catalog'
 import {
   evaluateBrandQuota,
   getStudioEntitlements,
@@ -51,7 +51,7 @@ export async function assertBrandCapacity(
     recordQuotaFailOpen('studio.brands', 'entitlements_unavailable')
   }
 
-  const hardCap = PLAN_CATALOG.find((p) => p.key === entitlements?.planKey)?.hardCap ?? false
+  const hardCap = planForAccountKey(entitlements?.planKey)?.hardCap ?? false
   const claim: BrandClaim = { organizationId, entitlements, hardCap }
   assertAllowed(claim, needsCount(claim) ? await countActiveBrands(db, organizationId) : 0)
   return claim
@@ -92,7 +92,7 @@ function needsCount(claim: BrandClaim): boolean {
   return claim.hardCap && claim.entitlements?.limits['studio.brands'] !== undefined
 }
 
-function countActiveBrands(q: Db | Tx, organizationId: string): Promise<number> {
+export function countActiveBrands(q: Db | Tx, organizationId: string): Promise<number> {
   return q.$count(
     activeVersion,
     inArray(

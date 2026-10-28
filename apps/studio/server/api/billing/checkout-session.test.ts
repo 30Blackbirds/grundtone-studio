@@ -22,6 +22,7 @@ vi.mock('~~/server/db', () => ({ db: {} }))
 vi.mock('~~/server/lib/pdp', () => ({ checkOrg: vi.fn(), checkProject: vi.fn() }))
 const provisionNow = vi.fn(() => Promise.resolve(true))
 vi.mock('~~/server/lib/tenant-outbox', () => ({ provisionNow }))
+vi.mock('~~/server/lib/brand-count', () => ({ currentBrandCount: () => Promise.resolve(12) }))
 
 const handler = (await import('./checkout-session.post')).default as unknown as (
   event: FakeEvent,
@@ -264,5 +265,28 @@ describe('tenant provisioning before the mint', () => {
       data: { code: 'billing_unavailable' },
     })
     expect(provisionNow).not.toHaveBeenCalled()
+  })
+})
+
+// Allan 2026-10-27: what Studio shows is what Stripe bills, from day one. The
+// mint carries the org's active-brand count so account bills the overage on
+// the first invoice instead of waiting for the next brand-count report.
+describe('the mint carries the active-brand count', () => {
+  it('sends activeBrands from the database, not from the client', async () => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+    process.env.ACCOUNT_URL = 'http://account.test'
+    const fetchMock = vi.fn((_url: string, _init: { body: string }) =>
+      Promise.resolve(new Response(JSON.stringify({ checkoutUrl: 'https://stripe.test/c' }))),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
+    provisionNow.mockResolvedValue(true)
+    try {
+      await handler(authedEvent({ ...VALID_BODY, activeBrands: 1 }))
+      const sent = JSON.parse(fetchMock.mock.calls[0]![1].body) as { activeBrands: number }
+      expect(sent.activeBrands).toBe(12)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

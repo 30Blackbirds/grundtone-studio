@@ -1007,7 +1007,9 @@
       "studio_solo": "Solo",
       "studio_studio": "Studio",
       "studio_scale": "Scale",
-      "studio_enterprise": "Enterprise"
+      "studio_enterprise": "Enterprise",
+      "studio_legacy": "Legacy",
+      "studio_internal": "KlangHaus internal"
     },
     "new": "New",
     "popular": "Most popular",

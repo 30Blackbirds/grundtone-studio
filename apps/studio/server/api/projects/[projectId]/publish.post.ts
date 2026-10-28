@@ -4,6 +4,7 @@ import { db } from '~~/server/db'
 import { activeVersion, configVersion, fontLicenceAttestation } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { assertBrandCapacity, claimBrandSlot } from '~~/server/lib/brand-quota'
+import { reportBrandCount } from '~~/server/lib/brand-count'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { copyObject, paths, putObject } from '~~/server/lib/storage'
@@ -99,6 +100,10 @@ export default defineEventHandler(async (event) => {
     }
     return updated
   })
+
+  // A new brand changes what account bills (overage). Not awaited: the publish
+  // does not wait on billing, and the daily reconcile repairs a lost report.
+  if (brandClaim) void reportBrandCount(access.organization.id)
 
   // ─── Phase B — upload immutable archive blobs ───────────────────────────
   const assets = referencedAssets(tokens)
