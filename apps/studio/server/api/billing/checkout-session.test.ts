@@ -20,6 +20,8 @@ vi.mock('~~/server/lib/org-lookup', () => ({
 // role logic in play via the actual import below.
 vi.mock('~~/server/db', () => ({ db: {} }))
 vi.mock('~~/server/lib/pdp', () => ({ checkOrg: vi.fn(), checkProject: vi.fn() }))
+const provisionNow = vi.fn(() => Promise.resolve(true))
+vi.mock('~~/server/lib/tenant-outbox', () => ({ provisionNow }))
 vi.mock('~~/server/lib/brand-count', () => ({ currentBrandCount: () => Promise.resolve(12) }))
 
 const handler = (await import('./checkout-session.post')).default as unknown as (
@@ -218,6 +220,54 @@ describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
   })
 })
 
+// account#179 answers 404 unknown_tenant for an org without a company, and the
+// company comes from Studio's tenantProvisioned. So the mint must not be
+// attempted before account has acknowledged the org.
+describe('tenant provisioning before the mint', () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve(new Response(JSON.stringify({ checkoutUrl: 'https://stripe.test/c' }))),
+  )
+
+  beforeEach(() => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+    process.env.ACCOUNT_URL = 'http://account.test'
+    provisionNow.mockReset()
+    fetchMock.mockClear()
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('mints once the org is provisioned', async () => {
+    provisionNow.mockResolvedValue(true)
+    await expect(handler(authedEvent(VALID_BODY))).resolves.toEqual({
+      checkoutUrl: 'https://stripe.test/c',
+    })
+    expect(provisionNow).toHaveBeenCalledWith(expect.objectContaining({ id: 'org-1' }))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('🔴 503s tenant_not_provisioned and never calls the mint when it has not landed', async () => {
+    provisionNow.mockResolvedValue(false)
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      statusCode: 503,
+      data: { code: 'tenant_not_provisioned' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('stays behind the dormant 503: an unset ACCOUNT_URL never provisions', async () => {
+    delete process.env.ACCOUNT_URL
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({
+      data: { code: 'billing_unavailable' },
+    })
+    expect(provisionNow).not.toHaveBeenCalled()
+  })
+})
+
 // Allan 2026-10-27: what Studio shows is what Stripe bills, from day one. The
 // mint carries the org's active-brand count so account bills the overage on
 // the first invoice instead of waiting for the next brand-count report.
@@ -230,6 +280,7 @@ describe('the mint carries the active-brand count', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
+    provisionNow.mockResolvedValue(true)
     try {
       await handler(authedEvent({ ...VALID_BODY, activeBrands: 1 }))
       const sent = JSON.parse(fetchMock.mock.calls[0]![1].body) as { activeBrands: number }
