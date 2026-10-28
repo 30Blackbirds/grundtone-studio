@@ -124,6 +124,22 @@ describe.skipIf(!DATABASE_URL)('tenant outbox (real Postgres)', () => {
       expect(row!.event.occurredAt).toBe('2026-12-01T00:00:00.000Z')
     })
 
+    it('🔴 knownOrgIds does NOT count an org whose only trace is account-written org_suspension', async () => {
+      const org = newOrg()
+      await db.insert(schema.orgSuspension).values({
+        organizationId: org,
+        suspendedAt: new Date(),
+        cdnGraceUntil: new Date(),
+        reason: 'test',
+        actor: 'system:test',
+      })
+      try {
+        expect(await outbox.knownOrgIds()).not.toContain(org)
+      } finally {
+        await db.delete(schema.orgSuspension).where(eq(schema.orgSuspension.organizationId, org))
+      }
+    })
+
     it('knownOrgIds finds an org Studio only has a project for', async () => {
       const org = newOrg()
       await db

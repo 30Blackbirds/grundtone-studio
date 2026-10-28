@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull, lte, min, sql } from 'drizzle-orm'
 // provisioned.ts) runs this module under plain `node --import tsx` in the
 // image, where Nuxt's path aliases do not exist.
 import { db } from '../db'
-import { auditLog, orgSuspension, project, tenantEventOutbox } from '../db/schema'
+import { auditLog, project, tenantEventOutbox } from '../db/schema'
 import { PORTAL_KEY } from './entitlements'
 
 // Studio's producer side of the eventcontract (platform
@@ -79,12 +79,21 @@ export function earliest(
   return new Date(Math.min(...times.map((d) => d.getTime())))
 }
 
-/** Every org Studio has a trace of — the backfill's population. */
+/**
+ * Every org Studio has SERVED — the backfill's population. Only tables Studio
+ * itself writes on a member's or a provisioning key's action: `project` and
+ * `audit_log` (every audit writer is a Studio request handler).
+ *
+ * 🔴 NOT `org_suspension` ([sikkerhed], studio#367 re-issue 2026-10-28): account
+ * writes that row (TenantLifecycleCallbackService), so counting it would make
+ * account's own state the grant source for account's billing gate — circular.
+ * And reactivation deletes the row, so a present row means "suspended now":
+ * the union would have announced currently suspended orgs as tenants.
+ */
 export async function knownOrgIds(): Promise<string[]> {
   const rows = await db.execute<{ id: string }>(sql`
     SELECT organization_id AS id FROM ${project}
     UNION SELECT organization_id FROM ${auditLog}
-    UNION SELECT organization_id FROM ${orgSuspension}
   `)
   return [...rows].map((r) => r.id).sort()
 }

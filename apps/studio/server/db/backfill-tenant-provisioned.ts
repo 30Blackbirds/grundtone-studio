@@ -1,4 +1,5 @@
-// Queues tenantProvisioned for every org Studio already has a trace of, so
+// Queues tenantProvisioned for every org Studio has served (a project or an
+// audit row; tenant-outbox.ts `knownOrgIds` says why not org_suspension), so
 // account gets a company + grundtone-studio membership for orgs that existed
 // before the producer (server/lib/tenant-outbox.ts) went live. The scheduled
 // `outbox:deliver` task sends the rows; this script only writes the outbox.
