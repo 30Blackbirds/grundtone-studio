@@ -20,6 +20,8 @@ vi.mock('~~/server/lib/org-lookup', () => ({
 }))
 vi.mock('~~/server/db', () => ({ db: {} }))
 vi.mock('~~/server/lib/pdp', () => ({ checkOrg: vi.fn(), checkProject: vi.fn() }))
+const mintAccountUserToken = vi.fn((_e: unknown, _org: string) => Promise.resolve('user-jwt'))
+vi.mock('~~/server/lib/account-user-token', () => ({ mintAccountUserToken }))
 
 const handler = (await import('./portal-session.post')).default as unknown as (
   event: FakeEvent,
@@ -116,5 +118,39 @@ describe('POST /api/billing/portal-session (§7a kortskifte)', () => {
       statusCode: 503,
       data: { code: 'billing_unavailable' },
     })
+  })
+})
+
+// Condition 2 (a): a portal session can change the card and cancel, so account
+// binds it to the logged-in billing user; Studio forwards that user's token.
+describe("the logged-in user's token (account#186)", () => {
+  beforeEach(() => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+    process.env.ACCOUNT_URL = 'http://account.test'
+    mintAccountUserToken.mockReset()
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("mints it for the request's org and forwards it to account", async () => {
+    mintAccountUserToken.mockResolvedValue('user-jwt')
+    const fetchMock = vi.fn((_u: string, _i: RequestInit) =>
+      Promise.resolve(new Response(JSON.stringify({ portalUrl: 'https://stripe.test/p' }))),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(handler(authedEvent(VALID_BODY))).resolves.toEqual({
+      portalUrl: 'https://stripe.test/p',
+    })
+    expect(mintAccountUserToken.mock.calls[0]![1]).toBe('org-1')
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>
+    expect(headers['x-klanghaus-user-token']).toBe('user-jwt')
+  })
+
+  it('🔴 never calls account when the token cannot be minted', async () => {
+    mintAccountUserToken.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 401 }))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 401 })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

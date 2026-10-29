@@ -98,3 +98,61 @@ describe('postToAccount', () => {
     })
   })
 })
+
+// Condition 2 (a): the mints carry the logged-in user's token next to the S2S
+// bearer, and account's 403s on that binding are the user's, not Studio's.
+describe('postToAccount — the user token (account#186)', () => {
+  const ok = () =>
+    vi.fn((_url: string, _init: RequestInit) => Promise.resolve(new Response('{"portalUrl":"u"}')))
+
+  it('sends x-klanghaus-user-token next to the bearer', async () => {
+    process.env.ACCOUNT_S2S_TOKEN = 's2s'
+    const fetchMock = ok()
+    vi.stubGlobal('fetch', fetchMock)
+    await postToAccount('https://account.test', '/v1/x', {}, FAIL, 'user-jwt')
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>
+    expect(headers['x-klanghaus-user-token']).toBe('user-jwt')
+    expect(headers.Authorization).toBe('Bearer s2s')
+  })
+
+  it('sends no user-token header when none is given', async () => {
+    const fetchMock = ok()
+    vi.stubGlobal('fetch', fetchMock)
+    await postToAccount('https://account.test', '/v1/x', {}, FAIL)
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>
+    expect('x-klanghaus-user-token' in headers).toBe(false)
+  })
+
+  it.each(['user_role_insufficient', 'user_org_mismatch'])(
+    '🔴 account 403 %s → a 403 carrying that code, not a 502',
+    async (code) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ error: code, message: 'm' }), { status: 403 }),
+          ),
+        ),
+      )
+      await expect(
+        postToAccount('https://account.test', '/v1/x', {}, FAIL, 't'),
+      ).rejects.toMatchObject({ statusCode: 403, data: { code } })
+    },
+  )
+
+  it.each(['invalid_user_token', 'user_token_required'])(
+    "account 401 %s is Studio's fault: the caller's 502",
+    async (code) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve(new Response(JSON.stringify({ error: code }), { status: 401 })),
+        ),
+      )
+      await expect(
+        postToAccount('https://account.test', '/v1/x', {}, FAIL, 't'),
+      ).rejects.toMatchObject({ statusCode: 502, data: { code: 'portal_failed' } })
+    },
+  )
+})
