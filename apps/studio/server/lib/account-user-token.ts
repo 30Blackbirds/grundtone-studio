@@ -25,8 +25,10 @@ const NOT_A_MEMBER = 'ACCOUNT_USER_TOKEN_NOT_A_MEMBER'
 const ORIGIN_CODES = new Set(['MISSING_OR_NULL_ORIGIN', 'INVALID_ORIGIN'])
 
 function authBase(): string {
-  // Server-side → the container-internal address when set, as org-lookup does.
-  const base = process.env.AUTH_INTERNAL_URL ?? process.env.AUTH_ISSUER
+  // Server-side → the container-internal address when set. `||`, not `??`, as
+  // the BFF proxy (server/api/auth/[...].ts) chose: an EMPTY AUTH_INTERNAL_URL
+  // must fall back to the issuer too, not become a bare path ([infra] on #370).
+  const base = process.env.AUTH_INTERNAL_URL || process.env.AUTH_ISSUER
   if (!base) throw new Error('AUTH_INTERNAL_URL or AUTH_ISSUER must be set')
   return base
 }

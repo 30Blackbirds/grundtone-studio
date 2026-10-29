@@ -97,6 +97,17 @@ describe('mintAccountUserToken', () => {
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ orgId: 'org-1' })
   })
 
+  it('🔴 an EMPTY AUTH_INTERNAL_URL falls back to AUTH_ISSUER, not to a bare path', async () => {
+    process.env.AUTH_INTERNAL_URL = ''
+    process.env.AUTH_ISSUER = 'https://auth.public.test'
+    try {
+      await expect(mintAccountUserToken(withCookie(), 'org-1')).resolves.toBe('jwt-1')
+      expect(calls[0]!.url).toBe('https://auth.public.test/api/auth/account-user-token')
+    } finally {
+      delete process.env.AUTH_ISSUER
+    }
+  })
+
   it('401s without calling auth when the request has no cookie', async () => {
     await expect(mintAccountUserToken(fakeEvent({}), 'org-1')).rejects.toMatchObject({
       statusCode: 401,
