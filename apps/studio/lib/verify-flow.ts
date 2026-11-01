@@ -14,8 +14,7 @@ export const VERIFY_ERROR_STATES = {
 } as const
 
 export type VerifyDoneState =
-  | (typeof VERIFY_ERROR_STATES)[keyof typeof VERIFY_ERROR_STATES]
-  | 'success'
+  (typeof VERIFY_ERROR_STATES)[keyof typeof VERIFY_ERROR_STATES] | 'success'
 
 /**
  * Mapper /verify/done's ?error-param til UI-state. Intet param = succes;
