@@ -48,8 +48,7 @@ function authBaseURL(): string | undefined {
 // be reviewed and translated as if it were a product message.
 function reportDevAuthGap(error: Record<string, unknown> | undefined): void {
   const data = error?.data as
-    | { devAuthBypass?: boolean; path?: string; group?: 'never' | 'on-request' }
-    | undefined
+    { devAuthBypass?: boolean; path?: string; group?: 'never' | 'on-request' } | undefined
   if (data?.devAuthBypass !== true) return
 
   // Two messages, because the two groups are not the same promise. 'never' is
