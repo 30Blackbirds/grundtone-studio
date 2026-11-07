@@ -150,12 +150,15 @@ klanghausPipeline(
         # 🔴 POSITIVE CONTROL BEFORE THE MEASUREMENT: creating the per-build
         # database (see the note at the top) is it. With no reachable postgres
         # the script throws, so "the tests passed" cannot be told apart from
-        # "nothing touched a database". The DSN carries a password and is only
-        # ever captured, never echoed. The drop runs on every exit, so a red
-        # migrate or test does not leave a database behind.
-        DATABASE_URL="$(pnpm --filter @grundtone-studio/studio exec tsx server/db/ci-db.ts create)"
+        # "nothing touched a database". The DSN carries a password, so it goes
+        # through a 0600 file and is never on stdout or in the log (see
+        # scripts/ci-test-db.sh). The drop runs on every exit, so a red migrate
+        # or test does not leave a database behind.
+        DSN_FILE="$(umask 077; mktemp)"
+        trap 'scripts/ci-test-db.sh drop; rm -f "$DSN_FILE"' EXIT
+        scripts/ci-test-db.sh create "$DSN_FILE"
+        DATABASE_URL="$(cat "$DSN_FILE")"
         export DATABASE_URL
-        trap 'pnpm --filter @grundtone-studio/studio exec tsx server/db/ci-db.ts drop' EXIT
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
       ''',

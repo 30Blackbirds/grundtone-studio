@@ -8,20 +8,32 @@
 // resonans does it in Go: the Jenkinsfile must not grow, the agents have no
 // docker and no psql, and a code path runs the same on a laptop.
 //
-//   tsx server/db/ci-db.ts create   -> prints the per-build DATABASE_URL on
-//                                      stdout (nothing else goes to stdout)
+//   tsx server/db/ci-db.ts create --out <file>
+//                                   -> writes the per-build DATABASE_URL to
+//                                      <file> (mode 0600) and nothing to stdout
 //   tsx server/db/ci-db.ts drop     -> drops it again (idempotent)
+//
+// 🔴 The DSN goes to a FILE, not to stdout. It carries ci_build's password, and
+// the caller used to capture `$(pnpm … ci-db.ts create)`, i.e. ALL of pnpm's
+// stdout: one extra line (pnpm 10.14.0 printed "WARN Unsupported engine" there
+// on node 24.18.0) became part of DATABASE_URL, migrate threw "Invalid URL" and
+// printed the whole input, password included ([sikkerhed], #347). A file is
+// not polluted by whatever else writes to stdout. scripts/ci-test-db.sh is the
+// caller and checks the URL's shape without printing it.
 //
 // The name derives from BUILD_TAG, so a retry reclaims its own leftovers
 // instead of orphaning a new database. `create` drops first for that reason.
 // Creating the database IS the positive control of the check: with no
 // reachable postgres it throws, and the check cannot pass on no database.
+import { writeFileSync } from 'node:fs'
 import postgres from 'postgres'
 import { ciDbName } from './ci-db-name'
 
 const action = process.argv[2]
-if (action !== 'create' && action !== 'drop') {
-  console.error('usage: tsx server/db/ci-db.ts <create|drop>')
+const outIndex = process.argv.indexOf('--out')
+const outFile = outIndex > 0 ? process.argv[outIndex + 1] : undefined
+if ((action !== 'create' && action !== 'drop') || (action === 'create' && !outFile)) {
+  console.error('usage: tsx server/db/ci-db.ts create --out <file> | drop')
   process.exit(2)
 }
 
@@ -41,8 +53,8 @@ const dbName = ciDbName(tag)
 // The `postgres` client validates the identifier when it is passed as a
 // value, so the name is never interpolated as raw SQL.
 // `onnotice`: the client's default is console.log, which put the server's
-// "database ... does not exist, skipping" NOTICE on stdout — and stdout is the
-// DSN the caller captures. Notices are still worth seeing, so they go to stderr.
+// "database ... does not exist, skipping" NOTICE on stdout. Diagnostics belong
+// on stderr; stdout stays empty.
 const sql = postgres(adminDsn, {
   max: 1,
   prepare: false,
@@ -56,7 +68,9 @@ try {
     await sql`CREATE DATABASE ${sql(dbName)}`
     const url = new URL(adminDsn)
     url.pathname = `/${dbName}`
-    process.stdout.write(url.toString())
+    // `mode` applies when the file is created; the caller makes it under
+    // `umask 077` too, so it is never readable by others in between.
+    writeFileSync(outFile!, url.toString(), { mode: 0o600 })
   }
   console.error(`${action}: ${dbName}`)
 } finally {
