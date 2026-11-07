@@ -1,6 +1,12 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue'
-  import { BETA_MODE, PLAN_CATALOG, type PlanDef } from '~~/lib/plan-catalog'
+  import {
+    BETA_MODE,
+    PLAN_CATALOG,
+    planForAccountKey,
+    planNameKeyForAccountKey,
+    type PlanDef,
+  } from '~~/lib/plan-catalog'
   import type { BillingInvoice, BillingSubscription } from '~~/server/lib/billing-read'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
@@ -44,12 +50,12 @@
   )
 
   const subscription = computed(() => overview.value.subscription)
-  const plan = computed<PlanDef | null>(
-    () => PLAN_CATALOG.find((p) => p.key === subscription.value?.planKey) ?? null,
-  )
-  const planName = computed(() =>
-    plan.value ? t(`plans.names.${plan.value.key}`) : (subscription.value?.planKey ?? ''),
-  )
+  const plan = computed<PlanDef | null>(() => planForAccountKey(subscription.value?.planKey))
+  // Legacy and internal have a name but no catalog entry (no cap, no rate).
+  const planName = computed(() => {
+    const nameKey = planNameKeyForAccountKey(subscription.value?.planKey)
+    return nameKey ? t(`plans.names.${nameKey}`) : (subscription.value?.planKey ?? '')
+  })
 
   const brandsIncluded = computed(() => plan.value?.brandsIncluded ?? null)
   const extraBrands = computed(() =>

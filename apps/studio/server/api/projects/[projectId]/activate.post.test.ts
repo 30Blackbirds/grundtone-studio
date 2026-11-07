@@ -79,6 +79,12 @@ vi.mock('~~/server/lib/css-renderer', () => ({ renderTokensCss: () => renderToke
 
 let brandClaim: unknown = null
 let capacityThrows: unknown = null
+vi.mock('~~/server/lib/brand-count', () => ({
+  reportBrandCount: (orgId: string) => {
+    log.push(`report:${orgId}`)
+    return Promise.resolve({ kind: 'applied' })
+  },
+}))
 vi.mock('~~/server/lib/brand-quota', () => ({
   assertBrandCapacity: () =>
     capacityThrows ? Promise.reject(capacityThrows) : Promise.resolve(brandClaim),
@@ -213,6 +219,21 @@ describe('🔴 the pointer blobs are written before the pointer flips', () => {
     expect([put, flip, audit].every((i) => i >= 0)).toBe(true)
     expect(put).toBeLessThan(flip)
     expect(flip).toBeLessThan(audit)
+  })
+
+  // Overage billing (Allan 2026-10-27): a NEW brand changes what account bills,
+  // so it is reported — after the brand row is written, never instead of it.
+  it('🔴 reports the brand count to account after a new brand, not before', async () => {
+    brandClaim = { organizationId: ORG.id, limit: 3 }
+    await activate()
+    const report = log.indexOf(`report:${ORG.id}`)
+    expect(report).toBeGreaterThan(log.indexOf('claim:slot'))
+  })
+
+  it('does not report when no brand was created', async () => {
+    brandClaim = null
+    await activate()
+    expect(log.some((l) => l.startsWith('report:'))).toBe(false)
   })
 
   it('claims a brand slot before any blob write, and only when there is a claim', async () => {

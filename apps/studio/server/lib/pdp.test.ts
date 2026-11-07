@@ -58,7 +58,7 @@ vi.mock('./metrics', () => ({
   recordPdpUnavailable: (reason: string) => unavailableReasons.push(reason),
 }))
 
-vi.mock('@klanghaus/permissions-client/connect', () => ({ PermissionsService: {} }))
+vi.mock('../vendor/permissions-client/src/connect', () => ({ PermissionsService: {} }))
 
 vi.mock('h3', () => ({
   createError: (o: { statusCode: number; statusMessage?: string }) =>

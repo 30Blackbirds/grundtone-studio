@@ -6,7 +6,7 @@ import type { H3Event } from 'h3'
 import { createError } from 'h3'
 import { Code, ConnectError, createPromiseClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-node'
-import { PermissionsService } from '@klanghaus/permissions-client/connect'
+import { PermissionsService } from '../vendor/permissions-client/src/connect'
 import { recordPdpUnavailable } from './metrics'
 import { isDevBypassSubject } from './dev-auth-bypass'
 

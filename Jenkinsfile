@@ -23,7 +23,8 @@
 //    `Test` below is the EXACT required name; the prefix is added by the
 //    library, so at flip one line is removed and the name is already right.
 //
-// ⛔ ONLY `Test` IS PORTED. The other 13 required contexts stay on Actions
+// ⛔ `Test` and `Lint & Typecheck` ARE PORTED (the latter folds ESLint,
+//    Prettier, Stylelint, TypeScript and i18n parity, see its block). The other required contexts stay on Actions
 //    until each has been measured on its own. A thin start is not a partial
 //    port: it is one name at a time, where disagreements can be attributed.
 //
@@ -95,8 +96,8 @@ klanghausPipeline(
   toolchains: ['node': [exact: '24.20.0']],
   tools: [
     'node': [exact: '24.20.0', cmd: 'node --version'],
-    // `2>/dev/null | tail -1`: pnpm warns on stderr about the unset
-    // ${NODE_AUTH_TOKEN} in `.npmrc`, which would hide the version line.
+    // `2>/dev/null | tail -1`: keeps the version line clean of any pnpm
+    // warning on stderr.
     'pnpm': [exact: '10.14.0', cmd: 'pnpm --version 2>/dev/null | tail -1'],
   ],
 
@@ -107,10 +108,10 @@ klanghausPipeline(
       // The exact required name. See the note on the prefix above.
       context: 'Test',
 
-      // 🔴 The token is SCOPED to this check, not ambient. studio's .npmrc
-      // points the @klanghaus scope at npm.pkg.github.com via ${NODE_AUTH_TOKEN};
-      // without the binding `pnpm install` gets 401 on @klanghaus/permissions-client.
-      npmAuth: true,
+      // No registry token: @klanghaus/auth-jwt and permissions-client are
+      // vendored in apps/studio/server/vendor/ (KH-944, #354), so every
+      // dependency is public. (`npmAuth:` would bind nothing anyway — the
+      // library withdrew it.)
 
       // The library only DECLARES this key: it sets KH_SVC_POSTGRES17_HOST/PORT
       // and starts nothing. Starting the sidecar is [infra]'s controller-side
@@ -166,6 +167,72 @@ klanghausPipeline(
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
       ''',
+    ],
+
+    // ─── Lint & Typecheck ───────────────────────────────────────────────────
+    [
+      // The five static checks Actions' ci.yml ran as ESLint, Prettier,
+      // Stylelint, TypeScript and i18n parity. ci.yml has been
+      // disabled_manually since 2026-09-15, and since then NO check ran any of
+      // them: `turbo run lint` sat red on main for days in September without
+      // anything turning red (869fbfz99), and prettier was red on main again
+      // when this was measured (3 files, fixed in the same PR).
+      //
+      // ONE check, not five: every check runs `pnpm install` in the one shared
+      // workspace, and whether the library runs checks concurrently is not
+      // measured — five installs racing in one node_modules is a risk this
+      // does not need to take. Each step echoes its name, so a red run says
+      // which of the five failed.
+      //
+      // No token, no services: plain public dependencies (vendored @klanghaus
+      // packages, KH-944) and no database. Runs on PRs and main.
+      context: 'Lint & Typecheck',
+      cmd: '''
+        set -euo pipefail
+        export TURBO_TELEMETRY_DISABLED=1
+        pnpm install --frozen-lockfile
+
+        echo '── ESLint'
+        pnpm turbo run lint
+        echo '── Stylelint'
+        pnpm stylelint
+        echo '── TypeScript'
+        pnpm typecheck
+        echo '── i18n parity'
+        node scripts/check-i18n-parity.mjs
+        echo '── Prettier'
+        pnpm format:check
+
+        # 🔴 Nothing above may rewrite a tracked file. turbo did exactly that to
+        # AGENTS.md when it detected an agent (agentGuidance, now off in
+        # turbo.json); a tool that edits the tree makes the format check judge
+        # a file nobody committed. A dirty tree here is red, with the diff.
+        echo '── tree unchanged'
+        git diff --exit-code --stat
+      ''',
+    ],
+
+    // ─── vendored @klanghaus packages upstream ──────────────────────────────
+    [
+      // Do auth's packages/jwt and platform's packages/permissions-client on
+      // main still hold the bytes studio vendored? (The LOCAL half — copy vs
+      // manifest — runs in the test suite.) auth-jwt/src/verify.ts is the token
+      // verifier, so studio carries a copy of a security control and must hear
+      // when the original changes ([sikkerhed], #354 verdict). Same check as
+      // auth#183. Needs to read the private source repos, so the App token; the
+      // library binds it only on `defaultBranch`, hence main pushes only.
+      // The token reaches ONLY this cmd: plain node, no install, no dependency
+      // code. The script's positive control is each manifest's own
+      // sourceCommit: a 404 there is "cannot see the source repo" (exit 2),
+      // never drift. Exit 1 = drift: take the upstream change into
+      // server/vendor or say why not.
+      // Not a required context. UNMEASURED: that the App's installation can
+      // read KlangHaus/auth and KlangHaus/platform — a 404 at a pin would show
+      // it, as exit 2.
+      context: 'vendored @klanghaus upstream',
+      githubToken: true,
+      cmd: 'set -euo pipefail\nnode apps/studio/scripts/vendor-drift.mjs --upstream main',
+      when: { ctx -> !ctx.isPR },
     ],
   ],
 )

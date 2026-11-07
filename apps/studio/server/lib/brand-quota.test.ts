@@ -128,6 +128,17 @@ describe('assertBrandCapacity', () => {
     expect(recordQuotaDenial).toHaveBeenCalledWith('studio.brands')
   })
 
+  // account returns the free plan as `studio-free` (hyphen). Studio once
+  // compared that to its own `studio_free` and found no hard cap.
+  it('🔴 refuses the 3rd brand on Free when account spells it studio-free', async () => {
+    state.activeBrands = 2
+    getStudioEntitlements.mockResolvedValue(ent('studio-free', 2))
+    await expect(assertBrandCapacity('org-1', 'p-new')).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'brand_quota_exceeded', limit: 2, planKey: 'studio-free' },
+    })
+  })
+
   it('allows the 3rd brand on Solo and hands back the claim context (positive control)', async () => {
     state.activeBrands = 2
     getStudioEntitlements.mockResolvedValue(ent('studio_solo', 3))
