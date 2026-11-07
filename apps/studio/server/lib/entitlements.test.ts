@@ -5,6 +5,9 @@ import {
   clearEntitlementsCache,
   type Entitlements,
   evaluateBrandQuota,
+  evaluateProvisioningFeature,
+  requireProvisioningFeature,
+  PROVISIONING_FEATURE,
 } from './entitlements'
 
 function ent(overrides: Partial<Entitlements> = {}): Entitlements {
@@ -155,5 +158,135 @@ describe('getStudioEntitlements (client)', () => {
     expect(await getStudioEntitlements('org-2')).toBeNull()
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ nope: true }), { status: 200 }))
     expect(await getStudioEntitlements('org-3')).toBeNull()
+  })
+})
+
+describe('🔴 evaluateProvisioningFeature — a PAID bool feature fails CLOSED (KH-964 AC-E, §4)', () => {
+  const paid = (o: Partial<Entitlements> = {}) =>
+    ent({ planKey: 'studio_solo', features: [PROVISIONING_FEATURE], limits: {}, ...o })
+
+  it('matches the key account seeds on its paid and internal plans', () => {
+    // A typo here would refuse every paying org with feature_not_enabled, and
+    // every cell below would still pass — they all build on this constant.
+    expect(PROVISIONING_FEATURE).toBe('studio.provisioning_api')
+  })
+
+  it('ACCEPT: a paid plan carrying the feature', () => {
+    expect(evaluateProvisioningFeature(paid())).toEqual({ allowed: true })
+  })
+
+  it('ACCEPT (AC-E5): the internal plan — the feature, and no limits at all', () => {
+    expect(evaluateProvisioningFeature(paid({ planKey: 'studio-internal' }))).toEqual({
+      allowed: true,
+    })
+  })
+
+  it('ACCEPT: grace before graceUntil is active (§4)', () => {
+    const future = new Date(Date.now() + 60_000).toISOString()
+    expect(evaluateProvisioningFeature(paid({ planState: 'grace', graceUntil: future }))).toEqual({
+      allowed: true,
+    })
+  })
+
+  it('AC-E1: studio-free → 403 feature_not_enabled', () => {
+    expect(evaluateProvisioningFeature(ent())).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'feature_not_enabled',
+    })
+  })
+
+  it('AC-E1: studio-legacy (unlimited quotas, no paid features) → feature_not_enabled', () => {
+    expect(
+      evaluateProvisioningFeature(ent({ planKey: 'studio-legacy', limits: {} })),
+    ).toMatchObject({
+      code: 'feature_not_enabled',
+    })
+  })
+
+  it('🔴 AC-E2: no answer → 503 entitlements_unavailable, NOT allowed — the opposite of the quotas', () => {
+    // The same `null` that evaluateProjectQuota turns into { allowed: true }.
+    expect(evaluateProjectQuota(null, 99)).toEqual({ allowed: true })
+    expect(evaluateProvisioningFeature(null)).toEqual({
+      allowed: false,
+      status: 503,
+      code: 'entitlements_unavailable',
+    })
+  })
+
+  it.each([
+    ['suspended', {}],
+    [
+      'expired grace',
+      { planState: 'grace' as const, graceUntil: new Date(Date.now() - 60_000).toISOString() },
+    ],
+    ['canceled', { planState: 'canceled' as const }],
+  ])('AC-E3: %s with the feature → 403 suspended, not "upgrade"', (_label, o) => {
+    const e = paid({ planState: 'suspended', ...o })
+    expect(evaluateProvisioningFeature(e)).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'suspended',
+    })
+  })
+
+  it('AC-E3: suspended WITHOUT the feature still hears suspended', () => {
+    expect(evaluateProvisioningFeature(ent({ planState: 'suspended' }))).toMatchObject({
+      code: 'suspended',
+    })
+  })
+})
+
+describe('requireProvisioningFeature — the real client, both null branches', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    clearEntitlementsCache()
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockReset()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const answer = (body: Entitlements) =>
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }))
+
+  it('ACCEPT: resolves for an org account says has the feature', async () => {
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent({ features: [PROVISIONING_FEATURE] }))
+    await expect(requireProvisioningFeature('org-ok')).resolves.toBeUndefined()
+  })
+
+  it('🔴 AC-E2: configured but unreachable → 503 entitlements_unavailable', async () => {
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    fetchMock.mockRejectedValue(new Error('down'))
+    await expect(requireProvisioningFeature('org-down')).rejects.toMatchObject({
+      statusCode: 503,
+      data: { code: 'entitlements_unavailable' },
+    })
+    expect(fetchMock).toHaveBeenCalled()
+  })
+
+  it('🔴 unconfigured (no ACCOUNT_URL) is ALSO a refusal — dormant must not mean open here', async () => {
+    vi.stubEnv('ACCOUNT_URL', '')
+    await expect(requireProvisioningFeature('org-dormant')).rejects.toMatchObject({
+      statusCode: 503,
+      data: { code: 'entitlements_unavailable' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('AC-E1 end to end: a free org → 403 feature_not_enabled', async () => {
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent())
+    await expect(requireProvisioningFeature('org-free')).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'feature_not_enabled' },
+    })
   })
 })

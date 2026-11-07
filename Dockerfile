@@ -28,10 +28,16 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/studio/package.json ./apps/studio/
 COPY packages/saas-client/package.json ./packages/saas-client/
-# .npmrc auth'er @klanghaus-scope (privat GitHub Packages: auth-jwt + permissions-client)
-# — token som BuildKit-secret (samme mønster som auth-repoet).
-RUN --mount=type=secret,id=node_auth_token \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" pnpm install --frozen-lockfile --prod=false
+# No registry token: @klanghaus/auth-jwt and permissions-client are vendored in
+# apps/studio/server/vendor/ (KH-944, 2026-10-24), so every dependency is public.
+#
+# --ignore-scripts, as in account and auth: no package's install-time code runs
+# in the build. Measured 2026-10-25, it skips exactly two lifecycle scripts and
+# neither is needed here: the root `prepare` (husky, git hooks) and studio's
+# `postinstall` (`nuxt prepare`, which `nuxt build` below does itself).
+# Dependency build scripts were already off: pnpm 10 runs none without an
+# `onlyBuiltDependencies` list, and this repo has none.
+RUN pnpm install --frozen-lockfile --prod=false --ignore-scripts
 
 FROM base AS builder
 WORKDIR /app
@@ -71,11 +77,9 @@ RUN --mount=type=secret,id=sentry_auth_token \
 # nødvendige runtime. --prod-flag fjerner dem og giver ERR_MODULE_NOT_FOUND
 # på første request. Bundle-bloat ~50 MB accepteret indtil Nuxt nitro
 # konfigureres til fully-inline output (nitro.rollupConfig.external = []).
-# deploy re-resolver workspace-deps inkl. private @klanghaus-pakker → samme
-# build-secret som deps-stagen (ellers falder den tilbage til npmjs.org → 404).
-RUN --mount=type=secret,id=node_auth_token \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
-    pnpm --filter @grundtone-studio/studio deploy --legacy /deploy
+# deploy re-resolves workspace deps; all of them are public since the vendoring.
+# --ignore-scripts for the same reason as the install above.
+RUN pnpm --filter @grundtone-studio/studio deploy --legacy --ignore-scripts /deploy
 
 # Assertion-only (deref sker nu in-place i build-RUN'et ovenfor, så pnpm
 # deploy kopierer rigtige filer fra fødslen): de tre multi-versions-pakker

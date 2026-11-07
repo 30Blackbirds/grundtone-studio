@@ -21,24 +21,26 @@ Standard commands are already documented — see root `package.json` scripts, th
   the engine check. Activate nvm first: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use`
   (the update script already does this; interactive login shells get Node 24 automatically because
   the nvm `default` alias is pinned to `24.21.0`).
-- pnpm `10.17.1` (the Jenkins agent's pnpm; `npmFetch` refuses any other) is provided via corepack.
+- pnpm `10.14.0` is provided via corepack.
 - `engines.node` is `>=24.18.1` (the Node 24 security release) and `engine-strict=true`, so
   `pnpm install` fails with `ERR_PNPM_UNSUPPORTED_ENGINE` on any older Node. That includes the Node
   **pnpm itself runs on**, which can differ from `node -v`: a volta or corepack pnpm shim pinned to
   an older runtime fails even when `node -v` prints 24.21.0 (measured 2026-09-17: volta's pnpm ran
   on 24.16.0). Check with `pnpm exec node -v`.
 
-### Private `@klanghaus/*` packages — the main gotcha
+### Vendored `@klanghaus/*` packages — no registry token
 
-`apps/studio` depends on `@klanghaus/auth-jwt` and `@klanghaus/permissions-client`, published to
-**GitHub Packages** (`npm.pkg.github.com`). `.npmrc` reads `NODE_AUTH_TOKEN`; without a token with
-`read:packages` on the KlangHaus org, `pnpm install` fails with `ERR_PNPM_FETCH_401` on those two
-tarballs. Everything else (including the public `@grundtone/*` design system) installs fine.
+`apps/studio` used to install `@klanghaus/auth-jwt` and `@klanghaus/permissions-client` from GitHub
+Packages, which needed a `read:packages` token everywhere (`NODE_AUTH_TOKEN`). Since 2026-10-24
+(KH-944) both are **vendored** in `apps/studio/server/vendor/`, so every dependency is public and
+`pnpm install` needs no token.
 
-- Set the `NODE_AUTH_TOKEN` secret to unblock the full workspace install and the `apps/studio` app.
-- Without it, only `packages/saas-client` can be installed/built/tested
-  (`pnpm --filter @grundtone/saas-client install --frozen-lockfile`) — the update script falls back
-  to exactly this so the pod still boots.
+- Each package keeps a `manifest.json` (source repo, tag, commit, sha256 per file). The copies are
+  byte-identical to their tags: do NOT edit or reformat them (prettier and eslint ignore the folder;
+  `tests/vendored-packages.test.ts` turns red on a changed, extra or missing file).
+- To take an upstream change: copy the files from the new tag, rewrite the manifest, and run
+  `node apps/studio/scripts/vendor-drift.mjs --upstream <ref>` (needs `gh` access to the source
+  repos).
 
 ### Backing services (Postgres + MinIO)
 

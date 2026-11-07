@@ -1,4 +1,4 @@
-import { createJwtVerifier } from '@klanghaus/auth-jwt'
+import { createJwtVerifier } from '../vendor/auth-jwt/src/index'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
 import { authenticateProvisioningKey } from '~~/server/lib/provisioning-auth'

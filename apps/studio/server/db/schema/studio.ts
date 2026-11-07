@@ -306,3 +306,40 @@ export const projectInvitation = pgTable(
     index('project_invitation_email_idx').on(t.email),
   ],
 )
+
+// Outbox for events Studio publishes to account's AccountIngestService
+// (eventcontract v1, at-least-once). The row id IS the event's idempotency_key:
+// stable across retries, so account's inbox answers `duplicate` on a replay.
+//
+// Today it carries one event type, `tenantProvisioned`: the first time Studio
+// serves an org, account learns the org is a grundtone-studio tenant (company +
+// membership). The partial unique index makes that at most once per org, so a
+// second touch, a second replica or the backfill all collapse into the same row.
+//
+// Delivered rows are kept: they are the record of what Studio told account.
+// A row account rejected as malformed (400) is parked, never retried — the
+// contract says a 400 is permanent and resending it would hammer forever.
+export const tenantEventOutbox = pgTable(
+  'tenant_event_outbox',
+  {
+    id: uuid().primaryKey(),
+    eventType: text().notNull(),
+    organizationId: text().notNull(),
+    // The full proto-JSON `Event` as sent, idempotencyKey included.
+    event: jsonb().$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    attempts: integer().notNull().default(0),
+    nextAttemptAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastError: text(),
+    deliveredAt: timestamp({ withTimezone: true }),
+    parkedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('tenant_event_outbox_provisioned_once_idx')
+      .on(t.organizationId)
+      .where(sql`${t.eventType} = 'tenantProvisioned'`),
+    index('tenant_event_outbox_due_idx')
+      .on(t.nextAttemptAt)
+      .where(sql`${t.deliveredAt} IS NULL AND ${t.parkedAt} IS NULL`),
+  ],
+)

@@ -10,6 +10,12 @@
 // bundled SDK. Measured: bytes changed, BEHAVIOUR did not — both built bundles
 // write the same 106 CSS properties for the same payloads (8 cases, positive
 // control included). v1.0.0 stays served with its ORIGINAL bytes.
-export const SDK_CONTRACT_VERSION = '1.0.1'
+//
+// 1.0.1 -> 1.0.2 (2026-10-23): #348 moved vite 8.3.2 -> 8.3.3, whose rolldown
+// writes `// src/x.ts` instead of `//#region` / `//#endregion` in the ESM
+// bundle. Measured: v1.js byte-identical; v1.mjs differs in comment-only lines
+// alone (6 -> 3), the code is byte-identical once they are removed (396 lines).
+// BEHAVIOUR cannot differ. v1.0.1 stays served with its ORIGINAL bytes.
+export const SDK_CONTRACT_VERSION = '1.0.2'
 
 export const SDK_CONTRACT_MAJOR = SDK_CONTRACT_VERSION.split('.')[0]

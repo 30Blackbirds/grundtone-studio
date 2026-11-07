@@ -90,7 +90,13 @@ if [ "$nocdn_exited" != 'true' ]; then
   docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
   exit 1
 fi
-docker logs "$APP-nocdn" 2>&1 | grep -q 'NUXT_PUBLIC_CDN_BASE' \
+# 🔴 Read the log into a variable, then grep a here-string. `docker logs | grep -q`
+# under `set -o pipefail` fails at random: grep -q exits on the first match, docker
+# logs gets SIGPIPE (141), and pipefail turns the FOUND line into a failure — a
+# false "not for the reason we are testing" while the log does name the variable
+# (measured 2026-10-23: same image, red once, green on the next run).
+nocdn_log="$(docker logs "$APP-nocdn" 2>&1)"
+grep -qF 'NUXT_PUBLIC_CDN_BASE' <<<"$nocdn_log" \
   || { log "✗ the image refused to start, but not for the reason we are testing — its log never names NUXT_PUBLIC_CDN_BASE"; docker logs "$APP-nocdn" 2>&1 | tail -20 >&2; docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true; exit 1; }
 docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
 log "✓ the image refuses to start without NUXT_PUBLIC_CDN_BASE, and says so"
@@ -267,7 +273,9 @@ log "✓ /docs/install: all $ndoc /client/ URL(s) it shows answer 200: $(echo "$
 # It is read from the page already fetched above, whose 200 is already
 # asserted: the payload is identical on every page, so there is no reason to
 # reach for a second URL whose status this smoke has never measured.
-payload_host=$(grep -oE 'cdnBase:"[^"]*"' "$SDK_TMP/install.html" | head -1 | sed -E 's/cdnBase:"(.*)"/\1/')
+# awk 'NR==1' instead of head -1: awk reads to the end, so grep never gets the
+# SIGPIPE that pipefail would turn into a failed assignment under `set -e`.
+payload_host=$(grep -oE 'cdnBase:"[^"]*"' "$SDK_TMP/install.html" | awk 'NR==1' | sed -E 's/cdnBase:"(.*)"/\1/')
 [ -n "$payload_host" ] \
   || { log "✗ no cdnBase in the page payload at all — either the value stopped being public, or this grep no longer sees it, and the check below would pass on nothing"; exit 1; }
 [ "$payload_host" = "https://$EXPECTED_CDN_HOST" ] \

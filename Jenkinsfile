@@ -23,7 +23,8 @@
 //    `Test` below is the EXACT required name; the prefix is added by the
 //    library, so at flip one line is removed and the name is already right.
 //
-// ⛔ ONLY `Test` IS PORTED. The other 13 required contexts stay on Actions
+// ⛔ `Test` and `Lint & Typecheck` ARE PORTED (the latter folds ESLint,
+//    Prettier, Stylelint, TypeScript and i18n parity, see its block). The other required contexts stay on Actions
 //    until each has been measured on its own. A thin start is not a partial
 //    port: it is one name at a time, where disagreements can be attributed.
 //
@@ -38,12 +39,12 @@
 //    database. resonans' `Tenant isolation` is green on that contract; here the
 //    per-build database is made by `apps/studio/server/db/ci-db.ts`.
 //
-// ✅ POSTGRES 16 IS PROD'S MAJOR, not a declared difference: ci-postgres is
-//    `postgres:16-alpine`, and so is prod (infra `3002874`,
-//    compose/prod/platform/compose.yml l.70 + l.347; 0 compose files run 17).
-//    The old Actions job tested `postgres:17-alpine`, a major prod does not run.
-//    Remaining difference: role `ci` and database `studio_<BUILD_TAG>` instead
-//    of `grundtone/grundtone_ci` and `grundtone_studio`.
+// ⚠️ A DECLARED DIFFERENCE, so a disagreement during the parallel week is not
+//    attributed to the port: Actions runs `postgres:17-alpine` as
+//    `grundtone/grundtone_ci`, database `grundtone_studio`; ci-postgres is
+//    `postgres:16-alpine` as `ci`, database `studio_<BUILD_TAG>`. Schema and
+//    tests are the same. Should a test one day depend on the database NAME or
+//    on a postgres-17-only feature, this is where the disagreement comes from.
 //
 // 🔴 IF THE CATALOG DOES NOT COVER a future stack: open a PR to
 //    jenkins-library with image AND digest. That is the ONLY way.
@@ -92,48 +93,27 @@ klanghausPipeline(
   //    has one node 24, 24.20.0 (infra compose/prod/ci/agent/Dockerfile), so
   //    the two sides run different patch versions until `.nvmrc` moves to
   //    24.20.0 (blog did that in the same commit as its pin).
-  //    pnpm: `packageManager` is pinned to the AGENT's pnpm (10.17.1, infra
-  //    compose/prod/ci/agent/Dockerfile `npm install -g pnpm@10.17.1`), because
-  //    `npmFetch` switches pnpm's version switching OFF and refuses a repo whose
-  //    packageManager names another pnpm — the token is only ever bound to the
-  //    pnpm whose tree digest it verified.
+  //    pnpm matches: both sides take `packageManager` (pnpm@10.14.0); blog's
+  //    green builds with a 10.0.0 pin show the agent honours that field.
   toolchains: ['node': [exact: '24.20.0']],
   tools: [
     'node': [exact: '24.20.0', cmd: 'node --version'],
-    // `2>/dev/null | tail -1`: pnpm warns on stderr about the unset
-    // ${NODE_AUTH_TOKEN} in `.npmrc`, which would hide the version line.
-    'pnpm': [exact: '10.17.1', cmd: 'pnpm --version 2>/dev/null | tail -1'],
+    // `2>/dev/null | tail -1`: keeps the version line clean of any pnpm
+    // warning on stderr.
+    'pnpm': [exact: '10.14.0', cmd: 'pnpm --version 2>/dev/null | tail -1'],
   ],
 
   pnpmCache: true,
-
-  // 🔴 PRIVATE PACKAGES COME FROM `npmFetch`, NOT `npmAuth`. `npmAuth` is
-  //    withdrawn and binds NOTHING (jenkins-library `6cdb872`,
-  //    klanghausPipeline.groovy l.698): it put a checks:write App token into
-  //    `cmd`, and npm.pkg.github.com rejects App installation tokens anyway.
-  //    PR-347#1 died on exactly that: ERR_PNPM_FETCH_401 on
-  //    @klanghaus/permissions-client ([infra]'s reading of the log).
-  //    `npmFetch` fetches ONCE, before any check, with a read:packages
-  //    credential bound to the variable `.npmrc` reads (NODE_AUTH_TOKEN); no
-  //    check ever sees the token, and checks install offline.
-  //    `credentialsId`: the classic read:packages PAT on a machine user that
-  //    the library names as Allan's to create (klanghausFetch.groovy header).
-  //    Until it exists in JCasC this build fails closed on the binding — red
-  //    with a name, not green on nothing.
-  //    `pnpmSha256`: the library's own VERIFY_SCRIPT run on `npm install -g
-  //    pnpm@10.17.1` (the agent's install command), measured 2026-10-19 with
-  //    npm 10.9.8 and with npm of node 24.21: same digest both times. It was
-  //    computed OFF the agent; if the agent's tree differs, verify() fails
-  //    closed and prints the measured digest — it never binds the token.
-  npmFetch: [
-    credentialsId: 'klanghaus-npm-read',
-    pnpmSha256: '0d328f56da46d9258f0fe00c27a9497a6c6dd663726f08262c791c8863665f40',
-  ],
 
   checks: [
     [
       // The exact required name. See the note on the prefix above.
       context: 'Test',
+
+      // No registry token: @klanghaus/auth-jwt and permissions-client are
+      // vendored in apps/studio/server/vendor/ (KH-944, #354), so every
+      // dependency is public. (`npmAuth:` would bind nothing anyway — the
+      // library withdrew it.)
 
       cmd: '''
         set -euo pipefail
@@ -163,8 +143,7 @@ klanghausPipeline(
         # all checks share one workspace. That is why each `cmd` is
         # self-contained; Actions' artifact hand-off (setup uploads, four jobs
         # download) does not exist here.
-        # Offline: npmFetch filled the store before any check ran.
-        pnpm install --offline --frozen-lockfile
+        pnpm install --frozen-lockfile
 
         # 🔴 POSITIVE CONTROL BEFORE THE MEASUREMENT: creating the per-build
         # database (see the note at the top) is it. With no reachable postgres
@@ -178,6 +157,72 @@ klanghausPipeline(
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
       ''',
+    ],
+
+    // ─── Lint & Typecheck ───────────────────────────────────────────────────
+    [
+      // The five static checks Actions' ci.yml ran as ESLint, Prettier,
+      // Stylelint, TypeScript and i18n parity. ci.yml has been
+      // disabled_manually since 2026-09-15, and since then NO check ran any of
+      // them: `turbo run lint` sat red on main for days in September without
+      // anything turning red (869fbfz99), and prettier was red on main again
+      // when this was measured (3 files, fixed in the same PR).
+      //
+      // ONE check, not five: every check runs `pnpm install` in the one shared
+      // workspace, and whether the library runs checks concurrently is not
+      // measured — five installs racing in one node_modules is a risk this
+      // does not need to take. Each step echoes its name, so a red run says
+      // which of the five failed.
+      //
+      // No token, no services: plain public dependencies (vendored @klanghaus
+      // packages, KH-944) and no database. Runs on PRs and main.
+      context: 'Lint & Typecheck',
+      cmd: '''
+        set -euo pipefail
+        export TURBO_TELEMETRY_DISABLED=1
+        pnpm install --frozen-lockfile
+
+        echo '── ESLint'
+        pnpm turbo run lint
+        echo '── Stylelint'
+        pnpm stylelint
+        echo '── TypeScript'
+        pnpm typecheck
+        echo '── i18n parity'
+        node scripts/check-i18n-parity.mjs
+        echo '── Prettier'
+        pnpm format:check
+
+        # 🔴 Nothing above may rewrite a tracked file. turbo did exactly that to
+        # AGENTS.md when it detected an agent (agentGuidance, now off in
+        # turbo.json); a tool that edits the tree makes the format check judge
+        # a file nobody committed. A dirty tree here is red, with the diff.
+        echo '── tree unchanged'
+        git diff --exit-code --stat
+      ''',
+    ],
+
+    // ─── vendored @klanghaus packages upstream ──────────────────────────────
+    [
+      // Do auth's packages/jwt and platform's packages/permissions-client on
+      // main still hold the bytes studio vendored? (The LOCAL half — copy vs
+      // manifest — runs in the test suite.) auth-jwt/src/verify.ts is the token
+      // verifier, so studio carries a copy of a security control and must hear
+      // when the original changes ([sikkerhed], #354 verdict). Same check as
+      // auth#183. Needs to read the private source repos, so the App token; the
+      // library binds it only on `defaultBranch`, hence main pushes only.
+      // The token reaches ONLY this cmd: plain node, no install, no dependency
+      // code. The script's positive control is each manifest's own
+      // sourceCommit: a 404 there is "cannot see the source repo" (exit 2),
+      // never drift. Exit 1 = drift: take the upstream change into
+      // server/vendor or say why not.
+      // Not a required context. UNMEASURED: that the App's installation can
+      // read KlangHaus/auth and KlangHaus/platform — a 404 at a pin would show
+      // it, as exit 2.
+      context: 'vendored @klanghaus upstream',
+      githubToken: true,
+      cmd: 'set -euo pipefail\nnode apps/studio/scripts/vendor-drift.mjs --upstream main',
+      when: { ctx -> !ctx.isPR },
     ],
   ],
 )

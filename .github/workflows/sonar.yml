@@ -60,13 +60,9 @@ jobs:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     permissions:
       contents: read
-      # 🔴 `packages: read` er BAERENDE, ikke hygiejne. Setup-actionen auther
-      # @klanghaus-scopet mod GitHub Packages med `github.token`, og et
-      # eksplicit `permissions:`-blok ERSTATTER standarden frem for at udvide
-      # den. ci.yml saetter ingen permissions og faar derfor read'en gratis;
-      # her ville en snaevring til `contents: read` alene give 401 paa
-      # `pnpm install` — typisk foerst ved et cache-miss, altsaa sporadisk.
-      packages: read
+      # `packages: read` is gone: it existed only because the setup action
+      # authenticated the @klanghaus scope against GitHub Packages. Since #354
+      # vendored those packages, `pnpm install` reads no private registry.
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

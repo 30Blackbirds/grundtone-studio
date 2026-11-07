@@ -2,9 +2,11 @@ import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
+import { currentBrandCount } from '~~/server/lib/brand-count'
 import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
+import { provisionNow } from '~~/server/lib/tenant-outbox'
 
 // §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
 // aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
@@ -60,6 +62,18 @@ export default defineEventHandler(async (event) => {
   // Dormant-503 FØR runtime-config og body: et usat ACCOUNT_URL skal
   // rapportere sig som dormant, ikke som en fejl længere inde.
   const accountUrl = requireAccountUrl()
+
+  // account#179 answers 404 unknown_tenant for an org it has no company for,
+  // and the company comes from Studio's tenantProvisioned. Deliver it now
+  // rather than leave a first-time buyer to the scheduled outbox run.
+  if (!(await provisionNow(org))) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Billing is not available yet',
+      data: { code: 'tenant_not_provisioned' },
+    })
+  }
+
   const appUrl = useRuntimeConfig(event).public.appUrl
 
   const { checkoutUrl } = await postToAccount<{ checkoutUrl: string }>(
@@ -69,6 +83,9 @@ export default defineEventHandler(async (event) => {
       tenantOrgId: org.id,
       portalKey: PORTAL_KEY,
       planKey: data.planKey,
+      // So the purchase bills the right overage from day one; after that the
+      // brand-count PUT keeps it current (server/lib/brand-count.ts).
+      activeBrands: await currentBrandCount(org.id),
       // §1a: accept-bevis + B2B-attestation følger med mintet (accounts
       // §8-krav — de persisterer version+timestamp); locale=da så Stripes
       // hostede side matcher flowet sprogligt.

@@ -13,6 +13,8 @@ export interface FullOrg {
   id: string
   name: string
   slug: string
+  /** Better Auth returns the organization row's createdAt (ISO string). */
+  createdAt?: string
   members?: Array<{ id: string; userId: string; role: string }>
 }
 
@@ -65,6 +67,7 @@ async function fetchFullOrg(
         headers: { cookie },
       },
     )
+    if (org) announceTenant(org)
     return org ?? null
   } catch (err) {
     // Better Auth returns 4xx (often surfaced as a thrown FetchError) when the
@@ -78,6 +81,19 @@ async function fetchFullOrg(
     if (/not found/i.test(msg)) return null
     throw err
   }
+}
+
+// Every successful lookup is cookie-scoped by auth to the caller's own
+// memberships, so reaching this line proves a signed-in member is using the org
+// in Studio. That is the moment Studio announces the org to account
+// (server/lib/tenant-outbox.ts explains why first use, not creation). Not
+// awaited: the request does not wait on the outbox, and the hook never throws.
+// Imported lazily so this module, which most handlers load, does not pull the
+// database client in at import time.
+function announceTenant(org: FullOrg): void {
+  import('./tenant-outbox')
+    .then(({ ensureTenantProvisioned }) => ensureTenantProvisioned(org))
+    .catch((err: unknown) => console.error('[tenant-outbox] hook failed to load:', err))
 }
 
 export async function lookupOrgBySlug(

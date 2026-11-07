@@ -3,6 +3,7 @@ import { createError, getRequestHeader, setHeader, type H3Event } from 'h3'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { hashApiKey } from './api-keys'
+import { requireProvisioningFeature } from './entitlements'
 import { recordKeyUse } from './key-usage'
 import { SlidingWindowRateLimiter } from './rate-limit'
 
@@ -49,9 +50,9 @@ export interface ProvisioningPrincipal {
  * cached row. If someone adds a cache here later, AC-A3 is no longer met, and
  * the cell `a revoked key is refused on the very next call` is what turns red.
  *
- * Never throws (mirrors the session and machine middleware): an unknown or
- * revoked key leaves `context.provisioning` undefined and lets the route guard
- * answer 401. Only does work when a `prov_` bearer is present, so it is a no-op
+ * Throws only for a key that WAS accepted: 429 over its rate limit, and 403/503
+ * from the org's plan gate. An unknown or revoked key leaves
+ * `context.provisioning` undefined and lets the route guard answer 401. Only does work when a `prov_` bearer is present, so it is a no-op
  * for browser, CDN and `sk_` traffic.
  */
 export async function authenticateProvisioningKey(event: H3Event): Promise<void> {
@@ -95,6 +96,14 @@ export async function authenticateProvisioningKey(event: H3Event): Promise<void>
       data: { code: 'rate_limit_exceeded', limit: row.rateLimit },
     })
   }
+
+  // 🔴 THE PLAN GATE SITS HERE, AT AUTHENTICATION, FOR THE SAME REASON THE RATE
+  // LIMIT DOES: it is a property of the ORG the key belongs to, and this is the
+  // one place every route the key can reach passes through — including the
+  // editor-gated endpoints it reaches as a machine principal below. A per-route
+  // check would miss those (KH-964 AC-E1–E3). After the rate limit, so a key
+  // hammering past its limit does not also hammer account.
+  await requireProvisioningFeature(row.organizationId)
 
   event.context.provisioning = {
     keyId: row.id,

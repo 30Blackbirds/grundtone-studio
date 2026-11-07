@@ -76,8 +76,7 @@ describe('/api/auth/[...] BFF-proxy', () => {
     await handler({ path: '/api/auth/verify-email?token=t&callbackURL=%2Fverify%2Fdone' })
     expect(proxyRequestMock).toHaveBeenCalledTimes(1)
     const opts = proxyRequestMock.mock.calls[0][2] as
-      | { fetchOptions?: { redirect?: string } }
-      | undefined
+      { fetchOptions?: { redirect?: string } } | undefined
     expect(opts?.fetchOptions?.redirect).toBe('manual')
   })
 })

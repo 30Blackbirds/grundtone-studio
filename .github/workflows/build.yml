@@ -272,8 +272,8 @@ jobs:
           provenance: false
           sbom: false
           cache-from: type=gha,scope=studio-v2
-          secrets: |
-            node_auth_token=${{ secrets.GITHUB_TOKEN }}
+          # No secrets: the Dockerfile mounts none besides sentry_auth_token,
+          # which this PR build does not need (#354 removed node_auth_token).
 
       # 🔴 PUSH BY DIGEST — NO TAGS HERE (riff ap1qcpe7zg3j8ex5ton6d4i1).
       # Pushing with `tags:` moved every mutable tag (latest, branch, sha-,
@@ -313,12 +313,9 @@ jobs:
           cache-from: type=gha,scope=studio-v2
           cache-to: type=gha,mode=max,scope=studio-v2
           provenance: false
-          # Privat @klanghaus-pakke-adgang: Dockerfile'en mounter dette som
-          # `--mount=type=secret,id=node_auth_token`. Uden det fejler pnpm install
-          # med 401 på @klanghaus/auth-jwt m.fl. GITHUB_TOKEN har packages:read i
-          # org (kræver at de pakker grant'er denne repo Actions-adgang).
+          # The Dockerfile's only secret mount is sentry_auth_token. The npm
+          # token is gone since #354 vendored the private @klanghaus packages.
           secrets: |
-            node_auth_token=${{ secrets.GITHUB_TOKEN }}
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
 
       # Boot-smoke (v0.2.11-incident, 2026-08-03): the image MUST come up and

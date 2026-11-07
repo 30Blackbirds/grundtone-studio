@@ -18,20 +18,22 @@ const subscriptionSchema = z.object({
   paymentMethod: z.object({ brand: z.string(), last4: z.string() }).nullable(),
 })
 
-const invoicesSchema = z.array(
-  z.object({
-    invoiceRef: z.string(),
-    status: z.string(),
-    amountMinor: z.number(),
-    currency: z.string(),
-    issuedAt: z.string(),
-    hostedUrl: z.string().nullable(),
-    pdfUrl: z.string().nullable(),
-  }),
-)
+const invoiceSchema = z.object({
+  invoiceRef: z.string(),
+  status: z.string(),
+  amountMinor: z.number(),
+  currency: z.string(),
+  issuedAt: z.string(),
+  hostedUrl: z.string().nullable(),
+  pdfUrl: z.string().nullable(),
+})
+
+// §7: `200 { "invoices": [ … ] }` — an envelope, not a bare array, so account
+// can add fields later. A bare array is rejected (→ null), not unwrapped.
+const invoicesSchema = z.object({ invoices: z.array(invoiceSchema) })
 
 export type BillingSubscription = z.infer<typeof subscriptionSchema>
-export type BillingInvoice = z.infer<typeof invoicesSchema>[number]
+export type BillingInvoice = z.infer<typeof invoiceSchema>
 
 async function accountGet(path: string): Promise<unknown | null> {
   const baseUrl = process.env.ACCOUNT_URL
@@ -70,7 +72,7 @@ export async function getBillingInvoices(
     if (raw === null) return null
     const parsed = invoicesSchema.safeParse(raw)
     if (!parsed.success) throw new Error(`invoices response invalid: ${parsed.error.message}`)
-    return parsed.data
+    return parsed.data.invoices
   } catch (err) {
     console.error(`[billing-read] invoices fetch failed for org ${orgId}:`, err)
     return null

@@ -135,6 +135,12 @@ vi.mock('~~/server/lib/storage', () => ({
 
 let brandClaim: unknown = null
 let capacityThrows: unknown = null
+vi.mock('~~/server/lib/brand-count', () => ({
+  reportBrandCount: (orgId: string) => {
+    log.push(`report:${orgId}`)
+    return Promise.resolve({ kind: 'applied' })
+  },
+}))
 vi.mock('~~/server/lib/brand-quota', () => ({
   assertBrandCapacity: () =>
     capacityThrows ? Promise.reject(capacityThrows) : Promise.resolve(brandClaim),
@@ -263,6 +269,21 @@ describe('🔴 the phase order is the customer guarantee', () => {
     expect(log.filter((l) => l.includes('current'))).toEqual([])
     expect(log).not.toContain('D:active_version')
     expect(auditEvents).toEqual([])
+  })
+
+  // Overage billing (Allan 2026-10-27): a NEW brand changes what account bills,
+  // so it is reported — after the brand row is written, never instead of it.
+  it('🔴 reports the brand count to account after a new brand, not before', async () => {
+    brandClaim = { organizationId: ORG.id, limit: 3 }
+    await publish()
+    const report = log.indexOf(`report:${ORG.id}`)
+    expect(report).toBeGreaterThan(log.indexOf('A:claimBrandSlot'))
+  })
+
+  it('does not report when no brand was created', async () => {
+    brandClaim = null
+    await publish()
+    expect(log.some((l) => l.startsWith('report:'))).toBe(false)
   })
 
   it('claims the brand slot inside the Phase A transaction, for a first version', async () => {
