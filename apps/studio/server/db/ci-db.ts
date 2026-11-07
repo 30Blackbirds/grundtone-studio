@@ -1,7 +1,7 @@
 // Per-build test database on the shared CI postgres.
 //
 // Jenkins hands every agent ONE DSN, KH_TEST_PG_DSN (infra compose/prod/ci,
-// jenkins.yaml): the role `ci` owns the cluster and may CREATE DATABASE, and the
+// jenkins.yaml) as the role `ci_build` (NOSUPERUSER NOCREATEROLE CREATEDB), and the
 // contract is that each build makes its own database and drops it again — two
 // concurrent builds of this repo would otherwise migrate into the same schema.
 // This lives in repo code rather than in the Jenkinsfile for the same reason
@@ -17,6 +17,7 @@
 // Creating the database IS the positive control of the check: with no
 // reachable postgres it throws, and the check cannot pass on no database.
 import postgres from 'postgres'
+import { ciDbName } from './ci-db-name'
 
 const action = process.argv[2]
 if (action !== 'create' && action !== 'drop') {
@@ -33,8 +34,9 @@ if (!adminDsn) {
 }
 
 const tag = process.env.BUILD_TAG ?? `local-${process.env.USER ?? 'dev'}`
-// A postgres identifier: lower-case, [a-z0-9_], at most 63 bytes.
-const dbName = `studio_${tag.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`.slice(0, 63)
+// A postgres identifier with a hash of the raw tag, so two builds never share
+// (and FORCE-drop) one database. See ci-db-name.ts.
+const dbName = ciDbName(tag)
 
 // The `postgres` client validates the identifier when it is passed as a
 // value, so the name is never interpolated as raw SQL.

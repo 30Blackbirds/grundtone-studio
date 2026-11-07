@@ -34,16 +34,18 @@
 //    that would start it does not exist, and the two consumers that relied on
 //    it were red on exactly that check (this repo on main `a21bf06`, permissions'
 //    `Integration assertions`). What DOES exist is infra#395 (2026-09-30): every
-//    agent gets `KH_TEST_PG_DSN` to the shared `ci-postgres` (jenkins.yaml), the
-//    role `ci` owns the cluster, and each build must create and drop its own
-//    database. resonans' `Tenant isolation` is green on that contract; here the
-//    per-build database is made by `apps/studio/server/db/ci-db.ts`.
+//    agent gets `KH_TEST_PG_DSN` to the shared `ci-postgres` (jenkins.yaml) as
+//    the role `ci_build` (NOSUPERUSER NOCREATEROLE CREATEDB), and each build
+//    must create and drop its own database. resonans' `Tenant isolation` is
+//    green on that contract; here the per-build database is made by
+//    `apps/studio/server/db/ci-db.ts`.
 //
 // ⚠️ A DECLARED DIFFERENCE, so a disagreement during the parallel week is not
 //    attributed to the port: Actions runs `postgres:17-alpine` as
 //    `grundtone/grundtone_ci`, database `grundtone_studio`; ci-postgres is
-//    `postgres:16-alpine` as `ci`, database `studio_<BUILD_TAG>`. Schema and
-//    tests are the same. Should a test one day depend on the database NAME or
+//    `postgres:16-alpine` as `ci_build`, database
+//    `studio_<BUILD_TAG>_<hash>` (apps/studio/server/db/ci-db-name.ts). Schema
+//    and tests are the same. Should a test one day depend on the database NAME or
 //    on a postgres-17-only feature, this is where the disagreement comes from.
 //
 // 🔴 IF THE CATALOG DOES NOT COVER a future stack: open a PR to
