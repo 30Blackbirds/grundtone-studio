@@ -23,7 +23,8 @@
 //    `Test` below is the EXACT required name; the prefix is added by the
 //    library, so at flip one line is removed and the name is already right.
 //
-// ⛔ ONLY `Test` IS PORTED. The other 13 required contexts stay on Actions
+// ⛔ `Test` and `Lint & Typecheck` ARE PORTED (the latter folds ESLint,
+//    Prettier, Stylelint, TypeScript and i18n parity, see its block). The other required contexts stay on Actions
 //    until each has been measured on its own. A thin start is not a partial
 //    port: it is one name at a time, where disagreements can be attributed.
 //
@@ -165,6 +166,49 @@ klanghausPipeline(
         pnpm install --frozen-lockfile
         pnpm --filter @grundtone-studio/studio db:migrate
         pnpm test
+      ''',
+    ],
+
+    // ─── Lint & Typecheck ───────────────────────────────────────────────────
+    [
+      // The five static checks Actions' ci.yml ran as ESLint, Prettier,
+      // Stylelint, TypeScript and i18n parity. ci.yml has been
+      // disabled_manually since 2026-09-15, and since then NO check ran any of
+      // them: `turbo run lint` sat red on main for days in September without
+      // anything turning red (869fbfz99), and prettier was red on main again
+      // when this was measured (3 files, fixed in the same PR).
+      //
+      // ONE check, not five: every check runs `pnpm install` in the one shared
+      // workspace, and whether the library runs checks concurrently is not
+      // measured — five installs racing in one node_modules is a risk this
+      // does not need to take. Each step echoes its name, so a red run says
+      // which of the five failed.
+      //
+      // No token, no services: plain public dependencies (vendored @klanghaus
+      // packages, KH-944) and no database. Runs on PRs and main.
+      context: 'Lint & Typecheck',
+      cmd: '''
+        set -euo pipefail
+        export TURBO_TELEMETRY_DISABLED=1
+        pnpm install --frozen-lockfile
+
+        echo '── ESLint'
+        pnpm turbo run lint
+        echo '── Stylelint'
+        pnpm stylelint
+        echo '── TypeScript'
+        pnpm typecheck
+        echo '── i18n parity'
+        node scripts/check-i18n-parity.mjs
+        echo '── Prettier'
+        pnpm format:check
+
+        # 🔴 Nothing above may rewrite a tracked file. turbo did exactly that to
+        # AGENTS.md when it detected an agent (agentGuidance, now off in
+        # turbo.json); a tool that edits the tree makes the format check judge
+        # a file nobody committed. A dirty tree here is red, with the diff.
+        echo '── tree unchanged'
+        git diff --exit-code --stat
       ''',
     ],
 
