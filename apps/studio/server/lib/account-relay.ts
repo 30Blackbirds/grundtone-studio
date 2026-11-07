@@ -1,5 +1,11 @@
 import { createError } from 'h3'
 
+/** The header account reads the user token from (account src/http/user-binding.ts). */
+export const USER_TOKEN_HEADER = 'x-klanghaus-user-token'
+
+/** Account's 403s on the user binding (condition 2 (a)). */
+const USER_BINDING_403 = new Set(['user_org_mismatch', 'user_role_insufficient'])
+
 // S2S-relayet til account (kontrakt §5/§7a). Checkout- og portal-mintet delte
 // 16 linjer ordret: dormant-503, headers, bearer, fetch med timeout, 502.
 //
@@ -49,10 +55,13 @@ export async function postToAccount<T>(
   path: string,
   body: Record<string, unknown>,
   failure: RelayFailure,
+  /** The logged-in user's account token (server/lib/account-user-token.ts). */
+  userToken?: string,
 ): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   const token = process.env.ACCOUNT_S2S_TOKEN
   if (token) headers.Authorization = `Bearer ${token}`
+  if (userToken) headers[USER_TOKEN_HEADER] = userToken
 
   const res = await fetch(`${accountUrl}${path}`, {
     method: 'POST',
@@ -61,6 +70,20 @@ export async function postToAccount<T>(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    // Account's errors are `{ error, message }` (account src/http/errors.ts).
+    const code = ((await res.json().catch(() => null)) as { error?: unknown } | null)?.error
+    // A 403 on the user binding is the user's role or org, as account reads it
+    // from auth: pass it on as a 403 the page can explain. Everything else —
+    // including a 401 on the token, which means Studio sent a bad one — stays
+    // Studio's 502, logged with account's code.
+    if (res.status === 403 && typeof code === 'string' && USER_BINDING_403.has(code)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Requires the owner or billing role',
+        data: { code },
+      })
+    }
+    console.error(`[account-relay] ${path} answered ${res.status}:`, code ?? '(no code)')
     throw createError({
       statusCode: 502,
       statusMessage: failure.statusMessage,

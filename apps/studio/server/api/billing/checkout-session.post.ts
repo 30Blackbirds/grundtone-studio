@@ -2,6 +2,7 @@ import { createError, defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { CHECKOUT_PLAN_KEYS, getPlan, type PlanKey } from '~~/lib/plan-catalog'
 import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
+import { mintAccountUserToken } from '~~/server/lib/account-user-token'
 import { currentBrandCount } from '~~/server/lib/brand-count'
 import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
@@ -76,6 +77,9 @@ export default defineEventHandler(async (event) => {
 
   const appUrl = useRuntimeConfig(event).public.appUrl
 
+  // Last, right before the mint: the token lives 300 s and is minted per
+  // request (server/lib/account-user-token.ts).
+  const userToken = await mintAccountUserToken(event, org.id)
   const { checkoutUrl } = await postToAccount<{ checkoutUrl: string }>(
     accountUrl,
     '/v1/billing/checkout-sessions',
@@ -99,6 +103,7 @@ export default defineEventHandler(async (event) => {
       cancelUrl: `${appUrl}/plans?org=${data.organizationSlug}&upgrade=cancelled`,
     },
     { statusMessage: 'Could not create checkout session', code: 'checkout_failed' },
+    userToken,
   )
   return { checkoutUrl }
 })

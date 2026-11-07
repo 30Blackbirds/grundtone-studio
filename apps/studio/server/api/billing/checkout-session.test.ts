@@ -20,6 +20,8 @@ vi.mock('~~/server/lib/org-lookup', () => ({
 // role logic in play via the actual import below.
 vi.mock('~~/server/db', () => ({ db: {} }))
 vi.mock('~~/server/lib/pdp', () => ({ checkOrg: vi.fn(), checkProject: vi.fn() }))
+const mintAccountUserToken = vi.fn((_e: unknown, _org: string) => Promise.resolve('user-jwt'))
+vi.mock('~~/server/lib/account-user-token', () => ({ mintAccountUserToken }))
 const provisionNow = vi.fn(() => Promise.resolve(true))
 vi.mock('~~/server/lib/tenant-outbox', () => ({ provisionNow }))
 vi.mock('~~/server/lib/brand-count', () => ({ currentBrandCount: () => Promise.resolve(12) }))
@@ -288,5 +290,44 @@ describe('the mint carries the active-brand count', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+// Condition 2 (a): the mint carries the logged-in billing user's token.
+describe("the logged-in user's token (account#186)", () => {
+  beforeEach(() => {
+    process.env.STUDIO_INTERNAL_ORG_IDS = 'org-1'
+    process.env.ACCOUNT_URL = 'http://account.test'
+    provisionNow.mockReset()
+    provisionNow.mockResolvedValue(true)
+    mintAccountUserToken.mockReset()
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("mints it for the request's org and forwards it to account", async () => {
+    mintAccountUserToken.mockResolvedValue('user-jwt')
+    const fetchMock = vi.fn((_u: string, _i: RequestInit) =>
+      Promise.resolve(new Response(JSON.stringify({ checkoutUrl: 'https://stripe.test/c' }))),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await handler(authedEvent(VALID_BODY))
+    expect(mintAccountUserToken.mock.calls[0]![1]).toBe('org-1')
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>
+    expect(headers['x-klanghaus-user-token']).toBe('user-jwt')
+  })
+
+  it('🔴 never calls account when the token cannot be minted', async () => {
+    mintAccountUserToken.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 403 }))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 403 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not mint before the org is provisioned (a 503 there spends no token)', async () => {
+    provisionNow.mockResolvedValue(false)
+    await expect(handler(authedEvent(VALID_BODY))).rejects.toMatchObject({ statusCode: 503 })
+    expect(mintAccountUserToken).not.toHaveBeenCalled()
   })
 })

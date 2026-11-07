@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { postToAccount, requireAccountUrl } from '~~/server/lib/account-relay'
+import { mintAccountUserToken } from '~~/server/lib/account-user-token'
 import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
@@ -25,6 +26,9 @@ export default defineEventHandler(async (event) => {
   const accountUrl = requireAccountUrl()
   const appUrl = useRuntimeConfig(event).public.appUrl
 
+  // A portal session lets its holder change the card and cancel, so account
+  // binds it to a billing user of this org too (condition 2 (a)).
+  const userToken = await mintAccountUserToken(event, org.id)
   const { portalUrl } = await postToAccount<{ portalUrl: string }>(
     accountUrl,
     '/v1/billing/portal-sessions',
@@ -34,6 +38,7 @@ export default defineEventHandler(async (event) => {
       returnUrl: `${appUrl}/orgs/${data.organizationSlug}/billing`,
     },
     { statusMessage: 'Could not create portal session', code: 'portal_failed' },
+    userToken,
   )
   return { portalUrl }
 })
