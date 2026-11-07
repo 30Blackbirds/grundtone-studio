@@ -31,8 +31,11 @@ case "${1:-}" in
     umask 077
     ci_db create --out "$out"
     dsn="$(cat "$out")"
-    # One line, postgres scheme, no whitespace, and the path is a studio_ name.
-    if [[ "$dsn" != *$'\n'* && "$dsn" =~ ^postgres(ql)?://[^[:space:]]+/studio_[a-z0-9_]+$ ]]; then
+    # One line, postgres scheme, no whitespace, and the path is a studio_ name,
+    # optionally followed by the admin DSN's query string: the agent's
+    # KH_TEST_PG_DSN ends in `?sslmode=disable` (infra jenkins.yaml), and
+    # ci-db.ts keeps it ([sikkerhed] B1 on #347).
+    if [[ "$dsn" != *$'\n'* && "$dsn" =~ ^postgres(ql)?://[^[:space:]]+/studio_[a-z0-9_]+(\?[^[:space:]]*)?$ ]]; then
       echo "ci-test-db: DATABASE_URL written to $out (${#dsn} bytes, not shown)" >&2
     else
       echo "ci-test-db: $out does not hold a postgres URL to a studio_ database" >&2

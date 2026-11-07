@@ -153,9 +153,11 @@ klanghausPipeline(
         # "nothing touched a database". The DSN carries a password, so it goes
         # through a 0600 file and is never on stdout or in the log (see
         # scripts/ci-test-db.sh). The drop runs on every exit, so a red migrate
-        # or test does not leave a database behind.
+        # or test does not leave a database behind. The file goes FIRST: under
+        # `set -e` a failing drop ends the trap, and the file would stay
+        # ([sikkerhed] B2 on #347).
         DSN_FILE="$(umask 077; mktemp)"
-        trap 'scripts/ci-test-db.sh drop; rm -f "$DSN_FILE"' EXIT
+        trap 'rm -f "$DSN_FILE"; scripts/ci-test-db.sh drop' EXIT
         scripts/ci-test-db.sh create "$DSN_FILE"
         DATABASE_URL="$(cat "$DSN_FILE")"
         export DATABASE_URL
