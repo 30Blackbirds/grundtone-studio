@@ -1344,7 +1344,14 @@ main {
    Building the prototype literally would have reproduced a failure they had
    already flagged. `--color-text` on the same pill is 13.64:1. The pill stays
    grey — only the text darkens — so the prototype's intent survives and the
-   contrast does too. [designer] should confirm the darker text. */
+   contrast does too. [designer] should confirm the darker text.
+
+   STILL NEEDED ON @grundtone/vue 3.3.0, measured 2026-10-24 with this rule
+   removed: 3.3.0 moved the four TINTED variants to --color-text (warning,
+   success, info, error now 12.5-14.3:1), but `neutral` still paints
+   --color-text-secondary on --color-surface-alt — rgb(108,117,125) on
+   rgb(240,241,242), 4.15:1, the same failing pair. Remove this rule only when
+   the library's neutral variant passes AA, and re-measure. */
 .members-wide .gt-badge,
 .members-narrow .gt-badge {
   color: var(--color-text);
@@ -1515,29 +1522,4 @@ main {
   min-width: 0;
   font-size: var(--font-size-xs);
   line-height: 1.5;
-}
-
-/* 🔴 THE DRAFT BADGE'S TEXT IS DARKENED, BECAUSE THE LIBRARY'S WARNING BADGE
-   FAILS AA AND THE PROTOTYPE ALREADY KNEW.
-
-   Measured on the rendered bar: GTBadge variant="warning" paints #ffc107 text
-   on a 14% tint of itself over white — effective background rgb(255,246,220),
-   contrast 1.51:1. That is the same defect [quality] measured across all four
-   tinted variants (riff KH-1121, in progress in the library).
-
-   The R8 brand-assets prototype does NOT use that colour: its `.draftbadge` is
-   #8a6d00 on the same tint — 4.56:1, which passes. So here, unlike the R5 role
-   pill, following the prototype FIXES the contrast rather than reproducing a
-   failure.
-
-   Expressed as a mix of the warning TOKEN rather than the prototype's raw hex,
-   so it follows whatever --color-warning resolves to in a brand: 50% toward
-   black lands on rgb(128,96,4) at 5.42:1, a little more headroom than the
-   prototype's own 4.56 and the same colour family.
-
-   Scoped to this bar on purpose. When KH-1121 fixes the badge in the library,
-   this override should be removed and the result re-measured — not kept as a
-   second source of truth. */
-.pubbar .gt-badge {
-  color: color-mix(in srgb, var(--color-warning) 50%, #000);
 }
