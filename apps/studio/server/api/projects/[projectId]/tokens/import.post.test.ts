@@ -116,13 +116,18 @@ describe('importing a DTCG document', () => {
 })
 
 describe('🔴 a foreign document may not produce a 500', () => {
-  it('413s a document too deep to serialize, naming which file', async () => {
-    // JSON.stringify throws on a self-referential or over-deep input, and the
-    // handler treats that as a refusal rather than letting it become a 500.
-    // Provoked with a cycle, which is the cheapest way to make stringify throw.
+  it('refuses a self-referential document by its bound, never by a crashed stringify', async () => {
+    // A cycle would make JSON.stringify throw. checkBounds runs first and is
+    // iterative: every lap round the cycle is one level deeper, so it passes
+    // MAX_DEPTH (long before MAX_NODES) and answers with the bound's own code;
+    // the size check never sees it. Measured: too_deep, not too_many_nodes.
     const cyclic: Record<string, unknown> = {}
     cyclic.self = cyclic
-    await expect(imp({ base: cyclic, dryRun: true })).rejects.toMatchObject({ statusCode: 413 })
+    await expect(imp({ base: cyclic, dryRun: true })).rejects.toMatchObject({
+      statusCode: 400,
+      data: { code: 'too_deep' },
+      statusMessage: expect.stringContaining('the base document'),
+    })
   })
 
   it('413s an oversized document and names the DARK file when that is the big one', async () => {

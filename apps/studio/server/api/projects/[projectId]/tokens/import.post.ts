@@ -1,4 +1,9 @@
-import { importTokens, type ImportReport, type StudioTokens } from '@grundtone-studio/dtcg'
+import {
+  checkBounds,
+  importTokens,
+  type ImportReport,
+  type StudioTokens,
+} from '@grundtone-studio/dtcg'
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { z } from 'zod'
 import { db } from '~~/server/db'
@@ -32,12 +37,14 @@ import { CURATED_FONT_WEIGHTS, tokensSchema, type Tokens } from '~~/server/lib/t
 // It is also not a byte count: JSON.stringify().length counts UTF-16 units of
 // the RE-serialized document, so a non-BMP body passes at ~3.6 MB of real
 // bytes and a pretty-printed one at ~2.27 MB uploaded. It is kept as a coarse
-// ceiling on obviously absurd documents, measured defensively because
-// stringify itself throws on a deeply nested input.
+// ceiling on obviously absurd documents.
 //
-// The bound that actually protects the parser is DEPTH, in packages/dtcg
-// (MAX_DEPTH/MAX_NODES): a 30 KB document nested 5000 deep — 1.5 % of this
-// ceiling — used to make parseDocument throw RangeError, i.e. a 500.
+// The bound that actually protects the parser is DEPTH and NODE COUNT, in
+// packages/dtcg (MAX_DEPTH/MAX_NODES, checkBounds): a 30 KB document nested
+// 5000 deep — 1.5 % of this ceiling — used to make parseDocument throw
+// RangeError, i.e. a 500. checkBounds counts only objects and arrays, so a
+// flat document with millions of primitive values passes it; only this size
+// ceiling catches that. Both stay.
 const MAX_SERIALIZED_UNITS = 2_000_000
 
 const importBody = z.object({
@@ -78,17 +85,38 @@ export default defineEventHandler(async (event): Promise<ImportResponse> => {
     throw createError({ statusCode: 400, statusMessage: parsedBody.error.issues[0]?.message })
   }
   const { base, dark, dryRun } = parsedBody.data
-  for (const [name, document] of [
+  const documents = [
     ['base', base],
     ['dark', dark],
-  ] as const) {
+  ] as const
+
+  // 🔴 THE PARSER'S OWN BOUNDS FIRST, on both files, before anything else walks
+  // them. checkBounds is iterative (an explicit stack), so it cannot overflow
+  // on the depth it measures. The size check below used to come first, and its
+  // JSON.stringify RECURSES: on Linux (prod) a 5000-deep document overflowed it,
+  // and the catch answered 413 instead of the bound's 400 — on macOS the bound
+  // answered. One set of limits (MAX_DEPTH, MAX_NODES), one answer everywhere.
+  for (const [name, document] of documents) {
+    if (document === undefined) continue
+    const bound = checkBounds(document)
+    if (bound) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `the ${name} document is refused: ${bound.reason}`,
+        data: { code: bound.code, path: bound.path, reason: bound.reason },
+      })
+    }
+  }
+
+  // After checkBounds, depth is at most MAX_DEPTH, so stringify can no longer
+  // overflow on depth. The catch stays as defence in depth: at absurd sizes
+  // stringify throws "Invalid string length", and 413 is the right answer.
+  for (const [name, document] of documents) {
     if (document === undefined) continue
     let units: number
     try {
       units = JSON.stringify(document)?.length ?? 0
     } catch {
-      // stringify throws on a document too deep to serialize. That is itself a
-      // refusal, not a 500: the parser would reject it for depth anyway.
       throw createError({
         statusCode: 413,
         statusMessage: `the ${name} document could not be measured; it is too large or too deeply nested`,

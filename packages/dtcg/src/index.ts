@@ -23,6 +23,11 @@ export {
   type StudioTokens,
 } from './export'
 export {
+  // The parser's own iterative bounds, exported so the import endpoint checks a
+  // foreign document against the SAME limits before anything else walks it.
+  checkBounds,
+  MAX_DEPTH,
+  MAX_NODES,
   parseDocument,
   validTokenName,
   type ParseError,

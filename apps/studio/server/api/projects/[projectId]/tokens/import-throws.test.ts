@@ -27,6 +27,9 @@ vi.mock('drizzle-orm', () => ({
   max: () => null,
 }))
 vi.mock('@grundtone-studio/dtcg', () => ({
+  // The endpoint checks the parser's bounds first; this file is about the
+  // mapper throwing, so the bound lets every document through.
+  checkBounds: () => null,
   importTokens: () => {
     throw new RangeError('Maximum call stack size exceeded')
   },
