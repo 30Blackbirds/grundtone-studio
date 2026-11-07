@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { MAX_DEPTH } from '@grundtone-studio/dtcg'
 import {
   createSpies,
   fakeEvent,
@@ -34,8 +35,11 @@ vi.mock('drizzle-orm', () => ({
   max: () => null,
 }))
 
+/** Counts db.select calls, so a cell can say a guard refused BEFORE any DB access. */
+const dbReads = { selects: 0 }
 const dbMock = {
   select: (cols?: Record<string, unknown>) => {
+    dbReads.selects++
     const isMaxQuery = cols && 'value' in cols
     return {
       from: () => ({
@@ -100,6 +104,7 @@ beforeEach(() => {
   spies.updates.length = 0
   drafts.length = 0
   auditEvents.length = 0
+  dbReads.selects = 0
   requireProjectAccess.mockReset()
   requireProjectAccess.mockResolvedValue({
     userId: SESSION.user.id,
@@ -131,25 +136,38 @@ describe('POST /api/projects/[projectId]/tokens/import', () => {
   // cannot say anything about raw bodies, bytes on the wire, or "before
   // parsing". What it measures is the ceiling on the parsed document, and that
   // the refusal happens before any write.
-  it('refuses an oversized parsed document, and writes nothing', async () => {
-    const huge = {
-      color: Object.fromEntries([...Array(60_000)].map((_, i) => [`c${i}`, color([0, 0, 0])])),
-    }
-    await expect(
-      handler(fakeEvent({ params: { projectId: PROJECT.id }, body: { base: huge } })),
-    ).rejects.toMatchObject({ statusCode: 413 })
+  // Every refusal below is measured the same way: the status, the branch that
+  // produced it, nothing written, and no DB read (the guards run first).
+  type Refusal = { statusCode?: number; statusMessage?: string; data?: { code?: string } }
+  const refusalOf = async (body: Record<string, unknown>) =>
+    (await handler(fakeEvent({ params: { projectId: PROJECT.id }, body })).then(
+      () => null,
+      (e: unknown) => e,
+    )) as Refusal | null
+  const nothingTouched = () => {
     expect(spies.inserts).toHaveLength(0)
     expect(spies.updates).toHaveLength(0)
     expect(auditEvents).toHaveLength(0)
+    expect(dbReads.selects).toBe(0)
+  }
+
+  it('refuses a flat but oversized parsed document with 413 from the size ceiling', async () => {
+    // FLAT: two nodes, so checkBounds passes it and only the ceiling can say no.
+    const huge = { color: { $description: 'x'.repeat(2_100_000) } }
+    const error = await refusalOf({ base: huge })
+    expect(error?.statusCode).toBe(413)
+    expect(error?.statusMessage).toContain('larger than 2000000 serialized units')
+    expect(error?.statusMessage).not.toContain('could not be measured')
+    nothingTouched()
   })
 
   // The defect: a 30 KB document nested 5000 deep — 1.5 % of the size ceiling —
   // made the parser throw RangeError, so the endpoint answered 500 on an
   // unhandled exception. A refused file must be a 4xx with a reason.
-  const deeplyNested = () => {
+  const deeplyNested = (depth = 5000) => {
     const root: Record<string, unknown> = {}
     let node = root
-    for (let i = 0; i < 5000; i++) {
+    for (let i = 0; i < depth; i++) {
       const child: Record<string, unknown> = {}
       node[`g${i}`] = child
       node = child
@@ -157,27 +175,89 @@ describe('POST /api/projects/[projectId]/tokens/import', () => {
     node.token = color([0, 0, 0])
     return root
   }
+  /** `{ a: [[[ … ]]] }`: the same depth made of ARRAYS. */
+  const deeplyNestedArrays = (depth = 5000) => {
+    let node: unknown = []
+    for (let i = 1; i < depth; i++) node = [node]
+    return { a: node }
+  }
+  /** Plain nested objects, exactly `depth` levels deep as checkBounds counts them. */
+  const nestedTo = (depth: number) => {
+    let node: Record<string, unknown> = {}
+    for (let i = 1; i < depth; i++) node = { g: node }
+    return node
+  }
 
-  it('refuses a deeply nested document with a 4xx, not a 500, and writes nothing', async () => {
+  // The serialised length of a `deeplyNested()` document, measured WITHOUT
+  // recursion. 🔴 `JSON.stringify` of 5000 levels is itself a recursive walker:
+  // on Linux (node 24.20.0, arm64) it overflowed the stack on the sanity line,
+  // before the handler ran. The same fix as packages/dtcg's parse.test.ts (#378).
+  const jsonLength = (document: Record<string, unknown>) => {
+    let length = 0
+    let node = document
+    for (;;) {
+      const key = Object.keys(node).find((k) => /^g\d+$/.test(k))
+      // The innermost group holds only the token: shallow, safe to stringify.
+      if (key === undefined) return length + JSON.stringify(node).length
+      // `{` + `"key"` + `:` + child + `}`
+      length += 1 + JSON.stringify(key).length + 1 + 1
+      node = node[key] as Record<string, unknown>
+    }
+  }
+
+  it('measures a deep document the way JSON.stringify does (control for jsonLength)', () => {
+    for (const depth of [0, 1, 10, 500]) {
+      expect(jsonLength(deeplyNested(depth))).toBe(JSON.stringify(deeplyNested(depth)).length)
+    }
+  })
+
+  it('refuses a deeply nested document with 400 too_deep, not a 500, and writes nothing', async () => {
     const root = deeplyNested()
-    expect(JSON.stringify(root).length).toBeLessThan(200_000)
-    const error = (await handler(
-      fakeEvent({ params: { projectId: PROJECT.id }, body: { base: root } }),
-    ).then(
-      () => null,
-      (e: unknown) => e,
-    )) as { statusCode?: number; statusMessage?: string } | null
+    expect(jsonLength(root)).toBeLessThan(200_000)
+    const error = await refusalOf({ base: root })
     expect(error).not.toBeNull()
-    // 🔴 NAMING THE BRANCH, not just the status class. Measured: with the depth
-    // bound removed, this cell still passed — the catch below turned the
-    // RangeError into a 400, so "4xx" could not tell a BOUNDED refusal from a
-    // CAUGHT crash. The message distinguishes them: the bound produces a
-    // structural-error refusal, the catch produces "could not be read".
+    // 🔴 NAMING THE BRANCH, not just the status class. A 4xx alone cannot tell
+    // the BOUND's refusal from a CAUGHT crash: the old size check caught a
+    // RangeError from JSON.stringify and answered 413 "could not be measured"
+    // on Linux, and the import catch answers 400 "could not be read". The code
+    // is the bound's own.
     expect(error!.statusCode).toBe(400)
-    expect(error!.statusMessage).toContain('structural error')
-    expect(spies.inserts).toHaveLength(0)
-    expect(spies.updates).toHaveLength(0)
-    expect(auditEvents).toHaveLength(0)
+    expect(error!.data?.code).toBe('too_deep')
+    expect(error!.statusMessage).not.toContain('could not be measured')
+    expect(error!.statusMessage).not.toContain('could not be read')
+    nothingTouched()
+  })
+
+  it('refuses a deeply nested document made of ARRAYS with 400 too_deep', async () => {
+    const error = await refusalOf({ base: deeplyNestedArrays() })
+    expect(error?.statusCode).toBe(400)
+    expect(error?.data?.code).toBe('too_deep')
+    expect(error?.statusMessage).not.toContain('could not be measured')
+    nothingTouched()
+  })
+
+  it('refuses a document with more than MAX_NODES nodes with 400 too_many_nodes', async () => {
+    const wide = { color: Object.fromEntries([...Array(200_010)].map((_, i) => [`c${i}`, {}])) }
+    const error = await refusalOf({ base: wide })
+    expect(error?.statusCode).toBe(400)
+    expect(error?.data?.code).toBe('too_many_nodes')
+    expect(error?.statusMessage).not.toContain('could not be measured')
+    nothingTouched()
+  })
+
+  it('checks the dark file against the same bounds', async () => {
+    const error = await refusalOf({ base: BASE, dark: deeplyNested() })
+    expect(error?.statusCode).toBe(400)
+    expect(error?.data?.code).toBe('too_deep')
+    expect(error?.statusMessage).toContain('the dark document')
+    nothingTouched()
+  })
+
+  it('the bound is not vacuous: exactly MAX_DEPTH passes it, one more does not', async () => {
+    const atLimit = await refusalOf({ base: nestedTo(MAX_DEPTH), dryRun: true })
+    expect(atLimit?.data?.code).not.toBe('too_deep')
+    const overLimit = await refusalOf({ base: nestedTo(MAX_DEPTH + 1), dryRun: true })
+    expect(overLimit?.data?.code).toBe('too_deep')
   })
 
   it('a dry run of the same document is refused too, never reported as an empty but fine file', async () => {
