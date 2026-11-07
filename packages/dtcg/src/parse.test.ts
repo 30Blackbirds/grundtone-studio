@@ -177,9 +177,33 @@ describe('bounds on a foreign document ([sikkerhed] on #319)', () => {
     return root
   }
 
+  // The serialised length of a `deep()` document, measured WITHOUT recursion.
+  // 🔴 `JSON.stringify(deep(5000))` is itself a recursive walker: on Linux
+  // (node 24.20.0, arm64) it overflowed the stack before parseDocument ever
+  // ran, so the cell failed on its own sanity line and turbo aborted the rest
+  // of the suite. On macOS the larger frame budget hid it.
+  const jsonLength = (document: Record<string, unknown>) => {
+    let length = 0
+    let node = document
+    for (;;) {
+      const key = Object.keys(node).find((k) => /^g\d+$/.test(k))
+      // The innermost group holds only the token: shallow, safe to stringify.
+      if (key === undefined) return length + JSON.stringify(node).length
+      // `{` + `"key"` + `:` + child + `}`
+      length += 1 + JSON.stringify(key).length + 1 + 1
+      node = node[key] as Record<string, unknown>
+    }
+  }
+
+  it('measures a deep document the way JSON.stringify does (control for jsonLength)', () => {
+    for (const depth of [0, 1, 10, 500]) {
+      expect(jsonLength(deep(depth))).toBe(JSON.stringify(deep(depth)).length)
+    }
+  })
+
   it('refuses a document deeper than the limit instead of throwing', () => {
     const document = deep(5000)
-    expect(JSON.stringify(document).length).toBeLessThan(200_000) // small, yet fatal before
+    expect(jsonLength(document)).toBeLessThan(200_000) // small, yet fatal before
     let result!: ReturnType<typeof parseDocument>
     expect(() => {
       result = parseDocument(document)
