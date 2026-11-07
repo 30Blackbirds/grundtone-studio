@@ -56,6 +56,40 @@ describe('classifyUserTokenResponse (auth#194 answers)', () => {
       error: { statusCode: 502 },
     })
   })
+
+  describe('🔴 the fallthrough log carries status and code, never the body', () => {
+    const logged = (status: number, body: unknown) => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      classifyUserTokenResponse(status, body)
+      const out = error.mock.calls.map((args) => args.map(String).join(' ')).join('\n')
+      error.mockRestore()
+      return out
+    }
+    // A fake JWT, ASSEMBLED AT RUNTIME: a literal in this shape is what secret
+    // scanners look for, and one in git history turns every branch's scan red.
+    const b64 = (s: string) => Buffer.from(s).toString('base64url')
+    const jwt = [b64('{"alg":"ES256"}'), b64('{"sub":"user-1"}'), b64('signature')].join('.')
+
+    it('a token under a non-200 status is not logged', () => {
+      const out = logged(201, { token: jwt, code: 'CREATED' })
+      expect(out).toContain('auth answered 201 (code CREATED)')
+      expect(out).not.toContain(jwt)
+      expect(out).not.toContain('eyJ')
+    })
+
+    it('a code that is not shaped like auth codes is not echoed', () => {
+      const out = logged(500, { code: `leak ${jwt}` })
+      expect(out).toContain('auth answered 500 (code -)')
+      expect(out).not.toContain(jwt)
+    })
+
+    it('negative control: the spy sees what IS logged, so the absence above is measured', () => {
+      const out = logged(418, { code: 'TEAPOT', message: 'body-marker' })
+      expect(out).toContain('418')
+      expect(out).toContain('TEAPOT')
+      expect(out).not.toContain('body-marker')
+    })
+  })
 })
 
 describe('mintAccountUserToken', () => {

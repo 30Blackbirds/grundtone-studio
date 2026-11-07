@@ -68,7 +68,11 @@ export function classifyUserTokenResponse(
         "runtimeConfig.public.appUrl's origin is in auth's trustedOrigins",
     )
   } else {
-    console.error(`[account-user-token] auth answered ${status}:`, JSON.stringify(body))
+    // 🔴 Status and code only, never the body: an answer that carries the token
+    // under any status other than 200 would otherwise put a valid JWT in the
+    // log. The code is printed only when it has the shape of auth's codes.
+    const code = typeof b.code === 'string' && /^[A-Z0-9_]{1,64}$/.test(b.code) ? b.code : '-'
+    console.error(`[account-user-token] auth answered ${status} (code ${code})`)
   }
   return {
     kind: 'error',
