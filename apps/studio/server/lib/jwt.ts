@@ -44,6 +44,18 @@ function nonEmptyString(payload: JWTPayload, claim: string): string | undefined 
   return typeof raw === 'string' && raw.length > 0 ? raw : undefined
 }
 
+/**
+ * The reason a verification failed, safe to log: jose's error code, or the
+ * error's class name for anything else (a JWKS fetch that never reached jose).
+ * It takes only the error, never the token, so a log line built from it cannot
+ * carry token content.
+ */
+export function verifyFailureCode(err: unknown): string {
+  if (!(err instanceof Error)) return 'non-error'
+  const code = (err as { code?: unknown }).code
+  return typeof code === 'string' ? code : err.name
+}
+
 export function createJwtVerifier(options: JwtVerifierOptions): JwtVerifier {
   const getKey =
     options.keyResolver ??
@@ -55,6 +67,9 @@ export function createJwtVerifier(options: JwtVerifierOptions): JwtVerifier {
         issuer: options.issuer,
         audience: options.audience,
         algorithms: JWT_ALGORITHMS,
+        // jose checks `exp` only when present; without this a token that never
+        // expires is accepted.
+        requiredClaims: ['exp'],
       })
       const sub = nonEmptyString(payload, 'sub')
       if (sub === undefined) throw new Error('jwt missing sub claim')

@@ -1,6 +1,6 @@
 import { createLocalJWKSet, exportJWK, generateKeyPair, importJWK, SignJWT, type JWK } from 'jose'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createJwtVerifier, JWT_ALGORITHMS, JWT_CLAIM_ORG } from './jwt'
+import { createJwtVerifier, JWT_ALGORITHMS, JWT_CLAIM_ORG, verifyFailureCode } from './jwt'
 
 /**
  * The access-token verifier, measured with real keys rather than assumed: a
@@ -30,14 +30,15 @@ const verifier = () => verifierFor([jwk])
 
 const token = (
   claims: Record<string, unknown>,
-  opts: { key?: CryptoKey; iss?: string; aud?: string; alg?: string } = {},
+  // `exp: null` signs a token with no expiry at all.
+  opts: { key?: CryptoKey; iss?: string; aud?: string; alg?: string; exp?: number | null } = {},
 ) => {
   const jwt = new SignJWT(claims)
     .setProtectedHeader({ alg: opts.alg ?? 'RS256', kid: 'k1' })
     .setIssuer(opts.iss ?? ISSUER)
     .setAudience(opts.aud ?? AUDIENCE)
     .setIssuedAt()
-    .setExpirationTime('5m')
+  if (opts.exp !== null) jwt.setExpirationTime(opts.exp ?? '5m')
   if ('sub' in claims) jwt.setSubject(String(claims.sub))
   return jwt.sign(opts.key ?? rsaPair.privateKey)
 }
@@ -83,6 +84,45 @@ describe('access-token verifier', () => {
   it('CONTROL: a token without sub is refused', async () => {
     const t = await token({ [JWT_CLAIM_ORG]: 'org-9' })
     await expect(verifier().verify(t)).rejects.toThrow('jwt missing sub claim')
+  })
+})
+
+describe('🔴 exp is required', () => {
+  it('refuses a validly signed token that carries no exp', async () => {
+    const t = await token({ sub: 'user-1' }, { exp: null })
+    await expect(verifier().verify(t)).rejects.toMatchObject({
+      code: 'ERR_JWT_CLAIM_VALIDATION_FAILED',
+      claim: 'exp',
+      reason: 'missing',
+    })
+  })
+
+  it('CONTROL: an expired token is still refused as expired, not as missing', async () => {
+    const t = await token({ sub: 'user-1' }, { exp: Math.floor(Date.now() / 1000) - 60 })
+    await expect(verifier().verify(t)).rejects.toMatchObject({ code: 'ERR_JWT_EXPIRED' })
+  })
+
+  it('CONTROL: a token with a future exp still verifies', async () => {
+    const t = await token({ sub: 'user-1' })
+    await expect(verifier().verify(t)).resolves.toEqual({ sub: 'user-1', tenant: null })
+  })
+})
+
+describe('verifyFailureCode', () => {
+  it("returns jose's code for a jose error", async () => {
+    const t = await token({ sub: 'user-1' }, { key: otherKey })
+    const err = await verifier()
+      .verify(t)
+      .catch((e: unknown) => e)
+    expect(verifyFailureCode(err)).toBe('ERR_JWS_SIGNATURE_VERIFICATION_FAILED')
+  })
+
+  it('returns the class name for an error without a code', () => {
+    expect(verifyFailureCode(new TypeError('fetch failed'))).toBe('TypeError')
+  })
+
+  it('returns a fixed word for a thrown non-error', () => {
+    expect(verifyFailureCode('a string')).toBe('non-error')
   })
 })
 
