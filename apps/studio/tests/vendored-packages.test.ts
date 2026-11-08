@@ -32,31 +32,32 @@ describe('vendored @klanghaus packages', () => {
     return dir
   }
 
-  it('vendors exactly auth-jwt and permissions-client', () => {
-    expect(listPackages()).toEqual(['auth-jwt', 'permissions-client'])
+  // auth-jwt left the vendor tree for server/lib/jwt.ts (1amk32fn4a8).
+  it('vendors exactly permissions-client', () => {
+    expect(listPackages()).toEqual(['permissions-client'])
   })
 
-  it.each(['auth-jwt', 'permissions-client'])('%s matches its manifest', (name) => {
+  it.each(['permissions-client'])('%s matches its manifest', (name) => {
     expect(localProblems(join(VENDOR_ROOT, name))).toEqual([])
   })
 
-  it.each([
-    ['auth-jwt', '@klanghaus/auth-jwt', 6],
-    ['permissions-client', '@klanghaus/permissions-client', 3],
-  ])('%s: the manifest names %s and covers %i files from one commit', (name, pkg, count) => {
-    const dir = join(VENDOR_ROOT, name)
-    const m = readManifest(dir)
-    expect(m.package).toBe(pkg)
-    expect(m.sourceCommit).toMatch(/^[0-9a-f]{40}$/)
-    expect(Object.keys(m.files)).toHaveLength(count)
-    expect(listVendored(dir)).toEqual(Object.keys(m.files).sort())
-  })
+  it.each([['permissions-client', '@klanghaus/permissions-client', 3]])(
+    '%s: the manifest names %s and covers %i files from one commit',
+    (name, pkg, count) => {
+      const dir = join(VENDOR_ROOT, name)
+      const m = readManifest(dir)
+      expect(m.package).toBe(pkg)
+      expect(m.sourceCommit).toMatch(/^[0-9a-f]{40}$/)
+      expect(Object.keys(m.files)).toHaveLength(count)
+      expect(listVendored(dir)).toEqual(Object.keys(m.files).sort())
+    },
+  )
 
   it('CONTROL: a one-byte edit is reported as changed', () => {
-    const dir = copy('auth-jwt')
-    const file = join(dir, 'src/verify.ts')
+    const dir = copy('permissions-client')
+    const file = join(dir, 'src/connect.ts')
     writeFileSync(file, readFileSync(file, 'utf8') + ' ')
-    expect(localProblems(dir)).toEqual([expect.stringMatching(/^changed: src\/verify\.ts /)])
+    expect(localProblems(dir)).toEqual([expect.stringMatching(/^changed: src\/connect\.ts /)])
   })
 
   it('CONTROL: an extra file and a missing file are both reported', () => {
@@ -81,7 +82,7 @@ describe('vendored @klanghaus packages', () => {
   // identical, drift, cannot see, nothing compared — runs without network.
   // Cells taken from auth#183 ([sikkerhed], #354 verdict). Its live run
   // against the source repos is the Jenkins check on main.
-  describe.each(['auth-jwt', 'permissions-client'])('upstream: %s', (name) => {
+  describe.each(['permissions-client'])('upstream: %s', (name) => {
     const dir = join(VENDOR_ROOT, name)
     const manifest = readManifest(dir)
     const bytes = (path: string) => readFileSync(join(dir, path))

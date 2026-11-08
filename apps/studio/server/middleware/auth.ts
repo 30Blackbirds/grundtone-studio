@@ -1,4 +1,4 @@
-import { createJwtVerifier } from '../vendor/auth-jwt/src/index'
+import { createJwtVerifier, verifyFailureCode } from '~~/server/lib/jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
 import { authenticateProvisioningKey } from '~~/server/lib/provisioning-auth'
@@ -142,7 +142,11 @@ export default defineEventHandler(async (event) => {
       tenant: actor.tenant,
       email: actor.email,
     } satisfies AuthActor
-  } catch {
-    // Invalid/expired token — leave context.auth undefined.
+  } catch (err) {
+    // Invalid/expired token — leave context.auth undefined. The reason is
+    // logged, never the token: without it an algorithm change at the auth
+    // service (ERR_JOSE_ALG_NOT_ALLOWED) or an unreachable JWKS refuses every
+    // login without a trace, indistinguishable from ordinary expiry.
+    console.info(`[auth] access token refused: ${verifyFailureCode(err)}`)
   }
 })
