@@ -162,6 +162,18 @@ describe.skipIf(!DATABASE_URL)('tenant outbox (real Postgres)', () => {
       expect(await outbox.isTenantProvisioned(org)).toBe(true)
     })
 
+    it('🔴 a row is due at the instant it was queued, on the same clock', async () => {
+      // `now` is taken BEFORE the insert. With next_attempt_at from the column's
+      // DEFAULT now() (database clock, microseconds) the row was later than this
+      // `now` and not claimed, which is the race behind the intermittently red
+      // deliverDue and provisionNow cells in Jenkins.
+      const org = newOrg()
+      const now = new Date()
+      await outbox.enqueueTenantProvisioned({ id: org }, now)
+      fakeAccount(200, { accepted: true })
+      expect(await outbox.deliverDue({ organizationId: org, now })).toMatchObject({ delivered: 1 })
+    })
+
     it('a delivered row is never sent again', async () => {
       const org = newOrg()
       await outbox.enqueueTenantProvisioned({ id: org })

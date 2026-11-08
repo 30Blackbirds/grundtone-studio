@@ -128,6 +128,13 @@ export async function enqueueTenantProvisioned(
       eventType: 'tenantProvisioned',
       organizationId: org.id,
       event: buildTenantProvisioned(id, org, provisionedAt, now),
+      // 🔴 Due on the APP clock, not the column's `DEFAULT now()`. deliverDue
+      // compares next_attempt_at with a JS Date, and the lease and backoff are
+      // JS Dates too. The default is Postgres' clock in microseconds; a JS Date
+      // is milliseconds. A row delivered within the same millisecond, or with
+      // the database clock even slightly ahead, was "not due yet": checkout's
+      // provisionNow then reported false for an org account would have taken.
+      nextAttemptAt: now,
     })
     .onConflictDoNothing()
     .returning({ id: tenantEventOutbox.id })
