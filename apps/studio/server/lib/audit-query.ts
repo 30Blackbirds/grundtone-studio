@@ -1,4 +1,4 @@
-import { and, eq, gte, ilike, inArray, lt, or, type SQL } from 'drizzle-orm'
+import { and, eq, gte, ilike, inArray, lt, or, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import { auditLog } from '~~/server/db/schema'
 import { AUDIT_ACTIONS } from '~~/server/lib/audit'
@@ -38,9 +38,23 @@ export interface AuditFilters {
   qActions?: readonly string[]
   /** Lower bound for the period filter. */
   after?: Date
-  before?: Date
+  /**
+   * Cursor timestamp as ISO text, compared in Postgres. Not a Date: created_at
+   * keeps microseconds and a Date keeps milliseconds (see auditCursorAt).
+   */
+  before?: string
   beforeId?: string
 }
+
+/**
+ * created_at as ISO text with all six fractional digits, for the next-page
+ * cursor (ClickUp 1amk32fn4t1). The column defaults to now(), which keeps
+ * microseconds; `createdAt.toISOString()` cut the cursor to milliseconds, so
+ * the `created_at = cursor` branch matched nothing and every row sharing the
+ * last row's millisecond but younger than it was skipped. Measured on
+ * postgres:16 before this change: page 2 lost 2 of 3 rows in one millisecond.
+ */
+export const auditCursorAt = sql<string>`to_char(${auditLog.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 /** Escapes LIKE wildcards so user input matches literally. */
 export function escapeLike(input: string): string {
@@ -69,13 +83,15 @@ export function auditConditions(f: AuditFilters): SQL[] {
 
   if (f.before) {
     // Composite cursor on (created_at DESC, id DESC): strictly older, or the
-    // same timestamp with a smaller id. Without beforeId, plain `<`.
+    // same timestamp with a smaller id. Without beforeId, plain `<`. The cast
+    // happens in Postgres so the cursor keeps its microseconds.
+    const before = sql`${f.before}::timestamptz`
     const cursor = f.beforeId
       ? or(
-          lt(auditLog.createdAt, f.before),
-          and(eq(auditLog.createdAt, f.before), lt(auditLog.id, f.beforeId)),
+          sql`${auditLog.createdAt} < ${before}`,
+          and(sql`${auditLog.createdAt} = ${before}`, lt(auditLog.id, f.beforeId)),
         )
-      : lt(auditLog.createdAt, f.before)
+      : sql`${auditLog.createdAt} < ${before}`
     if (cursor) conds.push(cursor)
   }
   return conds
