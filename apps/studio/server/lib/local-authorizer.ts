@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3'
 import { and, eq, inArray } from 'drizzle-orm'
-import { db } from '../db'
 import { orgMember, project, projectMachineGrant, projectMember } from '../db/schema'
 import { isDevBypassSubject } from './dev-auth-bypass'
 import type { Authorizer } from './authorizer'
@@ -31,6 +30,13 @@ import type { OrgRelation, PdpVerdict, ProjectAction } from './pdp'
 // `allowed` and never `denied`, so an outage still reads as a 503.
 
 const MACHINE_PREFIX = 'machine:'
+
+// Loaded on first use, not at import: server/db throws when DATABASE_URL is
+// unset, and every module that imports authorizer.ts would otherwise need a
+// database to be imported, including under AUTHORIZER=pdp and in unit tests.
+async function database() {
+  return (await import('../db')).db
+}
 
 function getActor(event: H3Event) {
   return event.context.auth ?? null
@@ -65,7 +71,9 @@ async function userGrants(
   userId: string,
   projectIds: string[],
 ): Promise<Map<string, ProjectGrants>> {
-  const rows = await db
+  const rows = await (
+    await database()
+  )
     .select({
       projectId: project.id,
       orgRole: orgMember.role,
@@ -85,7 +93,9 @@ async function userGrants(
 }
 
 async function machineGrants(keyId: string, projectIds: string[]): Promise<Set<string>> {
-  const rows = await db
+  const rows = await (
+    await database()
+  )
     .select({ projectId: projectMachineGrant.projectId })
     .from(projectMachineGrant)
     .where(
@@ -145,7 +155,9 @@ export const localAuthorizer: Authorizer = {
     // Org roles are user relations only; a machine key never holds one.
     if (actor.sub.startsWith(MACHINE_PREFIX)) return 'denied'
     try {
-      const [row] = await db
+      const [row] = await (
+        await database()
+      )
         .select({ role: orgMember.role })
         .from(orgMember)
         .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, actor.sub)))
@@ -181,7 +193,9 @@ export const localAuthorizer: Authorizer = {
   async grantProjectRole(_event, projectId, subject, role) {
     // The invite-accept endpoint writes the same row with the member's email
     // right after this; it upserts, so the two writes agree.
-    await db
+    await (
+      await database()
+    )
       .insert(projectMember)
       .values({ projectId, userId: subject, role })
       .onConflictDoUpdate({
@@ -191,7 +205,9 @@ export const localAuthorizer: Authorizer = {
   },
 
   async revokeProjectRole(_event, projectId, subject, role) {
-    await db
+    await (
+      await database()
+    )
       .delete(projectMember)
       .where(
         and(
@@ -205,14 +221,18 @@ export const localAuthorizer: Authorizer = {
   async grantMachineProjectRole(_event, projectId, keyId, role) {
     // The table refuses anything but editor (check constraint), the same
     // least-privilege line the permissions model draws.
-    await db
+    await (
+      await database()
+    )
       .insert(projectMachineGrant)
       .values({ projectId, apiKeyId: keyId, role })
       .onConflictDoNothing()
   },
 
   async revokeMachineProjectRole(_event, projectId, keyId, role) {
-    await db
+    await (
+      await database()
+    )
       .delete(projectMachineGrant)
       .where(
         and(
