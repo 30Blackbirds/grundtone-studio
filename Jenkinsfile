@@ -226,10 +226,14 @@ klanghausPipeline(
       // Not a required context. UNMEASURED: that the App's installation can
       // read KlangHaus/auth and KlangHaus/platform — a 404 at a pin would show
       // it, as exit 2.
+      // `!ctx.isPR` alone also matched every other branch's push build, where
+      // the library refuses the token and the stage fails: that made
+      // `continuous-integration/jenkins/branch` red on every PR head (#376 to
+      // #383). The branch has to be named, not only the build kind.
       context: 'vendored @klanghaus upstream',
       githubToken: true,
       cmd: 'set -euo pipefail\nnode apps/studio/scripts/vendor-drift.mjs --upstream main',
-      when: { ctx -> !ctx.isPR },
+      when: { ctx -> !ctx.isPR && ctx.headRef == 'main' },
     ],
   ],
 )
