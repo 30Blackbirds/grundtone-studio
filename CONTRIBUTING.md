@@ -83,29 +83,13 @@ the server.
 
 ## Tags + releases
 
-Production deploys are triggered by a semver tag on `main`:
+A semver tag on `main` (`vX.Y.Z`) builds, signs and publishes the release image through
+**`build.yml`**. It no longer deploys anything: the `deploy-production` job, which copied the
+compose file and the Caddyfile to the production VM over SSH and restarted it, was removed (ClickUp
+1amk32fn4rv).
 
-```bash
-git checkout main
-git pull
-git tag v0.3.0
-git push --tags
-```
-
-Tag pushes are handled by the `deploy-production` job in **`build.yml`** (there is no
-`deploy-prod.yml`). It runs only after `image build + boot-smoke` has pushed an image that actually
-boots — `needs: build`.
-
-> 🔴 **There is NO approval gate on the production Environment.** An earlier version of this
-> document said the tag push "requires a manual approval in the `production` GitHub Environment".
-> That is not true and has never been true here: required reviewers on an Environment need GitHub
-> Enterprise, and our Team plan returns 422 on the attempt (verified by [infra] 2026-07-29, and
-> re-verified against `GET /repos/.../environments` on 2026-08-11 — **no environment carries any
-> protection rule**).
->
-> **Pushing the tag IS the deploy authorisation.** There is nothing between it and production, which
-> is exactly why only Allan cuts `v*` tags. A document that promises a barrier is worse than one
-> that says there is none — it makes people act as if someone else will catch the mistake.
+Production is deployed like the other stacks: Infra rolls out a cosign-verified image, authorised by
+Allan's phrase. Only Allan cuts `v*` tags.
 
 The SDK (`@grundtone/saas-client`) versions independently — see the Changesets-based flow in
 `klanghaus/docs/grundtone-studio/roadmap.md`.
@@ -114,11 +98,11 @@ The SDK (`@grundtone/saas-client`) versions independently — see the Changesets
 
 Three GitHub Environments map to deploy targets:
 
-| Environment  | Used by                           | Protection rules                       |
-| ------------ | --------------------------------- | -------------------------------------- |
-| `staging`    | `build.yml` / `deploy-staging`    | **None** — auto on every green develop |
-| `production` | `build.yml` / `deploy-production` | **None** — the tag push is the gate    |
-| `release`    | `sdk-release.yml`                 | **None**                               |
+| Environment  | Used by                                       | Protection rules                       |
+| ------------ | --------------------------------------------- | -------------------------------------- |
+| `staging`    | `build.yml` / `deploy-staging`                | **None** — auto on every green develop |
+| `production` | nothing since `deploy-production` was removed | **None**                               |
+| `release`    | `sdk-release.yml`                             | **None**                               |
 
 Measured against `GET /repos/KlangHaus/grundtone-studio/environments` on 2026-08-11: every
 environment reports an empty `protection_rules`. The environments are a **secret-scoping and audit

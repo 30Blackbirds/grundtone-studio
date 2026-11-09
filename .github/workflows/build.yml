@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 # Cancel earlier runs of the same ref so the latest commit wins; never cancel
-# tag deploys, those must always complete or fail loudly.
+# tag builds, those must always complete or fail loudly.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -215,10 +215,19 @@ jobs:
         # OBS: vi STRIPPER 'v'-prefiks fra ref_name fordi docker/metadata-action
         # publisher imaget som '0.1.3', ikke 'v0.1.3' (default semver-pattern).
         # Hvis vi ikke stripper, fejler deploy-job med "manifest unknown".
+        # The ref arrives through env, never spliced into the script, and a tag
+        # must be a semver tag: the trigger glob `v*.*.*` also matches names
+        # that are not, and this value becomes an image tag and a step output.
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            REF="${{ github.ref_name }}"
-            echo "value=${REF#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            if [[ ! "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::tag is not vX.Y.Z[-pre]: refusing to derive an image tag from it"
+              exit 1
+            fi
+            echo "value=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
           else
             # 🔴 `github.sha` er MERGE-commit'en paa et pull_request-event, ikke
             # PR'ens head. Linjen var korrekt saa laenge workflowet kun blev
@@ -762,180 +771,3 @@ jobs:
             fi
             echo "✓ $path 200"
           done
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # Production deploy — only on semver tags pushed to main.
-  # NOTE: the `production` Environment has NO required-reviewer gate — that
-  # protection rule needs GitHub Enterprise (verified by [infra] 2026-07-29;
-  # our Team plan 422s on the attempt). The human gate is therefore the TAG
-  # PUSH itself: pushing vX.Y.Z IS the deploy authorisation. Who may push
-  # v-tags is an Allan-level decision — do not cut tags without it.
-  # ─────────────────────────────────────────────────────────────────────────
-  deploy-production:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # packages: read → jobbets GITHUB_TOKEN kan pulle imaget fra ghcr; VM'en
-    # logger ind med det ephemeralt i deploy-scriptet og logger ud igen, så
-    # ingen langlivede registry-tokens ligger på serveren.
-    permissions:
-      contents: read
-      packages: read
-    environment:
-      name: production
-      url: https://studio.grundtone.com
-
-    steps:
-      - name: Snapshot before deploy
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd ~/grundtone-studio
-            cp .env.production .env.production.bak.$(date +%Y%m%d-%H%M%S)
-
-      # 🔴 Compose-filen SKAL synkroniseres ved hvert deploy. Indtil 2026-08-19
-      # kørte deploy-scriptet `compose -f docker-compose.production.yml` mod den
-      # fil der TILFÆLDIGVIS lå på VM'en — en håndplaceret kopi fra før #147.
-      # Konsekvens: healthcheck-rettelsen (#147, juli) var "bygget" i seks uger
-      # uden nogensinde at være "installeret"; prod-containeren stod unhealthy
-      # hele tiden ([infra], #222). Repoet er kilden, VM'en er et mål.
-      # 🔴 THE SPARSE LIST IS WHAT THE SMOKE TEST CAN REACH. Measured on the
-      # v0.4.0 deploy (run 35856126992, the first real production deploy since
-      # 23 August): the smoke step died on
-      #   ./.github/scripts/assert-served-revision.sh: No such file or directory
-      # because this checkout fetched only the compose file and the Caddyfile.
-      # The deploy itself had already succeeded, so production was live and
-      # UNVERIFIED — the revision assertion, the page checks and the Sentry
-      # EU-region assertion never ran. A guard that cannot be reached is not a
-      # guard. Anything the smoke step calls must be listed here.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          sparse-checkout: |
-            docker-compose.production.yml
-            Caddyfile
-            .github/scripts
-          sparse-checkout-cone-mode: false
-
-      - name: Sync compose + Caddyfile to host
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          source: docker-compose.production.yml,Caddyfile
-          target: ~/grundtone-studio
-          overwrite: true
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          envs: GHCR_USER,GHCR_TOKEN
-          # set -e er den reelle fail-fast-gate: appleboy v1 ignorerer
-          # script_stop, så uden den bliver et fejlet pull et grønt no-op-
-          # deploy (v0.1.6, #121).
-          script: |
-            set -euo pipefail
-            cd ~/grundtone-studio
-            export IMAGE_TAG=${{ needs.build.outputs.tag }}
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            # 🔴 sed der matcher INGEN linje er et stille no-op: IMAGE_TAG-linjen
-            # bliver ikke skrevet, og compose faldt (med det gamle `:-latest`)
-            # tilbage til et forældet image (AJ-opgave 3). Assertér at linjen
-            # FINDES bagefter med den værdi vi ville skrive.
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env.production
-            grep -qx "IMAGE_TAG=${IMAGE_TAG}" .env.production \
-              || { echo "::error::.env.production bærer ikke IMAGE_TAG=${IMAGE_TAG} efter sed — linjen mangler"; exit 1; }
-            docker compose --env-file .env.production -f docker-compose.production.yml pull
-            docker logout ghcr.io
-            docker compose --env-file .env.production -f docker-compose.production.yml up -d --remove-orphans --force-recreate
-            docker image prune -f
-
-      - name: Smoke test
-        # healthz alone let the v0.2.6 SSR regression through (API healthy,
-        # pages 500) — page routes are part of the smoke since 2026-07-29.
-        run: |
-          BASE=https://studio.grundtone.com
-          for i in $(seq 1 30); do
-            if curl -sf "$BASE/api/healthz" > /dev/null; then
-              echo "✓ production healthz responding"
-              break
-            fi
-            [ "$i" = 30 ] && { echo "✗ healthz timed out — investigate manually"; exit 1; }
-            echo "waiting ($i/30)…"
-            sleep 5
-          done
-
-          # 🔴 Svaret LAESES, ikke bare hentes. Foer denne assertion kastede
-          # smoken bodyen vaek (`> /dev/null`) og beviste kun, at endpointet
-          # SVAREDE — et image der regredierede til revision:"unknown" ville
-          # have bestaaet. Handlerens egen kommentar sagde det: feltet er det
-          # ene ben, dommeren manglede.
-          #
-          # Maales paa den OFFENTLIGE vhost, ikke over localhost: en Caddy der
-          # svarer fra en foraeldet upstream er praecis det, dette fanger.
-          ./.github/scripts/assert-served-revision.sh "$BASE" "$GITHUB_SHA"
-
-          for path in /login /signup /dashboard; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
-            if [ "$code" != "200" ]; then
-              echo "✗ $path returned $code — investigate manually"
-              exit 1
-            fi
-            echo "✓ $path 200"
-          done
-
-          # 🔴 Regionen i DSN'en er JURIDISK bærende: privatlivspolitikkens
-          # §2.5 og §6 siger "Sentry, EU-region", og det er sandt PRÆCIS fordi
-          # DSN'en peger på ingest.de.sentry.io. Regionen bor i en env-var, så
-          # et projekt-/regionsskifte gør to publicerede sætninger falske uden
-          # at teksten er rørt ([infra]-fund 2026-08-19, [jura] bekræftede at
-          # teksten er korrekt i dag). En unit-test ville måle CI's env — her
-          # måles den værdi der FAKTISK serveres til brugerne.
-          # 🔴 FORANKRET, ikke en substring-søgning ([review]-fund): et løst
-          # grep paa 'ingest.de.sentry.io' accepterer ogsaa
-          # evil.ingest.de.sentry.io.attacker.example, fordi substrengen findes
-          # et sted. Moenstret skal matche SAMME form som EU_INGEST-regexen i
-          # server/lib/sentry-region.test.ts — ellers er de to haandhaevelser
-          # ikke samme regel, og enhedstesten vogter kun det ene sted.
-          # 🔴 LÆS EN SIDE DER SVARER, IKKE EN REDIRECT (KH-1192, målt på
-          # v0.4.0-deployet). Denne assertion læste `$BASE/`, og i prod er `/`
-          # en 307 til /dashboard med en krop på 96 BYTES — ingen HTML, ingen
-          # DSN. Kombineret med `[ -n "$dsn" ] &&` betød "fandt intet"
-          # BESTÅET, så assertionen var vakuum-grøn ved konstruktion: den kunne
-          # ikke fyre uanset hvor DSN'en pegede hen. Målt samtidig: på /login
-          # (200) ER DSN'en der, og den ER EU-ingest — så det var vagten der
-          # var blind, ikke produktet der manglede fejlrapportering.
-          # /login vælges frem for -L, fordi den er en ægte 200-side uden login
-          # og uden at afhænge af hvor en redirect peger hen i morgen.
-          dsn=$(curl -s "$BASE/login" | grep -o 'sentryDsn:"[^"]*"' | head -1)
-          # 🔴 DE TO FEJL MÅ IKKE DELE UDFALD. En manglende DSN (fejlrapporten
-          # er væk) og en DSN i forkert region (en publiceret juridisk sætning
-          # er falsk) er forskellige fejl og får hver sin røde.
-          if [ -z "$dsn" ]; then
-            echo "::error::Ingen sentryDsn i den serverede /login. Enten er fejlrapporteringen væk i dette miljø, eller også serveres den ikke længere i HTML — og så måler denne assertion intet. Se KH-1192."
-            exit 1
-          fi
-          if ! printf '%s' "$dsn" \
-            | grep -qE '^sentryDsn:"https://[^@"]+@[^.")]+\.ingest\.de\.sentry\.io/'; then
-            echo "::error::Serveret sentryDsn peger IKKE på EU-ingest. Privatlivspolitikkens §2.5 og §6 siger 'Sentry, EU-region' — flyt DSN'en tilbage, eller ret begge tekster med [jura]."
-            exit 1
-          fi
-          echo "✓ serveret Sentry-DSN er EU-ingest (§2.5 holder): ${dsn%%@*}@…"
-
-      - name: Notify
-        if: always()
-        run: |
-          STATUS="${{ job.status }}"
-          echo "Production deploy ${{ needs.build.outputs.tag }}: $STATUS"
-          # TODO Phase F: post to Slack/Discord webhook from secrets
