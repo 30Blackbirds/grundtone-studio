@@ -5,7 +5,7 @@ import { apiKey } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { generateApiKey } from '~~/server/lib/api-keys'
 import { API_KEY_ENVIRONMENTS } from '~~/server/lib/constants'
-import { grantMachineProjectRole } from '~~/server/lib/pdp'
+import { grantMachineProjectRole } from '~~/server/lib/authorizer'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
 const bodySchema = z.object({

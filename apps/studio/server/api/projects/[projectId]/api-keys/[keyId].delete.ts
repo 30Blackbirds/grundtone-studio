@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { apiKey } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
-import { revokeMachineProjectRole } from '~~/server/lib/pdp'
+import { revokeMachineProjectRole } from '~~/server/lib/authorizer'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 
 defineRouteMeta({

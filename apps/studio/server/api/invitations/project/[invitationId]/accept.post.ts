@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { project, projectInvitation, projectMember } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
-import { grantProjectRole } from '~~/server/lib/pdp'
+import { grantProjectRole } from '~~/server/lib/authorizer'
 import { PROJECT_ROLES, type ProjectRole } from '~~/server/lib/project-access'
 
 function asProjectRole(role: string): ProjectRole {

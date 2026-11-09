@@ -222,6 +222,55 @@ export const projectMember = pgTable(
   ],
 )
 
+// Org roles for the LOCAL authorizer (server/lib/local-authorizer.ts). With
+// AUTHORIZER=pdp the permissions service holds them and this table is unread.
+// It exists because the JWT carries the org id but no role, and studio had no
+// other local record of who holds which org role.
+//
+// One role per (org, user): studio's own UI treats org roles as a single rank
+// (ORG_ROLES), even though the permissions model could store several.
+export const orgMember = pgTable(
+  'org_member',
+  {
+    organizationId: text().notNull(),
+    // Central user id (= JWT sub).
+    userId: text().notNull(),
+    role: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('org_member_unique_idx').on(t.organizationId, t.userId),
+    index('org_member_user_idx').on(t.userId),
+    // A role the authorizer does not know would grant nothing and look like a
+    // permission bug; refuse it at the write instead.
+    check(
+      'org_member_role_known',
+      sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,
+    ),
+  ],
+)
+
+// Machine (per-project secret key) grants for the LOCAL authorizer: the
+// counterpart of the permissions model's `editor: [user, machine]`. A key can
+// only ever be editor, never admin, so a key cannot raise its own rights.
+export const projectMachineGrant = pgTable(
+  'project_machine_grant',
+  {
+    projectId: uuid()
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    apiKeyId: uuid()
+      .notNull()
+      .references(() => apiKey.id, { onDelete: 'cascade' }),
+    role: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('project_machine_grant_unique_idx').on(t.projectId, t.apiKeyId),
+    check('project_machine_grant_editor_only', sql`${t.role} = 'editor'`),
+  ],
+)
+
 // Postmark delivery / bounce / spam-complaint events, captured via the
 // /api/email/webhook receiver. Append-only — used to attribute hard bounces
 // to a recipient and to flag spam complaints. The full webhook body is

@@ -3,6 +3,7 @@ import { db } from '~~/server/db'
 import { activeVersion, project } from '~~/server/db/schema'
 import { countActiveBrands } from './brand-quota'
 import { PORTAL_KEY } from './entitlements'
+import { billingEnabled } from './runtime-flags'
 
 // Tells account how many active brands an org has, so Stripe bills the
 // overage Studio shows (Allan 2026-10-27: «ingen skjulte ting … fuld
@@ -30,6 +31,8 @@ export type BrandCountOutcome =
   | { kind: 'stale' }
   | { kind: 'no_subscription' }
   | { kind: 'dormant' }
+  /** FEATURE_BILLING=off: there is no billing to report to. */
+  | { kind: 'billing_off' }
   | { kind: 'failed'; error: string }
 
 /**
@@ -68,6 +71,9 @@ export function currentBrandCount(organizationId: string): Promise<number> {
 
 /** Reads the org's active brands now and sets that number on account. */
 export async function reportBrandCount(organizationId: string): Promise<BrandCountOutcome> {
+  // Checked before ACCOUNT_URL: with billing off, a configured account URL is
+  // still not a reason to send it brand counts.
+  if (!billingEnabled()) return { kind: 'billing_off' }
   const accountUrl = process.env.ACCOUNT_URL
   if (!accountUrl) return { kind: 'dormant' }
   try {

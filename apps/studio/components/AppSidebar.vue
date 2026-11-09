@@ -11,6 +11,7 @@
     canManageBilling,
   } = useOrgContext()
   const route = useRoute()
+  const { billingEnabled } = useFeatures()
   const session = useSession()
 
   const userName = computed(
@@ -119,7 +120,7 @@
           </li>
           <!-- Egen gate (wireframe-nav-ia §3): den rene billing-rolle skal se
                Fakturering UDEN at kunne se Indstillinger/Revisionslog. -->
-          <li v-if="canManageBilling">
+          <li v-if="canManageBilling && billingEnabled">
             <NuxtLink
               :to="`/orgs/${activeSlug}/billing`"
               :class="[linkClass, { [activeClass]: isBillingActive }]"

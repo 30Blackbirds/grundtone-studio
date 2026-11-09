@@ -8,6 +8,7 @@ import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
 import { provisionNow } from '~~/server/lib/tenant-outbox'
+import { requireBillingEnabled } from '~~/server/lib/runtime-flags'
 
 // §1a-ruling (jura 2026-08-02) + Allans §0 B2B-afskæring: ingen session uden
 // aktivt vilkårs-accept-bevis og erhvervs-erklæring — 400, ikke default.
@@ -41,6 +42,7 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  requireBillingEnabled()
   const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
   // Bliver stående FØR org-opslaget. MÅLT 2026-08-28: tjekket kan i dag ikke
   // fyre — `bodySchema`s enum admitterer kun studio_solo/_studio/_scale, og

@@ -1,4 +1,5 @@
 import { orgsWithBrands, reportBrandCount } from '~~/server/lib/brand-count'
+import { billingEnabled } from '~~/server/lib/runtime-flags'
 
 // Scheduled daily in nuxt.config.ts. Re-sends every org's active-brand count
 // to account, so a report lost at publish time (account down, a timeout) is
@@ -12,6 +13,8 @@ export default defineTask({
     description: 'Re-send each org’s active-brand count to account (overage billing)',
   },
   async run() {
+    // FEATURE_BILLING=off: nothing is billed, so there is nothing to heal.
+    if (!billingEnabled()) return { result: { billing_off: 1 } }
     const tally: Record<string, number> = {}
     for (const orgId of await orgsWithBrands()) {
       const outcome = await reportBrandCount(orgId)

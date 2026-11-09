@@ -7,7 +7,7 @@ import { recordAuditEvent } from '~~/server/lib/audit'
 import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
-import { grantProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
+import { grantProjectRole, linkProjectToOrg } from '~~/server/lib/authorizer'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(120),

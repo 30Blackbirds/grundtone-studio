@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3'
 import { z } from 'zod'
 import { getBillingInvoices, getBillingSubscription } from '~~/server/lib/billing-read'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
+import { requireBillingEnabled } from '~~/server/lib/runtime-flags'
 
 const querySchema = z.object({ organizationSlug: z.string().min(1) })
 
@@ -15,6 +16,7 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  requireBillingEnabled()
   const { actor, data } = requireAuthedRequest(event, querySchema, getQuery(event))
 
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')

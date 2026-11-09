@@ -19,6 +19,13 @@
   const slug = computed(() => route.params.slug as string)
   const { activeOrg, canManageBilling } = useOrgContext()
 
+  // FEATURE_BILLING=off: the page does not exist in this deployment, the same
+  // 404 its API routes answer.
+  const features = await $fetch<{ billing: boolean }>('/api/features')
+  if (!features.billing) {
+    throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
+  }
+
   interface Overview {
     available: boolean
     subscription: BillingSubscription | null

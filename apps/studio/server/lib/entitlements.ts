@@ -1,5 +1,6 @@
 import { createError } from 'h3'
 import { z } from 'zod'
+import { billingEnabled } from './runtime-flags'
 
 // Studio-side client for account's entitlements-API, per the locked contract
 // .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md (2026-07-29):
@@ -249,8 +250,36 @@ const FEATURE_MESSAGES: Record<Exclude<FeatureVerdict, { allowed: true }>['code'
   feature_not_enabled: "The organization's plan does not include the provisioning API",
 }
 
+/**
+ * 🔴 UNDECIDED ON PURPOSE (ClickUp 1amk32fn9r6, decision D-E2). With
+ * FEATURE_BILLING=off there is no plan, and what a paid feature does then is
+ * Allan's choice: (a) every org has it (self-host), or (b) every org is on the
+ * free plan and does not. Picking either here would make that choice in code.
+ *
+ * Until it is made, the gate refuses with its own code and status, so the
+ * answer cannot be mistaken for either side: not 403 `feature_not_enabled`
+ * (that is (b)) and not a grant (that is (a)). 501 says "this deployment has
+ * not decided", which is the true state. Replace this function, and its cells,
+ * with the decided rule.
+ */
+export function billingOffFeatureVerdict(): {
+  allowed: false
+  status: 501
+  code: 'billing_off_undecided'
+} {
+  return { allowed: false, status: 501, code: 'billing_off_undecided' }
+}
+
 /** Throws the verdict as an H3 error; returns when the org may use provisioning. */
 export async function requireProvisioningFeature(orgId: string): Promise<void> {
+  if (!billingEnabled()) {
+    const off = billingOffFeatureVerdict()
+    throw createError({
+      statusCode: off.status,
+      statusMessage: 'Paid features with billing off are not decided for this deployment',
+      data: { code: off.code },
+    })
+  }
   const verdict = evaluateProvisioningFeature(await getStudioEntitlements(orgId))
   if (verdict.allowed) return
   if (verdict.code === 'entitlements_unavailable') {

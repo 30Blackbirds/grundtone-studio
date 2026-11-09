@@ -43,3 +43,16 @@ describe('billing:brand-count-reconcile', () => {
     expect(warn.mock.calls[0]![0]).toBe('[brand-count-reconcile] org a: billed count 11 → 13')
   })
 })
+
+describe('billing:brand-count-reconcile with FEATURE_BILLING=off', () => {
+  it('reports no org and sends nothing', async () => {
+    process.env.FEATURE_BILLING = 'off'
+    reportBrandCount.mockClear()
+    try {
+      await expect(task.run()).resolves.toEqual({ result: { billing_off: 1 } })
+      expect(reportBrandCount).not.toHaveBeenCalled()
+    } finally {
+      process.env.FEATURE_BILLING = 'on'
+    }
+  })
+})

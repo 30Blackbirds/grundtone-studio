@@ -281,6 +281,30 @@ describe('requireProvisioningFeature — the real client, both null branches', (
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  // 🔴 D-E2 is undecided (ClickUp 1amk32fn9r6). With billing off the gate must
+  // answer neither side: not a grant (option a) and not 403
+  // feature_not_enabled (option b), whatever account would have said.
+  it('FEATURE_BILLING=off: 501 billing_off_undecided, even for an org that HAS the feature', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'off')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent({ features: [PROVISIONING_FEATURE] }))
+    await expect(requireProvisioningFeature('org-ok')).rejects.toMatchObject({
+      statusCode: 501,
+      data: { code: 'billing_off_undecided' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('FEATURE_BILLING=off: the same 501 for a free org, not its 403', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'off')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent())
+    await expect(requireProvisioningFeature('org-free')).rejects.toMatchObject({
+      statusCode: 501,
+      data: { code: 'billing_off_undecided' },
+    })
+  })
+
   it('AC-E1 end to end: a free org → 403 feature_not_enabled', async () => {
     vi.stubEnv('ACCOUNT_URL', 'https://account.test')
     answer(ent())
