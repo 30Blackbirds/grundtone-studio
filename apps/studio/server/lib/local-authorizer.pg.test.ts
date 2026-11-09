@@ -80,6 +80,35 @@ describe.skipIf(!DATABASE_URL)('localAuthorizer (real Postgres)', () => {
     expect(await authz.checkProject(event('billing-u'), p1, 'can_view')).toBe('denied')
   })
 
+  // 🔴 Sikkerhed F1 on #386: access derived from an org role must end the
+  // moment the org_member row does, with no cached or derived grant left. What
+  // this cell does NOT show is that anything deletes the row: org membership
+  // is written in auth today, so under AUTHORIZER=local the row would stay.
+  it('removing an org member ends every project access derived from the org role', async () => {
+    await db
+      .insert(schema.orgMember)
+      .values({ organizationId: org, userId: 'leaver', role: 'admin' })
+    expect(await authz.checkProject(event('leaver'), p1, 'can_view')).toBe('allowed')
+    expect(await authz.checkOrg(event('leaver'), org, 'admin')).toBe('allowed')
+    await db.delete(schema.orgMember).where(eq(schema.orgMember.userId, 'leaver'))
+    expect(await authz.checkProject(event('leaver'), p1, 'can_view')).toBe('denied')
+    expect(await authz.checkProject(event('leaver'), p2, 'can_view')).toBe('denied')
+    expect(await authz.checkOrg(event('leaver'), org, 'admin')).toBe('denied')
+  })
+
+  it('a demoted member loses what the higher role gave', async () => {
+    await db
+      .insert(schema.orgMember)
+      .values({ organizationId: org, userId: 'demoted', role: 'manager' })
+    expect(await authz.checkProject(event('demoted'), p1, 'can_admin')).toBe('allowed')
+    await db
+      .update(schema.orgMember)
+      .set({ role: 'member' })
+      .where(eq(schema.orgMember.userId, 'demoted'))
+    expect(await authz.checkProject(event('demoted'), p1, 'can_admin')).toBe('denied')
+    expect(await authz.checkProject(event('demoted'), p1, 'can_view')).toBe('allowed')
+  })
+
   it('checkOrg reads the exact role', async () => {
     expect(await authz.checkOrg(event('owner-u'), org, 'owner')).toBe('allowed')
     expect(await authz.checkOrg(event('owner-u'), org, 'member')).toBe('denied')
