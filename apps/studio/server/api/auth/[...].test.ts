@@ -80,3 +80,73 @@ describe('/api/auth/[...] BFF-proxy', () => {
     expect(opts?.fetchOptions?.redirect).toBe('manual')
   })
 })
+
+// Org membership is written through studio's routes, which also record the role
+// in studio. This proxy refuses the seven auth writes (a stale page fails
+// loudly) and strips a browser-sent org-write credential on every path.
+describe('/api/auth/[...]: org membership writes go through studio', () => {
+  const WRITES = [
+    'organization/create',
+    'organization/delete',
+    'organization/invite-member',
+    'organization/accept-invitation',
+    'organization/update-member-role',
+    'organization/remove-member',
+    'organization/leave',
+  ]
+
+  it.each(WRITES)('%s: 403 use_studio_route, never proxied', (p) => {
+    vi.stubEnv('AUTH_INTERNAL_URL', 'http://auth:3000')
+    expect(() => handler({ path: `/api/auth/${p}` })).toThrow(
+      expect.objectContaining({ statusCode: 403, data: { code: 'use_studio_route' } }),
+    )
+    expect(proxyRequestMock).not.toHaveBeenCalled()
+  })
+
+  // A router may still match these spellings, so the block must too.
+  it.each([
+    '/api/auth/organization/leave/',
+    '/api/auth//organization//leave',
+    '/api/auth/organization%2Fleave',
+    '/api/auth/Organization/Leave?x=1',
+    '/api/auth/organization/le%61ve',
+    '/api/auth/organization/leave%E0%A4%A',
+  ])('the spelling %s is refused too', (path) => {
+    vi.stubEnv('AUTH_INTERNAL_URL', 'http://auth:3000')
+    expect(() => handler({ path })).toThrow(expect.objectContaining({ statusCode: 403 }))
+    expect(proxyRequestMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'organization/update',
+    'organization/set-active',
+    'organization/cancel-invitation',
+    'organization/reject-invitation',
+    'organization/list',
+    'organization/get-full-organization',
+    'organization/leave-summary',
+  ])('%s is still proxied (not one of the seven)', async (p) => {
+    vi.stubEnv('AUTH_INTERNAL_URL', 'http://auth:3000')
+    await handler({ path: `/api/auth/${p}` })
+    expect(proxyRequestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('a browser-sent org-write credential is stripped before proxying; other headers stay', async () => {
+    vi.stubEnv('AUTH_INTERNAL_URL', 'http://auth:3000')
+    const event = {
+      path: '/api/auth/get-session',
+      node: {
+        req: {
+          headers: { cookie: 'session=abc', 'x-klanghaus-org-write-credential': 'forged' },
+        },
+      },
+    }
+    await (handler as unknown as (e: typeof event) => Promise<unknown>)(event)
+    const proxied = proxyRequestMock.mock.calls[0]![0] as typeof event
+    // Measured against the real h3: what its proxy would forward.
+    const { getProxyRequestHeaders } = await vi.importActual<typeof import('h3')>('h3')
+    const forwarded = getProxyRequestHeaders(proxied as never)
+    expect(forwarded).not.toHaveProperty('x-klanghaus-org-write-credential')
+    expect(forwarded).toHaveProperty('cookie', 'session=abc')
+  })
+})

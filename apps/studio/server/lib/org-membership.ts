@@ -6,7 +6,7 @@ import type { Db } from '../db'
 import * as schema from '../db/schema'
 import { auditLog, orgMember } from '../db/schema'
 import { auditRow, type AuditEventInput } from './audit'
-import { canAssignRole, canManageMember } from './org-membership-input'
+import { canAssignRole, canManageMember, ORG_WRITE_CREDENTIAL_HEADER } from './org-membership-input'
 import { recordOrgWriteIncomplete } from './metrics'
 import { ORG_ROLES, orgRoleHelpers, type OrgRole } from './project-access'
 
@@ -83,13 +83,7 @@ export interface MembershipDeps {
 
 const AUTH_TIMEOUT_MS = 10_000
 
-/**
- * The header auth will require on its org-membership writes (ClickUp
- * 1amk32fna12), so that only studio's server can make them. Its value is a
- * server-only secret: read from process.env here, never from public runtime
- * config, and never attached by the generic /api/auth proxy.
- */
-export const ORG_WRITE_CREDENTIAL_HEADER = 'x-klanghaus-org-write-credential'
+export { ORG_WRITE_CREDENTIAL_HEADER }
 
 /** Where and how studio's server reaches auth for org writes (membershipDeps). */
 export interface OrgWriteTarget {
