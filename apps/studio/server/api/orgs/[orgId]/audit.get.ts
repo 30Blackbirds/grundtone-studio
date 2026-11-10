@@ -1,8 +1,8 @@
-import { and, desc } from 'drizzle-orm'
+import { and, desc, getTableColumns } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { auditLog } from '~~/server/db/schema'
 import { resolveMachineActors } from '~~/server/lib/audit-actors'
-import { auditConditions, auditFilterSchema } from '~~/server/lib/audit-query'
+import { auditConditions, auditCursorAt, auditFilterSchema } from '~~/server/lib/audit-query'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
 const PAGE_SIZE = 50
@@ -11,7 +11,8 @@ const PAGE_SIZE = 50
 // created_at would skip or duplicate rows whenever two events share the same
 // millisecond — likely in bursty signup/publish flows. The cursor is the last
 // seen (createdAt, id); the next page asks for rows strictly less than that
-// tuple in the same ordering.
+// tuple in the same ordering. The cursor's timestamp is read as text with
+// microseconds (auditCursorAt); a JS Date would cut it to milliseconds.
 
 defineRouteMeta({
   openAPI: {
@@ -44,12 +45,12 @@ export default defineEventHandler(async (event) => {
     q,
     qActions,
     after: after ? new Date(after) : undefined,
-    before: before ? new Date(before) : undefined,
+    before,
     beforeId,
   })
 
   const rows = await db
-    .select()
+    .select({ ...getTableColumns(auditLog), cursorAt: auditCursorAt })
     .from(auditLog)
     .where(and(...conds))
     .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
@@ -63,12 +64,12 @@ export default defineEventHandler(async (event) => {
     orgId,
     page.map((r) => r.actorUserId),
   )
-  const items = page.map((r) => ({
+  const items = page.map(({ cursorAt: _cursorAt, ...r }) => ({
     ...r,
     actorKey: (r.actorUserId && keys.get(r.actorUserId)) || null,
   }))
-  const last = items[items.length - 1]
-  const nextBefore = hasMore && last ? last.createdAt.toISOString() : null
+  const last = page[page.length - 1]
+  const nextBefore = hasMore && last ? last.cursorAt : null
   const nextBeforeId = hasMore && last ? last.id : null
 
   return { items, nextBefore, nextBeforeId }
