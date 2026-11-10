@@ -16,8 +16,14 @@ vi.mock('./project-access', () => ({
 const fetchMock = vi.fn()
 vi.stubGlobal('$fetch', fetchMock)
 
-const { authCaller, AuthOutcomeUnknown, AuthRefused, ORG_WRITE_CREDENTIAL_HEADER, orgWriteTarget } =
-  await import('./org-membership')
+const {
+  authCaller,
+  AuthOutcomeUnknown,
+  AuthRefused,
+  ORG_WRITE_CREDENTIAL_HEADER,
+  orgWriteTarget,
+  unlockOutcome,
+} = await import('./org-membership')
 
 const SECRET = 's'.repeat(32)
 const target = { base: 'http://auth.internal', credential: SECRET }
@@ -169,5 +175,24 @@ describe('orgWriteTarget in production: where the credential may go', () => {
         }),
       ).toThrow(expect.objectContaining({ statusCode: 503 }))
     }
+  })
+})
+
+// The unlock decision (A2 hygiene). Terminating a backend is only right when
+// the one that took the lock answered false; a thrown unlock never reaches
+// this function and terminates nothing (the caller maps it to 'threw').
+describe('unlockOutcome: when a backend may be terminated', () => {
+  it('the locking backend answers true: unlocked', () => {
+    expect(unlockOutcome(42, { ok: true, pid: 42 })).toBe('unlocked')
+  })
+  it('the locking backend answers false: terminate (it is alive and holds the lock)', () => {
+    expect(unlockOutcome(42, { ok: false, pid: 42 })).toBe('terminate')
+  })
+  it('another backend answers (the connection was replaced): nothing is terminated', () => {
+    expect(unlockOutcome(42, { ok: false, pid: 77 })).toBe('replaced')
+    expect(unlockOutcome(42, { ok: true, pid: 77 })).toBe('replaced')
+  })
+  it('no row: nothing is terminated', () => {
+    expect(unlockOutcome(42, undefined)).toBe('replaced')
   })
 })

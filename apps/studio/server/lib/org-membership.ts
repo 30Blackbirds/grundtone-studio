@@ -378,24 +378,51 @@ export async function withOrgLockOn<T>(
       // (postgres.js max_lifetime). If the unlock does not say true, end that
       // backend instead (Postgres then drops its locks), so the org is not
       // left "busy" behind a pooled connection.
-      let unlocked = false
+      //
+      // Only a FALSE answer from the SAME backend that took the lock: then it is
+      // alive and still holds it. If the unlock THROWS, or answers from another
+      // backend (the connection was replaced), the session that held the lock
+      // is gone, Postgres has dropped its locks, and the old pid may since
+      // belong to an unrelated session, so nothing is terminated.
+      let answer: UnlockOutcome
       try {
-        const [row] = await reserved<{ ok: boolean }[]>`
-          select pg_advisory_unlock(hashtext(${key})) as ok`
-        unlocked = row?.ok === true
+        const [row] = await reserved<{ ok: boolean; pid: number }[]>`
+          select pg_advisory_unlock(hashtext(${key})) as ok, pg_backend_pid() as pid`
+        answer = unlockOutcome(pid, row)
       } catch {
-        unlocked = false
+        answer = 'threw'
       }
-      if (!unlocked) {
+      if (answer === 'terminate') {
         recordOrgWriteIncomplete('unlock_failed')
-        console.error('[org-membership] advisory unlock failed; ending that connection')
+        console.error('[org-membership] advisory unlock answered false; ending that connection')
         await db.$client`select pg_terminate_backend(${pid})`.catch(() => {})
+      } else if (answer !== 'unlocked') {
+        recordOrgWriteIncomplete('unlock_failed')
+        console.error(
+          `[org-membership] advisory unlock ${answer === 'threw' ? 'threw' : 'ran on a replaced connection'}; the locking session is gone, nothing ended`,
+        )
       }
     }
   } finally {
     activeOrgWrites--
     reserved?.release()
   }
+}
+
+export type UnlockOutcome = 'unlocked' | 'terminate' | 'threw' | 'replaced'
+
+/**
+ * What to do after the unlock answered. Terminate ONLY when the backend that
+ * took the lock answered false: it is alive and still holds the lock. An
+ * answer from another backend means the locking session is gone (and its pid
+ * may belong to someone else now).
+ */
+export function unlockOutcome(
+  lockPid: number,
+  row: { ok?: boolean; pid?: number } | undefined,
+): UnlockOutcome {
+  if (!row || row.pid !== lockPid) return 'replaced'
+  return row.ok === true ? 'unlocked' : 'terminate'
 }
 
 /** withOrgLockOn for the operations: `run` gets deps whose db is the locked connection. */
