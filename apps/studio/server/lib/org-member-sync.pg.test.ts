@@ -33,13 +33,21 @@ let reread: (orgId: string) => AuthOrg | null | Promise<AuthOrg | null>
 // A complete listing here carries the independent count a real source must
 // give; `countOverride` lets a cell give a wrong one.
 let countOverride: number | undefined | null
+// Each org's member list is proven complete unless a cell says otherwise, the
+// way a real source must prove it (signal plus an independent count).
+const prove = (o: AuthOrg | null): AuthOrg | null =>
+  o && {
+    ...o,
+    membersComplete: o.membersComplete ?? true,
+    memberCount: o.memberCount ?? o.members.length,
+  }
 const source = {
   listOrgs: async () => ({
-    orgs: authOrgs,
+    orgs: authOrgs.map((o) => prove(o)!),
     complete,
     expectedCount: countOverride === null ? undefined : (countOverride ?? authOrgs.length),
   }),
-  readOrg: async (orgId: string) => await reread(orgId),
+  readOrg: async (orgId: string) => prove(await reread(orgId)),
 }
 
 async function put(orgId: string, userId: string, role: string) {
@@ -64,6 +72,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
 
   beforeEach(async () => {
     await db.delete(schema.orgMember).where(inArray(schema.orgMember.organizationId, ORGS))
+    await db.delete(schema.auditLog).where(inArray(schema.auditLog.organizationId, ORGS))
     authOrgs = []
     complete = true
     countOverride = undefined
@@ -73,6 +82,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
   afterAll(async () => {
     if (!db) return
     await db.delete(schema.orgMember).where(inArray(schema.orgMember.organizationId, ORGS))
+    await db.delete(schema.auditLog).where(inArray(schema.auditLog.organizationId, ORGS))
     await db.$client.end()
   })
 
@@ -304,6 +314,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
         skippedUnknownRole: 1,
         multipleRoles: 1,
         removedAfterReread: 0,
+        busyOrgs: [],
       })
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'member' }])
       expect(await rows(b)).toEqual([])
@@ -374,4 +385,137 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     }
     expect(await rows(a)).toEqual([{ userId: 'u1', role: 'member' }])
   })
+
+  // 🔴 SIKKERHED C1 on #391 (their probe T): the org LISTING is complete but one
+  // org's member list is not; a member missing from it is a current member.
+  describe('C1: an org whose member list is not proven is reported, never repaired', () => {
+    const repair = (max = 50) =>
+      lib.compareOrgMembers(db, source, { repair: true, scope: ours, maxDeletions: max })
+
+    it('membersComplete missing: the member auth did not list is NOT deleted', async () => {
+      await put(a, 'listed', 'member')
+      await put(a, 'b', 'member')
+      authOrgs = [
+        {
+          orgId: a,
+          members: [{ userId: 'listed', role: 'member' }],
+          membersComplete: false,
+        },
+      ]
+      const r = await repair()
+      expect(r.deleted).toEqual([])
+      expect(r.unproven).toEqual([a])
+      expect(r.differences.map((d) => `${d.kind}:${d.userId}`)).toEqual(['stale:b'])
+      expect((await rows(a)).map((x) => x.userId)).toEqual(['b', 'listed'])
+    })
+
+    it('a member count that does not match the list: NOT deleted', async () => {
+      await put(a, 'listed', 'member')
+      await put(a, 'b', 'member')
+      authOrgs = [{ orgId: a, members: [{ userId: 'listed', role: 'member' }], memberCount: 2 }]
+      const r = await repair()
+      expect(r.deleted).toEqual([])
+      expect(r.unproven).toEqual([a])
+    })
+
+    it('a list that loses its proof between the passes: NOT deleted (checked under the lock)', async () => {
+      await put(a, 'b', 'member')
+      authOrgs = [{ orgId: a, members: [] }]
+      reread = () => ({ orgId: a, members: [], membersComplete: false })
+      const r = await repair()
+      expect(r.deleted).toEqual([])
+      expect(r.unproven).toEqual([a])
+    })
+  })
+
+  // Sikkerhed A1 on #391 (their probe M): auth may hold several roles.
+  it('studio billing against auth "billing,member": the same, nothing deleted', async () => {
+    await put(a, 'c', 'billing')
+    authOrgs = [{ orgId: a, members: [{ userId: 'c', role: 'billing,member' }] }]
+    const r = await lib.compareOrgMembers(db, source, {
+      repair: true,
+      scope: ours,
+      maxDeletions: 50,
+    })
+    expect(r.differences).toEqual([])
+    expect(r.deleted).toEqual([])
+    expect(await rows(a)).toEqual([{ userId: 'c', role: 'billing' }])
+  })
+
+  it('studio admin against auth "billing,member": exceeds every one of them, deleted', async () => {
+    await put(a, 'c', 'admin')
+    authOrgs = [{ orgId: a, members: [{ userId: 'c', role: 'billing,member' }] }]
+    const r = await lib.compareOrgMembers(db, source, {
+      repair: true,
+      scope: ours,
+      maxDeletions: 50,
+    })
+    expect(r.deleted.map((d) => d.userId)).toEqual(['c'])
+  })
+
+  // Sikkerhed A3 on #391: over the cap NOTHING is deleted, across orgs too.
+  it('one deletion in each of two orgs with a cap of 1: refused, nothing deleted anywhere', async () => {
+    await put(a, 'x', 'member')
+    await put(b, 'y', 'member')
+    authOrgs = [
+      { orgId: a, members: [] },
+      { orgId: b, members: [] },
+    ]
+    const r = await lib.compareOrgMembers(db, source, {
+      repair: true,
+      scope: ours,
+      maxDeletions: 1,
+    })
+    expect(r.refused).toEqual({ planned: 2, maxDeletions: 1 })
+    expect(r.deleted).toEqual([])
+    expect(await rows(a)).toEqual([{ userId: 'x', role: 'member' }])
+    expect(await rows(b)).toEqual([{ userId: 'y', role: 'member' }])
+  })
+
+  // Sikkerhed A2 on #391: every change the sync makes leaves an audit row.
+  it('repair and backfill write audit rows in the same transaction as the change', async () => {
+    await put(a, 'stale', 'member')
+    authOrgs = [{ orgId: a, members: [] }]
+    await lib.compareOrgMembers(db, source, { repair: true, scope: ours, maxDeletions: 50 })
+    authOrgs = [{ orgId: b, members: [{ userId: 'new', role: 'admin' }] }]
+    await lib.backfillOrgMembers(db, source, { dryRun: false })
+    const audit = await db
+      .select({
+        org: schema.auditLog.organizationId,
+        action: schema.auditLog.action,
+        target: schema.auditLog.targetId,
+      })
+      .from(schema.auditLog)
+      .where(inArray(schema.auditLog.organizationId, ORGS))
+    expect(audit.sort((x, y) => x.action.localeCompare(y.action))).toEqual([
+      { org: b, action: 'member.backfilled', target: 'new' },
+      { org: a, action: 'member.sync_removed', target: 'stale' },
+    ])
+  })
+
+  // A busy org must not end the run and lose the report.
+  it('an org busy with another write is named in the report; the other org is repaired', async () => {
+    await put(a, 'x', 'member')
+    await put(b, 'y', 'member')
+    authOrgs = [
+      { orgId: a, members: [] },
+      { orgId: b, members: [] },
+    ]
+    let release!: () => void
+    // Hold org a the way a route's write would.
+    const { withOrgLockOn } = await import('./org-membership')
+    const holding = withOrgLockOn(db, a, () => new Promise<void>((r) => (release = r)))
+    await new Promise((r) => setTimeout(r, 100))
+    const r = await lib.compareOrgMembers(db, source, {
+      repair: true,
+      scope: ours,
+      maxDeletions: 50,
+    })
+    release()
+    await holding
+    expect(r.busy).toEqual([a])
+    expect(r.deleted.map((d) => d.userId)).toEqual(['y'])
+    expect(r.differences.map((d) => `${d.kind}:${d.userId}`).sort()).toEqual(['stale:x', 'stale:y'])
+    expect(await rows(a)).toEqual([{ userId: 'x', role: 'member' }])
+  }, 15_000)
 })
