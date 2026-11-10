@@ -222,6 +222,38 @@ export const projectMember = pgTable(
   ],
 )
 
+// Who holds which org role, recorded by studio itself. The JWT carries the org
+// id but no role, and until now studio had no local record of org roles: they
+// lived in auth and, mirrored by auth's hooks, in the permissions service.
+//
+// Nothing writes or reads this table yet. The studio routes for org membership
+// (create, invite accept, role change, remove, leave, delete) will write it in
+// the same transaction as their audit row, and the local authorizer will read
+// it. Until then it is empty, and every access decision is unchanged.
+//
+// One role per (org, user): studio's own UI treats org roles as a single rank
+// (ORG_ROLES), even though the permissions model could store several.
+export const orgMember = pgTable(
+  'org_member',
+  {
+    organizationId: text().notNull(),
+    // Central user id (= JWT sub).
+    userId: text().notNull(),
+    role: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('org_member_unique_idx').on(t.organizationId, t.userId),
+    index('org_member_user_idx').on(t.userId),
+    // A role nothing knows would grant nothing and look like a permission bug;
+    // refuse it at the write instead.
+    check(
+      'org_member_role_known',
+      sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,
+    ),
+  ],
+)
+
 // Postmark delivery / bounce / spam-complaint events, captured via the
 // /api/email/webhook receiver. Append-only — used to attribute hard bounces
 // to a recipient and to flag spam complaints. The full webhook body is
