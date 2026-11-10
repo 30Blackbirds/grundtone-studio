@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 // Comparing auth's members with org_member, the fail-closed repair, and the
@@ -24,11 +24,11 @@ const ORGS = [a, b, gone]
 type AuthOrg = import('./org-member-sync').AuthOrg
 let authOrgs: AuthOrg[]
 let complete: boolean
-let reread: (orgId: string) => AuthOrg | null
+let reread: (orgId: string) => AuthOrg | null | Promise<AuthOrg | null>
 
 const source = {
   listOrgs: async () => ({ orgs: authOrgs, complete }),
-  readOrg: async (orgId: string) => reread(orgId),
+  readOrg: async (orgId: string) => await reread(orgId),
 }
 
 async function put(orgId: string, userId: string, role: string) {
@@ -250,5 +250,31 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       // u-owner gone from auth, u-multi demoted to member: neither is kept.
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'admin' }])
     })
+  })
+
+  // Sikkerhed C2: the sync takes the same lock as the routes, so it must not
+  // be able to empty the pool either.
+  it('pool size + 1 concurrent repair runs: an unrelated query is answered, all settle', async () => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    await put(a, 'u1', 'member')
+    authOrgs = [{ orgId: a, members: [{ userId: 'u1', role: 'member' }] }]
+    reread = () => sleep(150).then(() => authOrgs[0]!)
+    const runs = Array.from({ length: 11 }, () =>
+      lib.compareOrgMembers(db, source, { repair: true }).catch((e: unknown) => e),
+    )
+    const unrelated = await Promise.race([
+      db.execute(sql`select 1`).then(() => 'answered'),
+      sleep(2_000).then(() => 'hung'),
+    ])
+    expect(unrelated).toBe('answered')
+    const results = await Promise.all(runs)
+    for (const r of results) {
+      if (r && typeof r === 'object' && 'data' in r) {
+        expect((r as { data?: { code?: string } }).data?.code).toBe('org_write_busy')
+      } else {
+        expect(r).toMatchObject({ complete: true })
+      }
+    }
+    expect(await rows(a)).toEqual([{ userId: 'u1', role: 'member' }])
   })
 })

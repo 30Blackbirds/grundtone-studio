@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { Db } from '../db'
 import { orgMember } from '../db/schema'
-import { withOrgLock } from './org-membership'
+import { withOrgLockOn } from './org-membership'
 import { ORG_ROLES, type OrgRole } from './project-access'
 
 // Comparing auth's org members with studio's org_member, and the two things
@@ -127,8 +127,10 @@ function exceeds(studioRole: string, authRaw: string): boolean {
  * row whose role exceeds auth's. Nothing is inserted or raised; `missing` and
  * a lower studio role are reported and left. An org studio has rows for but
  * auth did not list is judged only when auth's listing was complete. Each
- * org's repair runs under that org's lock, so it cannot interleave with a
- * route's write, and it re-reads auth for that org before deleting.
+ * org's repair runs under that org's lock, on one reserved connection with a
+ * bounded wait (withOrgLockOn), so it cannot interleave with a route's write
+ * or take more than one connection; it re-reads auth before deleting. A busy
+ * org ends the run with 503 org_write_busy; a re-run continues.
  */
 export async function compareOrgMembers(
   db: Db,
@@ -150,7 +152,8 @@ export async function compareOrgMembers(
       report.differences.push(...diffOrg(orgId, await studioRows(db, orgId), first))
       continue
     }
-    await withOrgLock(db, orgId, async () => {
+    // Under the org's lock, on its one reserved connection (`db` below is it).
+    await withOrgLockOn(db, orgId, async (db) => {
       // Under the lock: studio's rows and auth's members as they are NOW, so a
       // change a route made since the listing is not undone.
       const auth = await source.readOrg(orgId)
@@ -225,7 +228,7 @@ export async function backfillOrgMembers(
   }
   for (const org of orgs) {
     c.membersRead += org.members.length
-    await withOrgLock(db, org.orgId, async () => {
+    await withOrgLockOn(db, org.orgId, async (db) => {
       const have = new Set((await studioRows(db, org.orgId)).map((r) => r.userId))
       const toInsert: Array<{ userId: string; role: OrgRole }> = []
       for (const m of org.members) {
