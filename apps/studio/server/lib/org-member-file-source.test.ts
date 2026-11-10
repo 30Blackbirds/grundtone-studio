@@ -15,8 +15,9 @@ type Json = Record<string, unknown>
 function green(): Json {
   return {
     format: ORG_MEMBERS_FORMAT,
-    exportedAt: '2026-11-10T12:00:00.000Z',
+    exportedAt: '2026-11-10T21:05:57.123456Z',
     orgCount: 2,
+    memberTotal: 2,
     orgs: [
       {
         orgId: 'org-a',
@@ -32,7 +33,8 @@ function green(): Json {
   }
 }
 
-const bytesOf = (j: Json) => Buffer.from(JSON.stringify(j))
+// As auth writes it: one line of JSON and a newline the sha256 covers.
+const bytesOf = (j: Json) => Buffer.from(JSON.stringify(j) + '\n')
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex')
 
 function parse(j: Json) {
@@ -47,6 +49,8 @@ function refused(j: Json) {
 describe('org-member export file', () => {
   it('GREEN: a complete file whose counts match parses, unchanged', () => {
     const file = parse(green())
+    expect(file.exportedAt).toBe('2026-11-10T21:05:57.123456Z')
+    expect(file.memberTotal).toBe(2)
     expect(file.orgCount).toBe(2)
     expect(file.orgs.map((o) => [o.orgId, o.members.length])).toEqual([
       ['org-a', 2],
@@ -73,9 +77,11 @@ describe('org-member export file', () => {
     ['an unknown format', (j: Json) => (j.format = 'klanghaus.org-members/2')],
     ['an extra top-level key', (j: Json) => (j.note = 'x')],
     ['orgCount missing', (j: Json) => delete j.orgCount],
+    ['memberTotal missing', (j: Json) => delete j.memberTotal],
     ['orgCount not an integer', (j: Json) => (j.orgCount = 2.5)],
     ['exportedAt not a timestamp', (j: Json) => (j.exportedAt = 'yesterday')],
     ['an empty userId', (j: Json) => (orgA(j).members[0]!.userId = '')],
+    ['a userId with whitespace', (j: Json) => (orgA(j).members[0]!.userId = 'user 1')],
     ['a userId that is not a string', (j: Json) => (orgA(j).members[0]!.userId = 42)],
     ['an empty role', (j: Json) => (orgA(j).members[0]!.role = '')],
     ['an extra key on a member', (j: Json) => (orgA(j).members[0]!.email = 'x@example.test')],
@@ -95,6 +101,12 @@ describe('org-member export file', () => {
     const j = green()
     orgA(j).memberCount = 3
     expect(() => parse(j)).toThrow('orgs.0: memberCount is 3 but it lists 2 members')
+  })
+
+  it('a memberTotal that does not match the lists is refused', () => {
+    const j = green()
+    j.memberTotal = 3
+    expect(() => parse(j)).toThrow('memberTotal is 3 but the orgs list 2 members')
   })
 
   it('a repeated orgId is refused', () => {

@@ -30,20 +30,27 @@ export class OrgMemberFileRefused extends Error {
   override name = 'OrgMemberFileRefused'
 }
 
-const id = z.string().min(1).max(256)
+// Ids carry no whitespace at all; auth's exporter refuses the same.
+const id = z.string().regex(/^\S{1,256}$/)
+const role = z.string().min(1).max(256)
 const count = z.int().nonnegative()
 
+// The format as agreed with auth (auth#222): `JSON.stringify(doc) + "\n"`, the
+// sha256 over exactly those bytes, all counts taken in one snapshot.
 const exportFile = z.strictObject({
   format: z.literal(ORG_MEMBERS_FORMAT),
+  // The snapshot's now() in UTC, with microseconds.
   exportedAt: z.iso.datetime(),
   // From a separate count in auth, not the length of `orgs`.
   orgCount: count,
+  // A separate count of ALL member rows, not the sum of the lists.
+  memberTotal: count,
   orgs: z.array(
     z.strictObject({
       orgId: id,
       // From a separate count in auth, not the length of `members`.
       memberCount: count,
-      members: z.array(z.strictObject({ userId: id, role: id })),
+      members: z.array(z.strictObject({ userId: id, role })),
     }),
   ),
   // Written only after the export finished every org.
@@ -95,6 +102,12 @@ export function parseOrgMembersExport(bytes: Buffer, sha256: string): ExportFile
       throw new OrgMemberFileRefused(`orgs.${i} lists a userId twice`)
     }
   })
+  const listed = file.orgs.reduce((n, org) => n + org.members.length, 0)
+  if (file.memberTotal !== listed) {
+    throw new OrgMemberFileRefused(
+      `memberTotal is ${file.memberTotal} but the orgs list ${listed} members`,
+    )
+  }
   return file
 }
 

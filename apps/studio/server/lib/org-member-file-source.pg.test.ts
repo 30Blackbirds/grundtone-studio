@@ -28,6 +28,7 @@ type Json = {
   format: string
   exportedAt: string
   orgCount: number
+  memberTotal: number
   orgs: Array<{
     orgId: string
     memberCount: number
@@ -39,8 +40,9 @@ type Json = {
 function green(): Json {
   return {
     format: 'klanghaus.org-members/1',
-    exportedAt: '2026-11-10T12:00:00.000Z',
+    exportedAt: '2026-11-10T21:05:57.123456Z',
     orgCount: 2,
+    memberTotal: 3,
     orgs: [
       {
         orgId: a,
@@ -63,7 +65,7 @@ async function sourceFor(bytes: Buffer) {
   const sha256 = createHash('sha256').update(bytes).digest('hex')
   return { path, sha256, source: fileSource.fileMemberSource({ path, sha256 }) }
 }
-const bytesOf = (j: Json) => Buffer.from(JSON.stringify(j))
+const bytesOf = (j: Json) => Buffer.from(JSON.stringify(j) + '\n')
 
 async function rows(orgId: string) {
   return (
@@ -171,9 +173,20 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     await nothingWritten()
   })
 
+  it('a memberTotal that does not match the lists: refused, nothing written', async () => {
+    const j = green()
+    j.memberTotal = 4
+    const { source } = await sourceFor(bytesOf(j))
+    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
+      'memberTotal is 4',
+    )
+    await nothingWritten()
+  })
+
   it('an org with 0 members: loads, inserts nothing there, leaves its studio rows alone', async () => {
     const j = green()
     j.orgs[1] = { orgId: b, memberCount: 0, members: [] }
+    j.memberTotal = 2
     await db
       .insert(schema.orgMember)
       .values({ organizationId: b, userId: 'u-route', role: 'member' })
