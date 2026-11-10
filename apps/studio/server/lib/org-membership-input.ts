@@ -45,19 +45,20 @@ export function parseBody<T extends z.ZodTypeAny>(schema: T, raw: unknown): z.in
  * another site could make a signed-in user's browser change org membership
  * through studio (a confused deputy).
  *
- * Same origin only: the request must carry an Origin whose host is the host it
- * was sent to, or the host of the configured public app URL. A missing Origin
- * is refused too; browsers send it on every POST, PATCH and DELETE, and nothing
- * server-side calls these routes. `Sec-Fetch-Site`, when present (a page cannot
- * set it), must say `same-origin`.
+ * Same origin only: the request's Origin must be, as a whole origin (scheme,
+ * host and port), the origin the request was sent to or the configured public
+ * app URL. The scheme the browser used comes from `X-Forwarded-Proto` behind a
+ * proxy, else from the socket. A missing Origin is refused too; browsers send
+ * it on every POST, PATCH and DELETE, and nothing server-side calls these
+ * routes. `Sec-Fetch-Site`, when present (a page cannot set it), must say
+ * `same-origin`.
  */
 export function assertSameOrigin(event: H3Event, appUrl = process.env.NUXT_PUBLIC_APP_URL): void {
-  const origin = getRequestHeader(event, 'origin')
   const site = getRequestHeader(event, 'sec-fetch-site')
   const allowed = new Set(
-    [getRequestHeader(event, 'host'), hostOf(appUrl)].filter((h): h is string => Boolean(h)),
+    [requestOrigin(event), originOf(appUrl)].filter((o): o is string => Boolean(o)),
   )
-  const from = hostOf(origin)
+  const from = originOf(getRequestHeader(event, 'origin'))
   if (!from || !allowed.has(from) || (site && site !== 'same-origin')) {
     throw createError({
       statusCode: 403,
@@ -67,10 +68,21 @@ export function assertSameOrigin(event: H3Event, appUrl = process.env.NUXT_PUBLI
   }
 }
 
-function hostOf(url: string | null | undefined): string | null {
+function requestOrigin(event: H3Event): string | null {
+  const host = getRequestHeader(event, 'host')
+  if (!host) return null
+  const forwarded = getRequestHeader(event, 'x-forwarded-proto')?.split(',')[0]?.trim()
+  const encrypted = (event as { node?: { req?: { socket?: { encrypted?: boolean } } } }).node?.req
+    ?.socket?.encrypted
+  return originOf(`${forwarded || (encrypted ? 'https' : 'http')}://${host}`)
+}
+
+/** `new URL(x).origin`, or null for anything that is not an http(s) origin. */
+function originOf(url: string | null | undefined): string | null {
   if (!url) return null
   try {
-    return new URL(url).host || null
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.origin : null
   } catch {
     return null
   }

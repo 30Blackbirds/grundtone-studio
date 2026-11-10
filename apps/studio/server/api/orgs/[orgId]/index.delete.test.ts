@@ -30,7 +30,11 @@ vi.mock('~~/server/lib/project-access', () => {
   }
 })
 
-const SAME_ORIGIN = { origin: 'https://studio.test', host: 'studio.test' }
+const SAME_ORIGIN = {
+  origin: 'https://studio.test',
+  host: 'studio.test',
+  'x-forwarded-proto': 'https',
+}
 
 const { default: handler } = await import('./index.delete')
 
@@ -69,7 +73,7 @@ describe('DELETE /api/orgs/:orgId', () => {
   // 🔴 Per route: a page on another origin is refused before anything runs.
   it('a cross-origin request is 403 cross_origin, and the operation is never called', async () => {
     const event = fakeEvent({
-      headers: { origin: 'https://evil.test', host: 'studio.test' },
+      headers: { origin: 'https://evil.test', host: 'studio.test', 'x-forwarded-proto': 'https' },
       params: { orgId: 'org-1' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
     })

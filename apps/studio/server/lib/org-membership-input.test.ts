@@ -36,10 +36,32 @@ describe('assertSameOrigin', () => {
   const ev = (headers: Record<string, string>) => ({ node: { req: { headers } } }) as never
   const refused = { statusCode: 403, data: { code: 'cross_origin' } }
 
-  it('same origin as the host it was sent to: allowed', () => {
+  it('same origin as the request (scheme from X-Forwarded-Proto): allowed', () => {
     expect(() =>
-      assertSameOrigin(ev({ origin: 'https://studio.test', host: 'studio.test' }), ''),
+      assertSameOrigin(
+        ev({ origin: 'https://studio.test', host: 'studio.test', 'x-forwarded-proto': 'https' }),
+        '',
+      ),
     ).not.toThrow()
+  })
+
+  // Sikkerhed A1 on #388: a host-only comparison accepted this.
+  it('http Origin on an https request: 403 (the whole origin is compared)', () => {
+    expect(() =>
+      assertSameOrigin(
+        ev({ origin: 'http://studio.test', host: 'studio.test', 'x-forwarded-proto': 'https' }),
+        '',
+      ),
+    ).toThrow(expect.objectContaining(refused))
+  })
+
+  it('http Origin against an https app URL: 403', () => {
+    expect(() =>
+      assertSameOrigin(
+        ev({ origin: 'http://studio.test', host: 'studio:3000' }),
+        'https://studio.test',
+      ),
+    ).toThrow(expect.objectContaining(refused))
   })
 
   it('the configured app URL is allowed when the host differs (behind a proxy)', () => {
@@ -53,16 +75,16 @@ describe('assertSameOrigin', () => {
 
   it.each([
     ['another origin', { origin: 'https://evil.test', host: 'studio.test' }],
-    ['the same host on another port', { origin: 'https://studio.test:9999', host: 'studio.test' }],
+    ['the same host on another port', { origin: 'http://studio.test:9999', host: 'studio.test' }],
     ['no Origin', { host: 'studio.test' }],
     ['an Origin that is not a URL', { origin: 'null', host: 'studio.test' }],
     [
       'Sec-Fetch-Site says cross-site',
-      { origin: 'https://studio.test', host: 'studio.test', 'sec-fetch-site': 'cross-site' },
+      { origin: 'http://studio.test', host: 'studio.test', 'sec-fetch-site': 'cross-site' },
     ],
     [
       'Sec-Fetch-Site says same-site',
-      { origin: 'https://studio.test', host: 'studio.test', 'sec-fetch-site': 'same-site' },
+      { origin: 'http://studio.test', host: 'studio.test', 'sec-fetch-site': 'same-site' },
     ],
   ])('%s: 403 cross_origin', (_name, headers) => {
     expect(() => assertSameOrigin(ev(headers), '')).toThrow(expect.objectContaining(refused))

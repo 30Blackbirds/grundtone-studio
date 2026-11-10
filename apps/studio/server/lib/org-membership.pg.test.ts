@@ -26,11 +26,13 @@ const event = null as never
 let auth: ReturnType<typeof vi.fn>
 let members: Array<{ id: string; userId: string; role: string }>
 let failAudit = false
+let invitationOrgId: string | null = null
 
 function deps(over: Partial<MembershipDeps> = {}): MembershipDeps {
   return {
     db,
     auth: auth as unknown as MembershipDeps['auth'],
+    invitationOrg: async () => invitationOrgId,
     members: async () => members,
     audit: async (exec, row) => {
       if (failAudit) throw new Error('commit refused (test)')
@@ -79,6 +81,7 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
 
   beforeEach(async () => {
     failAudit = false
+    invitationOrgId = org
     auth = vi.fn()
     members = []
     for (const o of [org, otherOrg]) {
@@ -140,6 +143,22 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       })
       expect(await roleOf(org, 'someone-else')).toBeNull()
       expect(await roleOf(org, 'u-new')).toBeNull()
+    })
+
+    it('the accepted member names another org than the invitation: nothing is written', async () => {
+      auth.mockResolvedValue({ member: { ...answer.member, organizationId: otherOrg } })
+      await expect(lib.acceptInvitation(deps(), event, 'u-new', 'inv-1')).rejects.toMatchObject({
+        statusCode: 502,
+      })
+      expect(await roleOf(otherOrg, 'u-new')).toBeNull()
+    })
+
+    it('an invitation auth does not know is 404, and accept is never asked', async () => {
+      invitationOrgId = null
+      await expect(lib.acceptInvitation(deps(), event, 'u-new', 'inv-x')).rejects.toMatchObject({
+        statusCode: 404,
+      })
+      expect(auth).not.toHaveBeenCalled()
     })
 
     it('auth says yes and studio’s commit fails: no row, so studio denies (fail-closed)', async () => {
@@ -326,6 +345,43 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       auth.mockResolvedValue({ role: 'billing' })
       await change('admin', 'billing')
       expect(await roleOf(org, 'u-x')).toBe('billing')
+    })
+
+    // 🔴 SIKKERHED C1: a refused demotion must not put back a row that a
+    // concurrent removal has since taken away in auth. A waits on auth with its
+    // row removed; B removes the same member and gets auth's yes; then A is
+    // refused. Without the per-org lock B runs in A's wait and A's restore
+    // leaves `manager` behind; with it B waits for A, and the row ends gone.
+    it('C1: a refused demotion racing a removal leaves NO row', async () => {
+      await put(org, 'u-x', 'manager')
+      members = [{ id: 'm-x', userId: 'u-x', role: 'manager' }]
+      let refuseA!: (e: unknown) => void
+      let aAsked!: () => void
+      const aIsWaiting = new Promise<void>((r) => (aAsked = r))
+      auth.mockImplementation((path: string) => {
+        if (path === 'update-member-role') {
+          aAsked()
+          return new Promise((_, reject) => (refuseA = reject))
+        }
+        return Promise.resolve({ member: {} })
+      })
+      const a = lib
+        .changeMemberRole(deps(), event, 'owner', org, 'm-x', 'member')
+        .catch((e: unknown) => e)
+      await aIsWaiting
+      const b = lib.removeMember(deps(), event, 'owner', org, 'm-x').catch((e: unknown) => e)
+      // Give B every chance to run inside A's wait if nothing stops it.
+      await new Promise((r) => setTimeout(r, 300))
+      refuseA(refused())
+      const [ra, rb] = await Promise.all([a, b])
+      expect(ra).toMatchObject({ statusCode: 403 })
+      expect(rb).toEqual({ member: {} })
+      expect(await roleOf(org, 'u-x')).toBeNull()
+    })
+
+    it('onlyAdds: admin manages members, so member -> admin only adds', () => {
+      expect(lib.onlyAdds('member', 'admin')).toBe(true)
+      expect(lib.onlyAdds('admin', 'member')).toBe(false)
     })
 
     it('onlyAdds: what counts as a grant', () => {

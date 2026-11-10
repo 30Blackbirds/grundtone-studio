@@ -13,7 +13,11 @@ vi.mock('~~/server/lib/org-membership', () => ({
   createOrganization: (...a: unknown[]) => op(...a),
 }))
 
-const SAME_ORIGIN = { origin: 'https://studio.test', host: 'studio.test' }
+const SAME_ORIGIN = {
+  origin: 'https://studio.test',
+  host: 'studio.test',
+  'x-forwarded-proto': 'https',
+}
 
 const { default: handler } = await import('./index.post')
 
@@ -55,7 +59,7 @@ describe('POST /api/orgs', () => {
   // 🔴 Per route: a page on another origin is refused before anything runs.
   it('a cross-origin request is 403 cross_origin, and the operation is never called', async () => {
     const event = fakeEvent({
-      headers: { origin: 'https://evil.test', host: 'studio.test' },
+      headers: { origin: 'https://evil.test', host: 'studio.test', 'x-forwarded-proto': 'https' },
       body: { name: 'Acme', slug: 'acme' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
     })

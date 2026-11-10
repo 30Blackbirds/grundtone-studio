@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { createError, getRequestHeader, type H3Event } from 'h3'
 import type { Db } from '../db'
 import { auditLog, orgMember } from '../db/schema'
@@ -33,6 +33,14 @@ import { ORG_ROLES, orgRoleHelpers, type OrgRole } from './project-access'
 //            before auth holds it. Any failure after the first commit leaves too
 //            little access, never too much.
 //
+// CONCURRENCY: the claim above holds only because writes on one org's members
+// run one at a time (withOrgLock); without that, a refused change could put
+// back a row a concurrent removal had already taken away in auth.
+//
+// NOT COVERED: a change that reaches auth without going through studio (a call
+// straight to auth, until auth refuses those, ClickUp 1amk32fna12). Studio
+// never sees it, so only the comparison of auth's members with org_member does.
+//
 // Every fail-closed ending is counted (recordOrgWriteIncomplete) and logged.
 // What is left behind is found by comparing auth's members with org_member.
 
@@ -58,6 +66,8 @@ export type AuthCall = (path: string, body: Record<string, unknown>) => Promise<
 export interface MembershipDeps {
   db: Db
   auth: AuthCall
+  /** The org an invitation belongs to, from auth; null when auth has no such invitation. */
+  invitationOrg: (invitationId: string) => Promise<string | null>
   /** Auth's view of an org's members, to learn whom a member id names. */
   members: (orgId: string) => Promise<Array<{ id: string; userId: string; role: string }> | null>
   /** Inserts the audit row; a test can make it fail to stand in for a failed commit. */
@@ -87,6 +97,11 @@ export interface OrgWriteTarget {
  * checks the origin of cookie POSTs), plus the org-write credential. The
  * credential is never logged: errors below carry auth's status and data only.
  */
+function cookieOf(event: H3Event): Record<string, string> {
+  const cookie = getRequestHeader(event, 'cookie')
+  return cookie ? { cookie } : {}
+}
+
 export function authCaller(event: H3Event, target: OrgWriteTarget): AuthCall {
   const cookie = getRequestHeader(event, 'cookie')
   const origin = getRequestHeader(event, 'origin')
@@ -142,7 +157,11 @@ function rights(role: OrgRole): Set<string> {
   const r = new Set<string>()
   if (orgRoleHelpers.canViewProjects(role)) r.add('project:view')
   if (role === 'owner' || role === 'manager') r.add('project:edit').add('project:admin')
-  if (orgRoleHelpers.canManageOrgMembers(role)) r.add('org:members')
+  // Managing members follows the RANK rule the routes enforce
+  // (org-membership-input.ts canManageMember): admin and above may manage the
+  // ranks below them. That rule decides who may; this set only decides whether
+  // a role change takes rights away, and must agree with it.
+  if (role === 'owner' || role === 'manager' || role === 'admin') r.add('org:members')
   if (orgRoleHelpers.canManageBilling(role)) r.add('org:billing')
   if (orgRoleHelpers.canCreateProjects(role)) r.add('org:create_projects')
   if (role === 'owner') r.add('org:delete')
@@ -260,6 +279,23 @@ async function revoke<T>(
   return answer
 }
 
+/**
+ * 🔴 ONE MEMBERSHIP WRITE AT A TIME PER ORG (Sikkerhed C1 on #388). Two writes
+ * on the same member could otherwise interleave across the auth call: a
+ * demotion auth will refuse removes the row and waits; a removal meanwhile
+ * gets auth's yes; then the refused demotion puts the row BACK, and studio
+ * holds a role auth no longer has. A transaction-scoped advisory lock, held
+ * from before the member lookup until the last write, makes them run one
+ * after the other. It costs one pooled connection per write while auth is
+ * asked (at most the auth timeout).
+ */
+export async function withOrgLock<T>(db: Db, orgId: string, run: () => Promise<T>): Promise<T> {
+  return db.transaction(async (lock) => {
+    await lock.execute(sql`select pg_advisory_xact_lock(hashtext(${`org_member:${orgId}`}))`)
+    return run()
+  })
+}
+
 const rowOf = (orgId: string, userId: string) =>
   and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, userId))
 
@@ -329,32 +365,48 @@ export async function acceptInvitation(
   invitationId: string,
 ) {
   type Answer = { member?: { userId?: string; organizationId?: string; role?: string } }
-  return grant<Answer>(
-    deps,
-    'accept-invitation',
-    { invitationId },
-    async (tx, res) => {
-      const m = res?.member
-      // The role is the one auth recorded, never one from the request.
-      if (!m?.organizationId || m.userId !== actorId || !isOrgRole(m.role)) {
-        badAnswer('accept-invitation')
-      }
-      await tx
-        .insert(orgMember)
-        .values({ organizationId: m.organizationId, userId: actorId, role: m.role })
-        .onConflictDoUpdate({
-          target: [orgMember.organizationId, orgMember.userId],
-          set: { role: m.role },
-        })
-      return {
-        organizationId: m.organizationId,
-        action: 'member.invite_accepted',
-        targetType: 'invitation',
-        targetId: invitationId,
-        after: { role: m.role },
-      }
-    },
-    event,
+  // The org is known only from the invitation; read it first so the accept runs
+  // under that org's lock like every other write on its members.
+  let orgId: string | null
+  try {
+    orgId = await deps.invitationOrg(invitationId)
+  } catch (err) {
+    authError(err)
+  }
+  if (!orgId) throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })
+  return withOrgLock(deps.db, orgId, () =>
+    grant<Answer>(
+      deps,
+      'accept-invitation',
+      { invitationId },
+      async (tx, res) => {
+        const m = res?.member
+        // The role is the one auth recorded, never one from the request.
+        if (
+          !m?.organizationId ||
+          m.organizationId !== orgId ||
+          m.userId !== actorId ||
+          !isOrgRole(m.role)
+        ) {
+          badAnswer('accept-invitation')
+        }
+        await tx
+          .insert(orgMember)
+          .values({ organizationId: m.organizationId, userId: actorId, role: m.role })
+          .onConflictDoUpdate({
+            target: [orgMember.organizationId, orgMember.userId],
+            set: { role: m.role },
+          })
+        return {
+          organizationId: m.organizationId,
+          action: 'member.invite_accepted',
+          targetType: 'invitation',
+          targetId: invitationId,
+          after: { role: m.role },
+        }
+      },
+      event,
+    ),
   )
 }
 
@@ -366,48 +418,50 @@ export async function changeMemberRole(
   memberId: string,
   role: OrgRole,
 ) {
-  const m = await memberOf(deps, orgId, memberId)
-  assertMayManage(actorRole, m.role)
-  if (!canAssignRole(actorRole, role)) forbidden('Requires a higher org role than the one given')
-  const from = isOrgRole(m.role) ? m.role : null
-  const body = { memberId, role, organizationId: orgId }
-  const entry: AuditEventInput = {
-    organizationId: orgId,
-    action: 'member.role_changed',
-    targetType: 'member',
-    targetId: m.userId,
-    before: { role: m.role },
-    after: { role },
-  }
-  const setRole = async (exec: Exec) => {
-    await exec
-      .insert(orgMember)
-      .values({ organizationId: orgId, userId: m.userId, role })
-      .onConflictDoUpdate({ target: [orgMember.organizationId, orgMember.userId], set: { role } })
-  }
-  // A role studio does not know is treated as holding every right, so any
-  // change away from it takes the revoke path.
-  if (from && onlyAdds(from, role)) {
-    return grant(
+  return withOrgLock(deps.db, orgId, async () => {
+    const m = await memberOf(deps, orgId, memberId)
+    assertMayManage(actorRole, m.role)
+    if (!canAssignRole(actorRole, role)) forbidden('Requires a higher org role than the one given')
+    const from = isOrgRole(m.role) ? m.role : null
+    const body = { memberId, role, organizationId: orgId }
+    const entry: AuditEventInput = {
+      organizationId: orgId,
+      action: 'member.role_changed',
+      targetType: 'member',
+      targetId: m.userId,
+      before: { role: m.role },
+      after: { role },
+    }
+    const setRole = async (exec: Exec) => {
+      await exec
+        .insert(orgMember)
+        .values({ organizationId: orgId, userId: m.userId, role })
+        .onConflictDoUpdate({ target: [orgMember.organizationId, orgMember.userId], set: { role } })
+    }
+    // A role studio does not know is treated as holding every right, so any
+    // change away from it takes the revoke path.
+    if (from && onlyAdds(from, role)) {
+      return grant(
+        deps,
+        'update-member-role',
+        body,
+        async (tx) => {
+          await setRole(tx)
+          return entry
+        },
+        event,
+      )
+    }
+    // Revoke path: the row goes first, and the new role is written only after
+    // auth agreed, so no right of the new role is held early.
+    return revoke(
       deps,
       'update-member-role',
       body,
-      async (tx) => {
-        await setRole(tx)
-        return entry
-      },
+      { remove: deleteRow(orgId, m.userId), apply: setRole, entry },
       event,
     )
-  }
-  // Revoke path: the row goes first, and the new role is written only after
-  // auth agreed, so no right of the new role is held early.
-  return revoke(
-    deps,
-    'update-member-role',
-    body,
-    { remove: deleteRow(orgId, m.userId), apply: setRole, entry },
-    event,
-  )
+  })
 }
 
 export async function removeMember(
@@ -417,24 +471,26 @@ export async function removeMember(
   orgId: string,
   memberId: string,
 ) {
-  const m = await memberOf(deps, orgId, memberId)
-  assertMayManage(actorRole, m.role)
-  return revoke(
-    deps,
-    'remove-member',
-    { memberIdOrEmail: memberId, organizationId: orgId },
-    {
-      remove: deleteRow(orgId, m.userId),
-      entry: {
-        organizationId: orgId,
-        action: 'member.removed',
-        targetType: 'member',
-        targetId: m.userId,
-        before: { role: m.role },
+  return withOrgLock(deps.db, orgId, async () => {
+    const m = await memberOf(deps, orgId, memberId)
+    assertMayManage(actorRole, m.role)
+    return revoke(
+      deps,
+      'remove-member',
+      { memberIdOrEmail: memberId, organizationId: orgId },
+      {
+        remove: deleteRow(orgId, m.userId),
+        entry: {
+          organizationId: orgId,
+          action: 'member.removed',
+          targetType: 'member',
+          targetId: m.userId,
+          before: { role: m.role },
+        },
       },
-    },
-    event,
-  )
+      event,
+    )
+  })
 }
 
 export async function leaveOrganization(
@@ -443,41 +499,45 @@ export async function leaveOrganization(
   actorId: string,
   orgId: string,
 ) {
-  // Auth fires no hook on leave, so this route is the only thing that ends a
-  // leaver's org role in studio.
-  return revoke(
-    deps,
-    'leave',
-    { organizationId: orgId },
-    {
-      remove: deleteRow(orgId, actorId),
-      entry: {
-        organizationId: orgId,
-        action: 'member.left',
-        targetType: 'member',
-        targetId: actorId,
+  return withOrgLock(deps.db, orgId, async () => {
+    // Auth fires no hook on leave, so this route is the only thing that ends a
+    // leaver's org role in studio.
+    return revoke(
+      deps,
+      'leave',
+      { organizationId: orgId },
+      {
+        remove: deleteRow(orgId, actorId),
+        entry: {
+          organizationId: orgId,
+          action: 'member.left',
+          targetType: 'member',
+          targetId: actorId,
+        },
       },
-    },
-    event,
-  )
+      event,
+    )
+  })
 }
 
 export async function deleteOrganization(deps: MembershipDeps, event: H3Event, orgId: string) {
-  return revoke(
-    deps,
-    'delete',
-    { organizationId: orgId },
-    {
-      remove: (tx) => tx.delete(orgMember).where(eq(orgMember.organizationId, orgId)).returning(),
-      entry: {
-        organizationId: orgId,
-        action: 'organization.deleted',
-        targetType: 'organization',
-        targetId: orgId,
+  return withOrgLock(deps.db, orgId, async () => {
+    return revoke(
+      deps,
+      'delete',
+      { organizationId: orgId },
+      {
+        remove: (tx) => tx.delete(orgMember).where(eq(orgMember.organizationId, orgId)).returning(),
+        entry: {
+          organizationId: orgId,
+          action: 'organization.deleted',
+          targetType: 'organization',
+          targetId: orgId,
+        },
       },
-    },
-    event,
-  )
+      event,
+    )
+  })
 }
 
 // An invitation changes no role until it is accepted, so it writes no
@@ -490,27 +550,29 @@ export async function inviteMember(
   orgId: string,
   input: { email: string; role: OrgRole; resend?: boolean },
 ) {
-  if (!canAssignRole(actorRole, input.role))
-    forbidden('Requires a higher org role than the one given')
-  return grant<{ id?: string }>(
-    deps,
-    'invite-member',
-    {
-      email: input.email,
-      role: input.role,
-      organizationId: orgId,
-      ...(input.resend ? { resend: true } : {}),
-    },
-    async (_tx, invitation) => ({
-      organizationId: orgId,
-      action: 'member.invited',
-      targetType: 'invitation',
-      targetId: invitation?.id,
-      targetLabel: input.email,
-      after: { role: input.role },
-    }),
-    event,
-  )
+  return withOrgLock(deps.db, orgId, async () => {
+    if (!canAssignRole(actorRole, input.role))
+      forbidden('Requires a higher org role than the one given')
+    return grant<{ id?: string }>(
+      deps,
+      'invite-member',
+      {
+        email: input.email,
+        role: input.role,
+        organizationId: orgId,
+        ...(input.resend ? { resend: true } : {}),
+      },
+      async (_tx, invitation) => ({
+        organizationId: orgId,
+        action: 'member.invited',
+        targetType: 'invitation',
+        targetId: invitation?.id,
+        targetLabel: input.email,
+        after: { role: input.role },
+      }),
+      event,
+    )
+  })
 }
 
 const MIN_CREDENTIAL_BYTES = 32
@@ -547,6 +609,23 @@ export async function membershipDeps(event: H3Event): Promise<MembershipDeps> {
   return {
     db,
     auth: authCaller(event, target),
+    invitationOrg: async (invitationId) => {
+      try {
+        const inv = await $fetch<{ organizationId?: string } | null>(
+          `${target.base}/api/auth/organization/get-invitation`,
+          {
+            query: { id: invitationId },
+            timeout: AUTH_TIMEOUT_MS,
+            headers: cookieOf(event),
+          },
+        )
+        return inv?.organizationId ?? null
+      } catch (err) {
+        const status = (err as { status?: number })?.status
+        if (status && status >= 400 && status < 500) return null
+        throw new AuthOutcomeUnknown(status ? `auth answered ${status}` : 'auth did not answer')
+      }
+    },
     members: async (orgId) => (await lookupOrgById(event, orgId))?.members ?? null,
   }
 }
