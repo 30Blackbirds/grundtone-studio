@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { organization, useSession } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
 
   const { t } = useI18n()
   const session = useSession()
@@ -46,7 +47,7 @@
     }
     leaving.value = org.id
     error.value = null
-    const res = await organization.leave({ organizationId: org.id })
+    const res = await orgWrites.leave(org.id)
     leaving.value = null
     if (res.error) {
       error.value = res.error.message ?? t('account.organizations.leaveError')

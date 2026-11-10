@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
   import { daysUntil } from '~~/utils/invite-expiry'
   import { dayOnly } from '~~/utils/relative-time'
 
@@ -79,12 +80,9 @@
     if (!activeOrg.value?.id) return
     inviting.value = true
     inviteError.value = null
-    const res = await organization.inviteMember({
+    const res = await orgWrites.inviteMember(activeOrg.value.id, {
       email: payload.email,
-      // Better Auth's client types narrow this to 'admin' | 'member' but the
-      // server-side ac config accepts our custom roles too.
-      role: payload.role as 'admin' | 'member',
-      organizationId: activeOrg.value.id,
+      role: payload.role,
     })
     inviting.value = false
     if (res.error) {
@@ -104,10 +102,9 @@
     if (!activeOrg.value?.id) return
     resendingId.value = inv.id
     try {
-      const res = await organization.inviteMember({
+      const res = await orgWrites.inviteMember(activeOrg.value.id, {
         email: inv.email,
-        role: inv.role as 'admin' | 'member',
-        organizationId: activeOrg.value.id,
+        role: inv.role,
         resend: true,
       })
       if (!res.error) toast.success(t('toasts.inviteResent'))

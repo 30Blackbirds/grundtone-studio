@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
   import {
     ASSIGNABLE_ORG_ROLES,
     canAssignRole,
@@ -106,16 +107,13 @@
     if (!activeOrg.value?.id || !selectedRole.value || !dirty.value) return
     saving.value = true
     saveError.value = null
-    // Better Auth's client types narrow this to 'admin' | 'member' because it
-    // doesn't see our server-side ac config (which adds 'manager' + 'billing').
-    // The picker is constrained to AssignableOrgRole, so the cast is
-    // correct-by-construction at this point — the server-side ac validates
-    // the actual value against its full role table.
-    const res = await organization.updateMemberRole({
-      memberId: memberId.value,
-      role: selectedRole.value as unknown as 'admin' | 'member',
-      organizationId: activeOrg.value.id,
-    })
+    // Through studio's route, which records the role in studio as well; it
+    // applies the same rank rules as this page and auth checks the role too.
+    const res = await orgWrites.updateMemberRole(
+      activeOrg.value.id,
+      memberId.value,
+      selectedRole.value,
+    )
     saving.value = false
     if (res.error) {
       saveError.value = res.error.message ?? t('memberDetail.saveError')
@@ -132,10 +130,7 @@
     if (!activeOrg.value?.id) return
     removingMember.value = true
     try {
-      const res = await organization.removeMember({
-        memberIdOrEmail: memberId.value,
-        organizationId: activeOrg.value.id,
-      })
+      const res = await orgWrites.removeMember(activeOrg.value.id, memberId.value)
       if (!res.error) {
         removeOpen.value = false
         toast.success(t('toasts.memberRemoved'))
