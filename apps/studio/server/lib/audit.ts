@@ -30,6 +30,9 @@ export type AuditAction =
   | 'asset.font_uploaded'
   | 'asset.logo_uploaded'
   | 'audit.exported'
+  | 'organization.created'
+  | 'organization.deleted'
+  | 'member.left'
 
 export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'member.invited',
@@ -56,6 +59,9 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'asset.font_uploaded',
   'asset.logo_uploaded',
   'audit.exported',
+  'organization.created',
+  'organization.deleted',
+  'member.left',
 ]
 
 export interface AuditEventInput {
@@ -76,6 +82,45 @@ export interface AuditEventInput {
   userAgent?: string
 }
 
+/** The audit_log row for an event, for callers that insert it in their own transaction. */
+export function auditRow(
+  event: H3Event | null,
+  input: AuditEventInput,
+): typeof auditLog.$inferInsert {
+  let actorUserId = input.actorUserId ?? null
+  let actorEmail = input.actorEmail ?? null
+  let ipAddress = input.ipAddress ?? null
+  let userAgent = input.userAgent ?? null
+
+  if (event) {
+    if (!actorUserId || !actorEmail) {
+      // Identity now comes from the JWT-derived actor on event.context.auth,
+      // populated by server/middleware/auth.ts. No DB/session round-trip.
+      const actor = event.context.auth
+      if (actor) {
+        actorUserId ??= actor.sub
+        actorEmail ??= actor.email ?? null
+      }
+    }
+    ipAddress ??= getRequestIP(event, { xForwardedFor: true }) ?? null
+    userAgent ??= getRequestHeader(event, 'user-agent') ?? null
+  }
+
+  return {
+    organizationId: input.organizationId,
+    actorUserId,
+    actorEmail,
+    action: input.action,
+    targetType: input.targetType ?? null,
+    targetId: input.targetId ?? null,
+    targetLabel: input.targetLabel ?? null,
+    before: input.before ?? null,
+    after: input.after ?? null,
+    ipAddress,
+    userAgent,
+  }
+}
+
 /**
  * Append a row to audit_log. Fire-and-forget — never throws; logs and swallows
  * any error so a failing audit write can't break the underlying mutation.
@@ -89,38 +134,7 @@ export async function recordAuditEvent(
   input: AuditEventInput,
 ): Promise<void> {
   try {
-    let actorUserId = input.actorUserId ?? null
-    let actorEmail = input.actorEmail ?? null
-    let ipAddress = input.ipAddress ?? null
-    let userAgent = input.userAgent ?? null
-
-    if (event) {
-      if (!actorUserId || !actorEmail) {
-        // Identity now comes from the JWT-derived actor on event.context.auth,
-        // populated by server/middleware/auth.ts. No DB/session round-trip.
-        const actor = event.context.auth
-        if (actor) {
-          actorUserId ??= actor.sub
-          actorEmail ??= actor.email ?? null
-        }
-      }
-      ipAddress ??= getRequestIP(event, { xForwardedFor: true }) ?? null
-      userAgent ??= getRequestHeader(event, 'user-agent') ?? null
-    }
-
-    await db.insert(auditLog).values({
-      organizationId: input.organizationId,
-      actorUserId,
-      actorEmail,
-      action: input.action,
-      targetType: input.targetType ?? null,
-      targetId: input.targetId ?? null,
-      targetLabel: input.targetLabel ?? null,
-      before: input.before ?? null,
-      after: input.after ?? null,
-      ipAddress,
-      userAgent,
-    })
+    await db.insert(auditLog).values(auditRow(event, input))
   } catch (err) {
     // 🔴 STILL SWALLOWED, AND NOW COUNTED. Swallowing is deliberate: a failed
     // audit insert must not break the publish that caused it. But a failure

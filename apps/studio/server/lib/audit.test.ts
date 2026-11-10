@@ -267,6 +267,11 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
   // enumerating the MECHANISM's call sites produced the false gap.
   const API = join(import.meta.dirname, '..', 'api')
 
+  // The org-membership routes delegate too: lib/org-membership.ts writes the
+  // audit row inside the same transaction as org_member, so the route file has
+  // no recordAuditEvent of its own.
+  const ORG_MEMBERSHIP_IMPORT = "from '~~/server/lib/org-membership'"
+
   function walk(dir: string): string[] {
     return readdirSync(dir).flatMap((e) => {
       const p = join(dir, e)
@@ -279,6 +284,9 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
     return walk(API).filter((p) => {
       const rel = p.replace(API, '')
       if (rel.startsWith('/orgs/')) return true
+      // Accepting an org invitation changes an org role, though its path names
+      // no org: it belongs in the denominator too.
+      if (rel.startsWith('/org-invitations/')) return true
       return /requireProjectAccess\(event, projectId, '(editor|admin)'\)/.test(
         readFileSync(p, 'utf8'),
       )
@@ -293,7 +301,11 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
   it('each one REFERENCES an audit write, directly or through saveDraft', () => {
     const gaps = reachable().filter((p) => {
       const src = readFileSync(p, 'utf8')
-      return !src.includes('recordAuditEvent(') && !src.includes('saveDraft(')
+      return (
+        !src.includes('recordAuditEvent(') &&
+        !src.includes('saveDraft(') &&
+        !src.includes(ORG_MEMBERSHIP_IMPORT)
+      )
     })
     expect(gaps.map((p) => p.replace(API, ''))).toEqual([])
   })
@@ -333,6 +345,14 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
         ? readFileSync(join(import.meta.dirname, 'save-draft.test.ts'), 'utf8')
         : '',
     )
+    // 🔴 A REAL-POSTGRES FILE: without DATABASE_URL its cells are skipped while
+    // this regex still finds them. CI has the database (the .pg suites throw
+    // when it is missing there), so the proof runs where it counts.
+    const ORG_MEMBERSHIP_PROVEN = /expect\(\s*(?:await\s+)?audit\w*/i.test(
+      existsSync(join(import.meta.dirname, 'org-membership.pg.test.ts'))
+        ? readFileSync(join(import.meta.dirname, 'org-membership.pg.test.ts'), 'utf8')
+        : '',
+    )
     const unproven = reachable()
       .filter((p) => {
         const src = readFileSync(p, 'utf8')
@@ -341,6 +361,12 @@ describe('🔴 AC-G completeness: the call sites, and what proves they FIRE', ()
         if (own) return false
         // Delegates to saveDraft AND has cells of its own proving it delegates.
         if (src.includes('saveDraft(') && existsSync(t) && DELEGATE_PROVEN) return false
+        // Same shortcut, same condition, for the org-membership delegates: the
+        // event is asserted in org-membership.pg.test.ts, and the route has its
+        // own cells proving it calls the operation.
+        if (src.includes(ORG_MEMBERSHIP_IMPORT) && existsSync(t) && ORG_MEMBERSHIP_PROVEN) {
+          return false
+        }
         return true
       })
       .map((p) => p.replace(API, ''))
