@@ -116,8 +116,8 @@ export function recordAuditWriteFailed(action: string): void {
 // An org-membership write that did not end where it should (lib/org-membership.ts).
 // Every one fails CLOSED (too little access, never too much), so this is the
 // signal that something needs a retry or the auth/org_member comparison.
-// `reason` is one of four fixed values: unconfigured, auth_pending,
-// restore_failed, not_recorded.
+// `reason` is one of six fixed values: unconfigured, auth_pending,
+// restore_failed, not_recorded, busy, unlock_failed.
 let orgWriteIncomplete: Counter | undefined
 export function recordOrgWriteIncomplete(reason: string): void {
   try {

@@ -116,17 +116,27 @@ describe('orgWriteTarget in production: where the credential may go', () => {
 
   it.each([
     ['https to a public host', 'https://auth.example.test'],
-    ['http to a container service name', 'http://auth:3000'],
     ['http to loopback', 'http://127.0.0.1:3000'],
     ['http to a private address', 'http://10.11.0.10:3000'],
     ['http to a 172.16/12 address', 'http://172.20.0.5:3000'],
     ['http to a 192.168 address', 'http://192.168.1.4'],
+    ['http to localhost', 'http://localhost:3000'],
+    ['http to IPv6 loopback', 'http://[::1]:3000'],
   ])('%s: allowed', (_name, url) => {
     expect(orgWriteTarget({ ...prod, AUTH_INTERNAL_URL: url })).toMatchObject({ base: url })
   })
 
   it.each([
     ['http to a public host', 'http://auth.example.test'],
+    // C3: public names that only START like a private range.
+    ['http://10.evil.example:3000', 'http://10.evil.example:3000'],
+    ['http://127.attacker.example', 'http://127.attacker.example'],
+    ['http://192.168.evil.example', 'http://192.168.evil.example'],
+    ['http://172.16.x.example', 'http://172.16.x.example'],
+    // A single-label name resolves via search domains and can be public.
+    ['http://evil', 'http://evil'],
+    ['http to a container service name', 'http://auth:3000'],
+    ['http to a public IPv6 address', 'http://[2001:db8::1]'],
     ['http to a public address', 'http://8.8.8.8'],
     ['http to 172.32 (outside 172.16/12)', 'http://172.32.0.1'],
     ['not a URL', 'auth:3000'],

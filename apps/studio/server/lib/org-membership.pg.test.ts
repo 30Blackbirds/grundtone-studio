@@ -521,6 +521,72 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       await first
     })
 
+    // A1 (Sikkerhed): pin "one connection per write". On a pool of ONE
+    // connection, a write that took a second connection for any of its
+    // transactions would wait for itself forever; this one must finish.
+    it('a write completes on a pool of ONE connection (one connection per write)', async () => {
+      const postgres = (await import('postgres')).default
+      const { drizzle } = await import('drizzle-orm/postgres-js')
+      const one = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false })
+      const tiny = drizzle(one, { schema, casing: 'snake_case' }) as unknown as Db
+      try {
+        await put(org, 'u-one', 'member')
+        members = [{ id: 'm-one', userId: 'u-one', role: 'member' }]
+        auth.mockResolvedValue({})
+        const done = await Promise.race([
+          lib.removeMember(deps({ db: tiny }), event, 'owner', org, 'm-one').then(() => 'done'),
+          sleep(3_000).then(() => 'hung'),
+        ])
+        expect(done).toBe('done')
+        expect(await roleOf(org, 'u-one')).toBeNull()
+      } finally {
+        await one.end({ timeout: 1 })
+      }
+    })
+
+    // A2 (Sikkerhed): if the unlock does not say true, the connection holding
+    // the session lock must not go back to the pool still holding it.
+    it('a failed unlock ends that backend, and the org is not left busy', async () => {
+      await put(org, 'u-ul', 'member')
+      await put(org, 'u-next', 'member')
+      members = [
+        { id: 'm-ul', userId: 'u-ul', role: 'member' },
+        { id: 'm-next', userId: 'u-next', role: 'member' },
+      ]
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      auth.mockResolvedValue({})
+      // Drop the lock early on the locked connection, so the final unlock
+      // finds nothing to release and answers false.
+      const dropEarly = (locked: Db) =>
+        new Proxy(locked, {
+          get: (t, k) =>
+            k === 'transaction'
+              ? async (fn: never) => {
+                  await locked.execute(sql`select pg_advisory_unlock_all()`)
+                  return (t as Db).transaction(fn)
+                }
+              : Reflect.get(t, k),
+        })
+      let pid = 0
+      const watchPid = (locked: Db) => {
+        void locked
+          .execute(sql`select pg_backend_pid() as pid`)
+          .then((r) => (pid = Number((r as unknown as Array<{ pid: number }>)[0]?.pid)))
+        return dropEarly(locked)
+      }
+      await lib.removeMember(deps({ onLocked: watchPid }), event, 'owner', org, 'm-ul')
+      await sleep(200)
+      const alive = await db.execute(
+        sql`select count(*)::int as n from pg_stat_activity where pid = ${pid}`,
+      )
+      expect(pid).toBeGreaterThan(0)
+      expect((alive as unknown as Array<{ n: number }>)[0]?.n).toBe(0)
+      // The next write on the same org gets the lock at once.
+      await expect(
+        lib.removeMember(deps({ lockLimits: limits }), event, 'owner', org, 'm-next'),
+      ).resolves.toEqual({})
+    })
+
     it('leave by someone auth does not list as a member: 404 before any lock or auth call', async () => {
       members = []
       await expect(lib.leaveOrganization(deps(), event, 'stranger', org)).rejects.toMatchObject({

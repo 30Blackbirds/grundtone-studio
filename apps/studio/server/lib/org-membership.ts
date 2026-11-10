@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import { isIP } from 'node:net'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { createError, getRequestHeader, type H3Event } from 'h3'
 import type { Db } from '../db'
@@ -342,9 +343,11 @@ export async function withOrgLockOn<T>(
     reserved = await db.$client.reserve()
     const key = `org_member:${orgId}`
     const deadline = Date.now() + limits.waitMs
+    let pid = 0
     for (;;) {
-      const [row] = await reserved<{ ok: boolean }[]>`
-        select pg_try_advisory_lock(hashtext(${key})) as ok`
+      const [row] = await reserved<{ ok: boolean; pid: number }[]>`
+        select pg_try_advisory_lock(hashtext(${key})) as ok, pg_backend_pid() as pid`
+      pid = row?.pid ?? 0
       if (row?.ok) break
       if (Date.now() >= deadline) busy('another write on this organization')
       await new Promise((r) => setTimeout(r, 50))
@@ -370,9 +373,24 @@ export async function withOrgLockOn<T>(
       }) as Db['transaction']
       return await run(locked)
     } finally {
-      // A session lock outlives the operation unless released; the connection
-      // goes back to the pool afterwards.
-      await reserved`select pg_advisory_unlock(hashtext(${key}))`
+      // A session lock outlives the operation unless released, and the
+      // connection goes back to the POOL, where it may live 30-60 minutes
+      // (postgres.js max_lifetime). If the unlock does not say true, end that
+      // backend instead (Postgres then drops its locks), so the org is not
+      // left "busy" behind a pooled connection.
+      let unlocked = false
+      try {
+        const [row] = await reserved<{ ok: boolean }[]>`
+          select pg_advisory_unlock(hashtext(${key})) as ok`
+        unlocked = row?.ok === true
+      } catch {
+        unlocked = false
+      }
+      if (!unlocked) {
+        recordOrgWriteIncomplete('unlock_failed')
+        console.error('[org-membership] advisory unlock failed; ending that connection')
+        await db.$client`select pg_terminate_backend(${pid})`.catch(() => {})
+      }
     }
   } finally {
     activeOrgWrites--
@@ -682,9 +700,14 @@ const MIN_CREDENTIAL_BYTES = 32
 /**
  * M1 (Sikkerhed): the credential travels in a header that proxies, Sentry and
  * loggers do not redact the way they redact Authorization and Cookie, so in
- * production it may only go over https, or over plain http to a host that is
- * not on the public internet: loopback, a private address, or a single-label
- * name (a container service such as `auth`, which public DNS cannot answer).
+ * production it may only go over https, or over plain http to loopback or a
+ * private address given as an IP LITERAL.
+ *
+ * C3: a hostname is never trusted by its spelling. `10.evil.example` or
+ * `127.attacker.example` are public names that merely start like a private
+ * range, and a single-label name (`auth`) resolves through the resolver's
+ * search domains and can land on a public host. Only `localhost` and IP
+ * literals in loopback or private ranges pass over http.
  */
 export function safeAuthTarget(url: string): boolean {
   let u: URL
@@ -696,15 +719,14 @@ export function safeAuthTarget(url: string): boolean {
   if (u.protocol === 'https:') return true
   if (u.protocol !== 'http:') return false
   const h = u.hostname.replace(/^\[|\]$/g, '')
-  return (
-    h === 'localhost' ||
-    h === '::1' ||
-    /^127\./.test(h) ||
-    /^10\./.test(h) ||
-    /^192\.168\./.test(h) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
-    /^[a-z0-9-]+$/i.test(h)
-  )
+  if (h === 'localhost') return true
+  const v = isIP(h)
+  if (v === 4) {
+    const [a, b] = h.split('.').map(Number) as [number, number]
+    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+  }
+  if (v === 6) return h === '::1' || /^f[cd][0-9a-f]{2}:/i.test(h)
+  return false
 }
 
 /**
