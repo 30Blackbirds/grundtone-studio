@@ -1,6 +1,7 @@
 import { createError, defineEventHandler, proxyRequest } from 'h3'
 import { devAuthBypassEnabled } from '~~/server/lib/dev-auth-bypass'
 import { DEV_AUTH_STUB_ROUTES, stubKeyFor, unstubbedGroup } from '~~/server/lib/dev-auth-stub'
+import { isOrgWriteAuthPath, ORG_WRITE_CREDENTIAL_HEADER } from '~~/server/lib/org-membership-input'
 
 // BFF-proxy for central auth (domæne-arkitekturen: login = BFF).
 //
@@ -32,6 +33,25 @@ function authProxyTarget(): string | undefined {
 }
 
 export default defineEventHandler((event) => {
+  // 🔴 ORG MEMBERSHIP IS WRITTEN THROUGH STUDIO'S OWN ROUTES (server/api/orgs/**,
+  // server/api/org-invitations/**), which record the role in studio too. This
+  // proxy refuses those writes, so a stale page fails loudly instead of
+  // changing auth behind studio's back. It closes only studio's door: a call
+  // straight to auth is refused by auth's own check (ClickUp 1amk32fna12).
+  if (isOrgWriteAuthPath(event.path)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Org membership is changed through studio, not this proxy',
+      data: { code: 'use_studio_route' },
+    })
+  }
+  // The proxy forwards request headers as they are (h3 getProxyRequestHeaders),
+  // so a browser-sent copy of the org-write credential would reach auth. Studio
+  // never attaches it here; strip any copy, on every path.
+  const incoming = (event as { node?: { req?: { headers?: Record<string, unknown> } } }).node?.req
+    ?.headers
+  if (incoming) Reflect.deleteProperty(incoming, ORG_WRITE_CREDENTIAL_HEADER)
+
   // 🔴 THE LOCAL DESIGN-REVIEW BYPASS (dev-auth-bypass.ts) SHORT-CIRCUITS HERE,
   // before the proxy target is even resolved, because locally there is no auth
   // service to proxy to. Three gates, all checked in one place; see that file.

@@ -87,3 +87,44 @@ function originOf(url: string | null | undefined): string | null {
     return null
   }
 }
+
+/**
+ * The header auth will require on its org-membership writes (ClickUp
+ * 1amk32fna12), so that only studio's server can make them. Its value is a
+ * server-only secret; the generic /api/auth proxy never attaches it and strips
+ * any copy a browser sends.
+ */
+export const ORG_WRITE_CREDENTIAL_HEADER = 'x-klanghaus-org-write-credential'
+
+/** Auth's org-membership writes, which studio makes only through its own routes. */
+export const ORG_WRITE_AUTH_PATHS: readonly string[] = [
+  'organization/create',
+  'organization/delete',
+  'organization/invite-member',
+  'organization/accept-invitation',
+  'organization/update-member-role',
+  'organization/remove-member',
+  'organization/leave',
+]
+
+/**
+ * True when a request path under /api/auth names one of those writes, in the
+ * spellings that reach the same endpoint: percent-encoding, doubled or
+ * trailing slashes, upper case, and dot segments (`x/../leave`, `./leave`,
+ * `%2e%2e`), resolved the way the proxy's own fetch resolves them. A path that
+ * cannot be decoded is treated as a write.
+ */
+export function isOrgWriteAuthPath(path: string): boolean {
+  let p = path.split('?')[0]!
+  try {
+    p = decodeURIComponent(p)
+  } catch {
+    return true
+  }
+  p = p.toLowerCase().replace(/\/+/g, '/')
+  // Resolve `.` and `..` segments: the proxy's fetch does, so auth would see
+  // the resolved path.
+  p = new URL(p, 'http://x').pathname
+  p = p.replace(/^\/api\/auth\//, '').replace(/\/+$/, '')
+  return ORG_WRITE_AUTH_PATHS.includes(p)
+}
