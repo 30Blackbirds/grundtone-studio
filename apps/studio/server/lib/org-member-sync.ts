@@ -28,8 +28,26 @@ export interface AuthOrg {
  * Auth's orgs and members. `complete` must be true only when every org was
  * listed; an org missing from an incomplete listing proves nothing.
  */
+/**
+ * Auth's listing of orgs.
+ *
+ * 🔴 A WRONG "complete" IS A MASS LOSS OF ACCESS: every org it leaves out has
+ * all its rows deleted by a repair. So a real source sets `complete` only
+ * when its own paging says the last page was read, AND it reports
+ * `expectedCount` from an independent count (a separate count query or
+ * endpoint, not the length of what it read). compareOrgMembers treats the
+ * listing as complete only when both hold and the count matches what was
+ * read; anything else (a missing signal, a missing count, a mismatch) is
+ * incomplete, and unlisted orgs are then not judged.
+ */
+export interface OrgListing {
+  orgs: AuthOrg[]
+  complete: boolean
+  expectedCount?: number
+}
+
 export interface MemberSource {
-  listOrgs(): Promise<{ orgs: AuthOrg[]; complete: boolean }>
+  listOrgs(): Promise<OrgListing>
   /** One org again, for the second read; null when auth has no such org. */
   readOrg(orgId: string): Promise<AuthOrg | null>
 }
@@ -98,8 +116,10 @@ async function studioOrgIds(db: Db): Promise<string[]> {
 }
 
 export interface CompareReport {
-  /** False when auth's listing was incomplete: orgs it did not list were not judged. */
+  /** False when auth's listing was not proven complete: orgs it did not list were not judged. */
   complete: boolean
+  /** Set when the planned deletions exceeded `maxDeletions`: nothing was deleted. */
+  refused?: { planned: number; maxDeletions: number }
   orgsCompared: number
   differences: Difference[]
   /** Rows deleted (only when repairing): stale rows, and rows whose studio role exceeds auth's. */
@@ -132,22 +152,32 @@ function exceeds(studioRole: string, authRaw: string): boolean {
  * or take more than one connection; it re-reads auth before deleting. A busy
  * org ends the run with 503 org_write_busy; a re-run continues.
  */
+/** Which orgs a run covers. There is no default: a caller must say 'all'. */
+export type OrgScope = 'all' | ((orgId: string) => boolean)
+
 export async function compareOrgMembers(
   db: Db,
   source: MemberSource,
-  opts: {
-    repair: boolean
-    /**
-     * Limits the run to the orgs this accepts (default: every org). A complete
-     * listing then means complete for those orgs; others are not touched.
-     */
-    only?: (orgId: string) => boolean
-  },
+  opts:
+    | { repair: false; scope: OrgScope }
+    | {
+        repair: true
+        scope: OrgScope
+        /**
+         * The most rows one run may delete. Above it the run deletes NOTHING
+         * and reports `refused`; a person looks before anything is removed.
+         */
+        maxDeletions: number
+      },
 ): Promise<CompareReport> {
-  const inScope = opts.only ?? (() => true)
+  const inScope = opts.scope === 'all' ? () => true : opts.scope
   const listing = await source.listOrgs()
-  const complete = listing.complete
   const orgs = listing.orgs.filter((o) => inScope(o.orgId))
+  // Complete only with the source's own signal AND a matching independent count.
+  const complete =
+    listing.complete === true &&
+    typeof listing.expectedCount === 'number' &&
+    listing.expectedCount === listing.orgs.length
   const listed = new Map(orgs.map((o) => [o.orgId, o]))
   const unlisted = (await studioOrgIds(db)).filter((id) => inScope(id) && !listed.has(id))
   const judged: Array<[string, AuthOrg | null]> = [
@@ -156,24 +186,45 @@ export async function compareOrgMembers(
   ]
 
   const report: CompareReport = { complete, orgsCompared: 0, differences: [], deleted: [] }
+  const doomedOf = (diffs: Difference[]) =>
+    diffs.filter(
+      (d): d is Extract<Difference, { kind: 'stale' | 'role_differs' }> =>
+        d.kind === 'stale' || (d.kind === 'role_differs' && exceeds(d.studioRole, d.authRole)),
+    )
+
+  // First pass, no lock, no writes: what the run would compare and delete.
+  const planned: Difference[] = []
   for (const [orgId, first] of judged) {
-    report.orgsCompared++
-    if (!opts.repair) {
-      report.differences.push(...diffOrg(orgId, await studioRows(db, orgId), first))
-      continue
-    }
-    // Under the org's lock, on its one reserved connection (`db` below is it).
+    planned.push(...diffOrg(orgId, await studioRows(db, orgId), first))
+  }
+  report.orgsCompared = judged.length
+  if (!opts.repair) {
+    report.differences = planned
+    return report
+  }
+  const plannedDeletions = doomedOf(planned).length
+  if (plannedDeletions > opts.maxDeletions) {
+    report.differences = planned
+    report.refused = { planned: plannedDeletions, maxDeletions: opts.maxDeletions }
+    return report
+  }
+
+  // Second pass: each org under its lock, against auth as it is NOW. The cap
+  // still holds if auth changed since the first pass.
+  for (const [orgId] of judged) {
     await withOrgLockOn(db, orgId, async (db) => {
-      // Under the lock: studio's rows and auth's members as they are NOW, so a
-      // change a route made since the listing is not undone.
       const auth = await source.readOrg(orgId)
       const diffs = diffOrg(orgId, await studioRows(db, orgId), auth)
       report.differences.push(...diffs)
-      const doomed = diffs.filter(
-        (d): d is Extract<Difference, { kind: 'stale' | 'role_differs' }> =>
-          d.kind === 'stale' || (d.kind === 'role_differs' && exceeds(d.studioRole, d.authRole)),
-      )
+      const doomed = doomedOf(diffs)
       if (!doomed.length) return
+      if (report.deleted.length + doomed.length > opts.maxDeletions) {
+        report.refused = {
+          planned: report.deleted.length + doomed.length,
+          maxDeletions: opts.maxDeletions,
+        }
+        return
+      }
       await db.delete(orgMember).where(
         and(
           eq(orgMember.organizationId, orgId),
@@ -224,7 +275,12 @@ export async function backfillOrgMembers(
   source: MemberSource,
   opts: { dryRun: boolean },
 ): Promise<BackfillCounts> {
-  const { orgs, complete } = await source.listOrgs()
+  const listing = await source.listOrgs()
+  const orgs = listing.orgs
+  const complete =
+    listing.complete === true &&
+    typeof listing.expectedCount === 'number' &&
+    listing.expectedCount === listing.orgs.length
   const c: BackfillCounts = {
     dryRun: opts.dryRun,
     complete,

@@ -30,8 +30,15 @@ let authOrgs: AuthOrg[]
 let complete: boolean
 let reread: (orgId: string) => AuthOrg | null | Promise<AuthOrg | null>
 
+// A complete listing here carries the independent count a real source must
+// give; `countOverride` lets a cell give a wrong one.
+let countOverride: number | undefined | null
 const source = {
-  listOrgs: async () => ({ orgs: authOrgs, complete }),
+  listOrgs: async () => ({
+    orgs: authOrgs,
+    complete,
+    expectedCount: countOverride === null ? undefined : (countOverride ?? authOrgs.length),
+  }),
   readOrg: async (orgId: string) => await reread(orgId),
 }
 
@@ -59,6 +66,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     await db.delete(schema.orgMember).where(inArray(schema.orgMember.organizationId, ORGS))
     authOrgs = []
     complete = true
+    countOverride = undefined
     reread = (orgId) => authOrgs.find((o) => o.orgId === orgId) ?? null
   })
 
@@ -97,7 +105,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      const r = await lib.compareOrgMembers(db, source, { repair: false, only: ours })
+      const r = await lib.compareOrgMembers(db, source, { repair: false, scope: ours })
       expect(r.differences.map((d) => `${d.kind}:${d.userId}`).sort()).toEqual([
         'missing:new',
         'role_differs:higher',
@@ -126,7 +134,11 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
       expect(r.deleted.map((d) => d.userId).sort()).toEqual(['higher', 'stale'])
       // `lower` stays member (raising it would grant), `new` stays absent.
       expect(await rows(a)).toEqual([
@@ -149,7 +161,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      await lib.compareOrgMembers(db, source, { repair: true, only: ours })
+      await lib.compareOrgMembers(db, source, { repair: true, scope: ours, maxDeletions: 50 })
       expect(await rows(a)).toEqual([])
     })
 
@@ -157,7 +169,11 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(gone, 'u1', 'owner')
       authOrgs = []
       complete = true
-      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
       expect(r.deleted).toEqual([{ orgId: gone, userId: 'u1', studioRole: 'owner' }])
     })
 
@@ -166,10 +182,66 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       authOrgs = []
       const r = await lib.compareOrgMembers(db, source, {
         repair: true,
-        only: (id) => id === a,
+        scope: (id) => id === a,
+        maxDeletions: 50,
       })
       expect(r.deleted).toEqual([])
       expect(await rows(gone)).toEqual([{ userId: 'u1', role: 'owner' }])
+    })
+
+    // 🔴 A WRONG "complete" deletes every org it leaves out, so complete needs
+    // the source's signal AND a matching independent count.
+    it('complete=true with no independent count: treated as incomplete, nothing unlisted judged', async () => {
+      await put(gone, 'u1', 'owner')
+      authOrgs = []
+      countOverride = null
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
+      expect(r.complete).toBe(false)
+      expect(await rows(gone)).toEqual([{ userId: 'u1', role: 'owner' }])
+    })
+
+    it('complete=true with a count that does not match what was read: incomplete', async () => {
+      await put(gone, 'u1', 'owner')
+      authOrgs = []
+      countOverride = 3
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
+      expect(r.complete).toBe(false)
+      expect(r.deleted).toEqual([])
+    })
+
+    it('a missing org with a proven-complete listing UNDER the cap: deleted', async () => {
+      await put(gone, 'u1', 'owner')
+      await put(gone, 'u2', 'member')
+      authOrgs = []
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 2,
+      })
+      expect(r.refused).toBeUndefined()
+      expect(r.deleted.map((d) => d.userId).sort()).toEqual(['u1', 'u2'])
+    })
+
+    it('the same OVER the cap: refuses, deletes nothing, reports what it would have', async () => {
+      await put(gone, 'u1', 'owner')
+      await put(gone, 'u2', 'member')
+      authOrgs = []
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 1,
+      })
+      expect(r.refused).toEqual({ planned: 2, maxDeletions: 1 })
+      expect(r.deleted).toEqual([])
+      expect((await rows(gone)).length).toBe(2)
     })
 
     // 🔴 A missing org in an INCOMPLETE listing proves nothing.
@@ -177,7 +249,11 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(gone, 'u1', 'owner')
       authOrgs = []
       complete = false
-      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
       expect(r.complete).toBe(false)
       expect(r.deleted).toEqual([])
       expect(await rows(gone)).toEqual([{ userId: 'u1', role: 'owner' }])
@@ -189,7 +265,11 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(a, 'late', 'member')
       authOrgs = [{ orgId: a, members: [] }]
       reread = () => ({ orgId: a, members: [{ userId: 'late', role: 'member' }] })
-      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        scope: ours,
+        maxDeletions: 50,
+      })
       expect(r.deleted).toEqual([])
       expect(await rows(a)).toEqual([{ userId: 'late', role: 'member' }])
     })
@@ -275,7 +355,9 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     authOrgs = [{ orgId: a, members: [{ userId: 'u1', role: 'member' }] }]
     reread = () => sleep(150).then(() => authOrgs[0]!)
     const runs = Array.from({ length: 11 }, () =>
-      lib.compareOrgMembers(db, source, { repair: true, only: ours }).catch((e: unknown) => e),
+      lib
+        .compareOrgMembers(db, source, { repair: true, scope: ours, maxDeletions: 50 })
+        .catch((e: unknown) => e),
     )
     const unrelated = await Promise.race([
       db.execute(sql`select 1`).then(() => 'answered'),
