@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, gte, inArray } from 'drizzle-orm'
 import type { Db } from '../db'
 import { auditLog, orgMember } from '../db/schema'
 import { auditRow, type AuditAction } from './audit'
@@ -61,6 +61,11 @@ export interface OrgListing {
   orgs: AuthOrg[]
   complete: boolean
   expectedCount?: number
+  /**
+   * When auth's state was read (ISO-8601, UTC). A backfill needs it: studio
+   * removals at or after this moment are not in the listing yet.
+   */
+  snapshotAt?: string
 }
 
 export interface MemberSource {
@@ -359,11 +364,82 @@ export interface BackfillCounts {
   busyOrgs: string[]
   /** Orgs whose member list is not proven complete: skipped, nothing inserted. */
   unproven: string[]
+  /** Members studio removed, demoted or lost with their org after the snapshot: not inserted. */
+  fenced: Array<{ orgId: string; userId: string }>
 }
 
 /** A real backfill run refused before writing anything. */
 export class BackfillRefused extends Error {
   override name = 'BackfillRefused'
+}
+
+/**
+ * Studio events that change or end a membership. One of these at or after the
+ * snapshot means the listing no longer describes that member (Sikkerhed C1 on
+ * #392): the routes write them in the same transaction as the change.
+ */
+const MEMBER_FENCE_ACTIONS = [
+  'member.removed',
+  'member.left',
+  'member.role_changed',
+  'member.sync_removed',
+] as const satisfies readonly AuditAction[]
+
+/**
+ * The snapshot's clock is auth's database, the audit row's is studio's. The
+ * fence starts this much before the snapshot so a skew between the two cannot
+ * let an event after it slip under. A wider fence only skips more inserts,
+ * and every skipped member is named.
+ */
+export const SNAPSHOT_CLOCK_MARGIN_MS = 5 * 60 * 1000
+
+/** A snapshot from further in the future than this is refused as a wrong clock. */
+const SNAPSHOT_FUTURE_LIMIT_MS = 60 * 1000
+
+/** Checks a real run's snapshot; returns where the fence starts. */
+function fenceStart(snapshotAt: string | undefined, maxAgeMinutes: number, now: Date): Date {
+  if (!Number.isFinite(maxAgeMinutes) || maxAgeMinutes <= 0) {
+    throw new BackfillRefused('maxAgeMinutes must be a positive number: nothing was written')
+  }
+  const at = snapshotAt ? new Date(snapshotAt) : null
+  if (!at || Number.isNaN(at.getTime())) {
+    throw new BackfillRefused('the listing carries no snapshot time: nothing was written')
+  }
+  const age = now.getTime() - at.getTime()
+  if (age < -SNAPSHOT_FUTURE_LIMIT_MS) {
+    throw new BackfillRefused('the snapshot time is in the future: nothing was written')
+  }
+  if (age > maxAgeMinutes * 60 * 1000) {
+    throw new BackfillRefused(
+      `the snapshot is ${Math.floor(age / 60000)} minutes old, over ${maxAgeMinutes}: nothing was written`,
+    )
+  }
+  return new Date(at.getTime() - SNAPSHOT_CLOCK_MARGIN_MS)
+}
+
+/**
+ * Members of one org that studio's audit shows changed at or after `from`;
+ * `all` when the org itself was deleted then.
+ */
+async function fencedMembers(
+  db: Db,
+  orgId: string,
+  from: Date,
+): Promise<{ all: boolean; users: Set<string> }> {
+  const events = await db
+    .select({ action: auditLog.action, targetId: auditLog.targetId })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.organizationId, orgId),
+        gte(auditLog.createdAt, from),
+        inArray(auditLog.action, [...MEMBER_FENCE_ACTIONS, 'organization.deleted']),
+      ),
+    )
+  return {
+    all: events.some((e) => e.action === 'organization.deleted'),
+    users: new Set(events.flatMap((e) => (e.targetId ? [e.targetId] : []))),
+  }
 }
 
 /**
@@ -381,13 +457,28 @@ export class BackfillRefused extends Error {
  * listing that is not proven complete before it writes anything, and an org
  * whose member list is not proven is skipped and named. If the second read
  * fails, the rows just inserted for that org are removed and the run stops.
+ *
+ * 🔴 THE SNAPSHOT IS OLDER THAN STUDIO (Sikkerhed C1 on #392). A member removed
+ * through studio after the snapshot has no row, which is exactly what a load
+ * fills in. So a real run needs the listing's `snapshotAt`, refuses one older
+ * than `maxAgeMinutes`, and skips (and names) every member whose membership
+ * studio's audit shows changed at or after it, and every member of an org
+ * deleted then. Whoever joins after the snapshot is simply missing: the
+ * routes wrote their row.
  */
 export async function backfillOrgMembers(
   db: Db,
   source: MemberSource,
-  opts: { dryRun: boolean },
+  opts: { dryRun: boolean; maxAgeMinutes: number; now?: () => Date },
 ): Promise<BackfillCounts> {
   const listing = await source.listOrgs()
+  // A dry run reports the fence too when it can, and refuses nothing.
+  let fenceFrom: Date | null = null
+  if (!opts.dryRun) {
+    fenceFrom = fenceStart(listing.snapshotAt, opts.maxAgeMinutes, opts.now?.() ?? new Date())
+  } else if (listing.snapshotAt && !Number.isNaN(Date.parse(listing.snapshotAt))) {
+    fenceFrom = new Date(Date.parse(listing.snapshotAt) - SNAPSHOT_CLOCK_MARGIN_MS)
+  }
   const orgs = listing.orgs
   const complete =
     listing.complete === true &&
@@ -405,6 +496,7 @@ export async function backfillOrgMembers(
     removedAfterReread: 0,
     busyOrgs: [],
     unproven: [],
+    fenced: [],
   }
   if (!opts.dryRun && !complete) {
     throw new BackfillRefused('the listing is not proven complete: nothing was written')
@@ -427,10 +519,18 @@ export async function backfillOrgMembers(
   async function loadOrg(org: AuthOrg) {
     await withOrgLockOn(db, org.orgId, async (db) => {
       const have = new Set((await studioRows(db, org.orgId)).map((r) => r.userId))
+      // Read under the lock, so a route cannot change the member in between.
+      const fence = fenceFrom
+        ? await fencedMembers(db, org.orgId, fenceFrom)
+        : { all: false, users: new Set<string>() }
       const toInsert: Array<{ userId: string; role: OrgRole }> = []
       for (const m of org.members) {
         if (have.has(m.userId)) {
           c.existing++
+          continue
+        }
+        if (fence.all || fence.users.has(m.userId)) {
+          c.fenced.push({ orgId: org.orgId, userId: m.userId })
           continue
         }
         const role = heldRole(m.role)

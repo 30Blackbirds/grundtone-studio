@@ -37,10 +37,14 @@ type Json = {
   complete: boolean
 }
 
+// Auth's snapshot time, as auth writes it (UTC, microseconds). Taken when the
+// file is loaded, so it is recent: a real run refuses an old snapshot.
+const SNAPSHOT = new Date().toISOString().replace('Z', '456Z')
+
 function green(): Json {
   return {
     format: 'klanghaus.org-members/1',
-    exportedAt: '2026-11-10T21:05:57.123456Z',
+    exportedAt: SNAPSHOT,
     orgCount: 2,
     memberTotal: 3,
     orgs: [
@@ -110,7 +114,7 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
 
   it('GREEN: a complete file with matching counts inserts every member, with audit rows', async () => {
     const { source } = await sourceFor(bytesOf(green()))
-    const c = await sync.backfillOrgMembers(db, source, { dryRun: false })
+    const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
     expect(c).toMatchObject({
       complete: true,
       orgs: 2,
@@ -138,18 +142,18 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
 
   it('a truncated file: refused, nothing written', async () => {
     const { source } = await sourceFor(bytesOf(green()).subarray(0, 150))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      fileSource.OrgMemberFileRefused,
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow(fileSource.OrgMemberFileRefused)
     await nothingWritten()
   })
 
   it('a file truncated after its digest was taken: refused, nothing written', async () => {
     const { path, source } = await sourceFor(bytesOf(green()))
     await writeFile(path, bytesOf(green()).subarray(0, 150))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      'does not match the expected sha256',
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow('does not match the expected sha256')
     await nothingWritten()
   })
 
@@ -157,9 +161,9 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.orgCount = 3
     const { source } = await sourceFor(bytesOf(j))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      'orgCount is 3',
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow('orgCount is 3')
     await nothingWritten()
   })
 
@@ -167,9 +171,9 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.orgs[1]!.memberCount = 2
     const { source } = await sourceFor(bytesOf(j))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      'orgs.1: memberCount is 2',
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow('orgs.1: memberCount is 2')
     await nothingWritten()
   })
 
@@ -177,9 +181,9 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.memberTotal = 4
     const { source } = await sourceFor(bytesOf(j))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      'memberTotal is 4',
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow('memberTotal is 4')
     await nothingWritten()
   })
 
@@ -191,7 +195,7 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
       .insert(schema.orgMember)
       .values({ organizationId: b, userId: 'u-route', role: 'member' })
     const { source } = await sourceFor(bytesOf(j))
-    const c = await sync.backfillOrgMembers(db, source, { dryRun: false })
+    const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
     expect(c).toMatchObject({ inserted: 2, unproven: [] })
     expect(await rows(b)).toEqual([{ userId: 'u-route', role: 'member' }])
     expect((await rows(a)).length).toBe(2)
@@ -201,7 +205,7 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.orgs[1]!.members[0]!.role = 'billing,member'
     const { source } = await sourceFor(bytesOf(j))
-    const c = await sync.backfillOrgMembers(db, source, { dryRun: false })
+    const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
     expect(c).toMatchObject({ inserted: 3, multipleRoles: 1 })
     expect(await rows(b)).toEqual([{ userId: 'u-billing', role: 'member' }])
   })
@@ -210,9 +214,9 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.orgs[1]!.members[0]!.userId = ''
     const { source } = await sourceFor(bytesOf(j))
-    await expect(sync.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
-      fileSource.OrgMemberFileRefused,
-    )
+    await expect(
+      sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow(fileSource.OrgMemberFileRefused)
     await nothingWritten()
   })
 
@@ -223,7 +227,7 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
     const j = green()
     j.orgs[1]!.members[0]!.userId = `never-seen-${randomUUID()}`
     const { source } = await sourceFor(bytesOf(j))
-    const c = await sync.backfillOrgMembers(db, source, { dryRun: false })
+    const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
     expect(c.inserted).toBe(3)
     expect((await rows(b)).length).toBe(1)
   })
@@ -239,10 +243,123 @@ describe.skipIf(!DATABASE_URL)('backfill from an export file (real Postgres)', (
         return source.readOrg(orgId)
       },
     }
-    await expect(sync.backfillOrgMembers(db, swapping, { dryRun: false })).rejects.toThrow(
-      'does not match the expected sha256',
-    )
+    await expect(
+      sync.backfillOrgMembers(db, swapping, { dryRun: false, maxAgeMinutes: 60 }),
+    ).rejects.toThrow('does not match the expected sha256')
     expect(await rows(a)).toEqual([])
     expect(await rows(b)).toEqual([])
+  })
+
+  // 🔴 Sikkerhed C1 on #392: a member who left through studio AFTER the export
+  // has no row, and a load fills in exactly that. Studio's audit since the
+  // snapshot decides.
+  describe('C1: a change in studio after the snapshot is not undone by the load', () => {
+    function withLeaver(): Json {
+      const j = green()
+      j.orgs[0] = {
+        orgId: a,
+        memberCount: 2,
+        members: [
+          { userId: 'u-stay', role: 'member' },
+          { userId: 'u-left', role: 'admin' },
+        ],
+      }
+      return j
+    }
+
+    /** An audit row the way the routes write it; `at` defaults to now. */
+    async function event(orgId: string, action: string, targetId: string, at?: Date) {
+      await db.insert(schema.auditLog).values({
+        organizationId: orgId,
+        action,
+        targetType: action === 'organization.deleted' ? 'organization' : 'member',
+        targetId,
+        ...(at ? { createdAt: at } : {}),
+      })
+    }
+
+    it('PROBE: a member who left after the export is not inserted again, and is named', async () => {
+      await event(a, 'member.left', 'u-left')
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(await rows(a)).toEqual([{ userId: 'u-stay', role: 'member' }])
+      expect(c.fenced).toEqual([{ orgId: a, userId: 'u-left' }])
+      expect(c.inserted).toBe(2)
+    })
+
+    it('CONTROL: the same file with no event after the export inserts both', async () => {
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(await rows(a)).toEqual([
+        { userId: 'u-left', role: 'admin' },
+        { userId: 'u-stay', role: 'member' },
+      ])
+      expect(c.fenced).toEqual([])
+    })
+
+    it('CONTROL: an event well before the export does not block the insert', async () => {
+      await event(a, 'member.left', 'u-left', new Date(Date.parse(SNAPSHOT) - 60 * 60_000))
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(c.fenced).toEqual([])
+      expect((await rows(a)).map((r) => r.userId)).toEqual(['u-left', 'u-stay'])
+    })
+
+    it('CONTROL: an event for the same user in ANOTHER org does not block this one', async () => {
+      await event(b, 'member.removed', 'u-left')
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(c.fenced).toEqual([])
+      expect((await rows(a)).map((r) => r.userId)).toEqual(['u-left', 'u-stay'])
+    })
+
+    it('an event inside the clock margin before the export still blocks (fails closed)', async () => {
+      await event(a, 'member.left', 'u-left', new Date(Date.parse(SNAPSHOT) - 60_000))
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(c.fenced).toEqual([{ orgId: a, userId: 'u-left' }])
+    })
+
+    it.each(['member.removed', 'member.role_changed', 'member.sync_removed'])(
+      '%s after the export: not inserted, named',
+      async (action) => {
+        await event(a, action, 'u-left')
+        const { source } = await sourceFor(bytesOf(withLeaver()))
+        const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+        expect(await rows(a)).toEqual([{ userId: 'u-stay', role: 'member' }])
+        expect(c.fenced).toEqual([{ orgId: a, userId: 'u-left' }])
+      },
+    )
+
+    it('organization.deleted after the export: nobody in that org is inserted; the other org is', async () => {
+      await event(a, 'organization.deleted', a)
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(await rows(a)).toEqual([])
+      expect(c.fenced).toEqual([
+        { orgId: a, userId: 'u-stay' },
+        { orgId: a, userId: 'u-left' },
+      ])
+      expect(await rows(b)).toEqual([{ userId: 'u-billing', role: 'billing' }])
+    })
+
+    it('a dry run names the same members and writes nothing', async () => {
+      await event(a, 'member.left', 'u-left')
+      const { source } = await sourceFor(bytesOf(withLeaver()))
+      const c = await sync.backfillOrgMembers(db, source, { dryRun: true, maxAgeMinutes: 60 })
+      expect(c.fenced).toEqual([{ orgId: a, userId: 'u-left' }])
+      expect(c.inserted).toBe(2)
+      expect(await rows(a)).toEqual([])
+    })
+
+    it('an export older than maxAgeMinutes: refused, nothing written', async () => {
+      const j = green()
+      j.exportedAt = new Date(Date.now() - 31 * 60_000).toISOString()
+      const { source } = await sourceFor(bytesOf(j))
+      await expect(
+        sync.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 30 }),
+      ).rejects.toThrow(sync.BackfillRefused)
+      await nothingWritten()
+    })
   })
 })

@@ -15,8 +15,9 @@ import type { AuthOrg, MemberSource, OrgListing } from './org-member-sync'
 //
 // 🔴 WHAT THE SECOND READ PROVES HERE: readOrg reads the file again and checks
 // its digest again, so it confirms the SNAPSHOT, not auth as it is now. A
-// member removed in auth after the export would still be loaded. That gap is
-// closed by how the export and the load are run, not by this code.
+// member removed in auth after the export would still be in it. The backfill
+// closes that for removals through studio: the listing carries `exportedAt`,
+// and studio's audit since then decides (Sikkerhed C1 on #392).
 //
 // No CLI, task or route calls this: the backfill grants, and a run needs
 // Allan's word.
@@ -143,7 +144,12 @@ export function fileMemberSource(opts: { path: string; sha256: string }): Member
   return {
     async listOrgs(): Promise<OrgListing> {
       const file = await load()
-      return { orgs: file.orgs.map(toAuthOrg), complete: true, expectedCount: file.orgCount }
+      return {
+        orgs: file.orgs.map(toAuthOrg),
+        complete: true,
+        expectedCount: file.orgCount,
+        snapshotAt: file.exportedAt,
+      }
     },
     async readOrg(orgId) {
       const org = (await load()).orgs.find((o) => o.orgId === orgId)
