@@ -1,6 +1,7 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
 import { membershipDeps, removeMember } from '~~/server/lib/org-membership'
 import { requireOrgRole } from '~~/server/lib/project-access'
+import { assertSameOrigin } from '~~/server/lib/org-membership-input'
 
 defineRouteMeta({
   openAPI: {
@@ -10,6 +11,8 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  // Before anything else: a cross-origin page must not reach the cookie.
+  assertSameOrigin(event)
   const orgId = getRouterParam(event, 'orgId')
   const memberId = getRouterParam(event, 'memberId')
   if (!orgId || !memberId) {

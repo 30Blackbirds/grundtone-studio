@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, readBody, setResponseStatus } from 'h3'
 import { z } from 'zod'
-import { parseBody } from '~~/server/lib/org-membership-input'
+import { assertSameOrigin, parseBody } from '~~/server/lib/org-membership-input'
 import { createOrganization, membershipDeps } from '~~/server/lib/org-membership'
 
 // Create an org. Auth creates it and makes the caller its owner; studio
@@ -23,6 +23,8 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  // Before anything else: a cross-origin page must not reach the cookie.
+  assertSameOrigin(event)
   const actor = event.context.auth
   if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   const body = parseBody(bodySchema, await readBody(event))

@@ -1,12 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeEvent, mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 
-// authCaller: what studio's server sends to auth, and how it reads the answer.
-// The order of the writes around it is in org-membership.pg.test.ts.
+// What studio's server sends to auth, where to, and how it reads the answer;
+// and the up-front refusal when that is not configured. The order of the writes
+// around it is in org-membership.pg.test.ts.
 
 vi.mock('h3', () => mockH3())
-vi.mock('./org-lookup', () => ({ authBase: () => 'http://auth.test' }))
 vi.mock('./audit', () => ({ auditRow: () => ({}) }))
+vi.mock('./metrics', () => ({ recordOrgWriteIncomplete: vi.fn() }))
 vi.mock('./project-access', () => ({
   ORG_ROLES: ['billing', 'member', 'admin', 'manager', 'owner'],
   orgRoleHelpers: {},
@@ -15,9 +16,11 @@ vi.mock('./project-access', () => ({
 const fetchMock = vi.fn()
 vi.stubGlobal('$fetch', fetchMock)
 
-const { authCaller, AuthOutcomeUnknown, AuthRefused, ORG_WRITE_CREDENTIAL_HEADER } =
+const { authCaller, AuthOutcomeUnknown, AuthRefused, ORG_WRITE_CREDENTIAL_HEADER, orgWriteTarget } =
   await import('./org-membership')
 
+const SECRET = 's'.repeat(32)
+const target = { base: 'http://auth.internal', credential: SECRET }
 const event = fakeEvent({
   headers: { cookie: 'session=abc', origin: 'https://studio.test', 'x-other': 'no' },
 }) as never
@@ -26,35 +29,23 @@ beforeEach(() => {
   fetchMock.mockReset()
   fetchMock.mockResolvedValue({ ok: true })
 })
-afterEach(() => vi.unstubAllEnvs())
 
 describe('authCaller', () => {
-  it('POSTs to auth’s organization path as the user: cookie and origin, nothing else', async () => {
-    vi.stubEnv('ORG_WRITE_SERVICE_SECRET', '')
-    await authCaller(event)('leave', { organizationId: 'org-1' })
+  it('POSTs to the internal auth URL as the user: cookie, origin, credential, nothing else', async () => {
+    await authCaller(event, target)('leave', { organizationId: 'org-1' })
     const [url, opts] = fetchMock.mock.calls[0]!
-    expect(url).toBe('http://auth.test/api/auth/organization/leave')
+    expect(url).toBe('http://auth.internal/api/auth/organization/leave')
     expect(opts).toMatchObject({ method: 'POST', body: { organizationId: 'org-1' } })
-    expect(opts.headers).toEqual({ cookie: 'session=abc', origin: 'https://studio.test' })
-  })
-
-  it('attaches the org-write credential when the secret is set', async () => {
-    vi.stubEnv('ORG_WRITE_SERVICE_SECRET', 'test-value')
-    await authCaller(event)('leave', { organizationId: 'org-1' })
-    expect(fetchMock.mock.calls[0]![1].headers[ORG_WRITE_CREDENTIAL_HEADER]).toBe('test-value')
-  })
-
-  it('sends no credential header when the secret is unset', async () => {
-    vi.stubEnv('ORG_WRITE_SERVICE_SECRET', '')
-    await authCaller(event)('leave', { organizationId: 'org-1' })
-    expect(Object.keys(fetchMock.mock.calls[0]![1].headers)).not.toContain(
-      ORG_WRITE_CREDENTIAL_HEADER,
-    )
+    expect(opts.headers).toEqual({
+      cookie: 'session=abc',
+      origin: 'https://studio.test',
+      [ORG_WRITE_CREDENTIAL_HEADER]: SECRET,
+    })
   })
 
   it('a 4xx is auth deciding: AuthRefused, with the status', async () => {
     fetchMock.mockRejectedValue(Object.assign(new Error('x'), { status: 403, data: { code: 'F' } }))
-    const err = await authCaller(event)('leave', {}).catch((e: unknown) => e)
+    const err = await authCaller(event, target)('leave', {}).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(AuthRefused)
     expect((err as InstanceType<typeof AuthRefused>).status).toBe(403)
   })
@@ -63,11 +54,56 @@ describe('authCaller', () => {
   // never read as "nothing happened".
   it('a 5xx after auth may have committed is UNKNOWN, not a refusal', async () => {
     fetchMock.mockRejectedValue(Object.assign(new Error('x'), { status: 502 }))
-    await expect(authCaller(event)('leave', {})).rejects.toBeInstanceOf(AuthOutcomeUnknown)
+    await expect(authCaller(event, target)('leave', {})).rejects.toBeInstanceOf(AuthOutcomeUnknown)
   })
 
   it('no answer at all (network, timeout) is unknown', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'))
-    await expect(authCaller(event)('leave', {})).rejects.toBeInstanceOf(AuthOutcomeUnknown)
+    await expect(authCaller(event, target)('leave', {})).rejects.toBeInstanceOf(AuthOutcomeUnknown)
+  })
+
+  // The error that reaches logs carries a status, never the request's headers.
+  it('the error it throws does not carry the credential', async () => {
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error(`[POST] header ${SECRET}`), { status: 503 }),
+    )
+    const err = await authCaller(event, target)('leave', {}).catch((e: unknown) => e)
+    expect(String((err as Error).message)).not.toContain(SECRET)
+  })
+})
+
+describe('orgWriteTarget: refused up front, 503, before anything is written or asked', () => {
+  const ok = { AUTH_INTERNAL_URL: 'http://auth.internal', ORG_WRITE_SERVICE_SECRET: SECRET }
+
+  it('both set, the secret at least 32 bytes: the target', () => {
+    expect(orgWriteTarget(ok)).toEqual(target)
+  })
+
+  it.each([
+    ['the secret unset', { ...ok, ORG_WRITE_SERVICE_SECRET: undefined }],
+    ['the secret empty', { ...ok, ORG_WRITE_SERVICE_SECRET: '' }],
+    ['the secret 31 bytes', { ...ok, ORG_WRITE_SERVICE_SECRET: 's'.repeat(31) }],
+    // 🔴 Never the public issuer: these calls go to the internal address only.
+    [
+      'no AUTH_INTERNAL_URL, even with AUTH_ISSUER set',
+      {
+        AUTH_ISSUER: 'https://auth.public',
+        ORG_WRITE_SERVICE_SECRET: SECRET,
+      },
+    ],
+  ])('%s → 503 org_write_unconfigured', (_name, env) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() => orgWriteTarget(env as NodeJS.ProcessEnv)).toThrow(
+      expect.objectContaining({ statusCode: 503, data: { code: 'org_write_unconfigured' } }),
+    )
+  })
+
+  it('the refusal names what is missing and never the value', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const short = 'short-secret-value'
+    expect(() => orgWriteTarget({ ...ok, ORG_WRITE_SERVICE_SECRET: short })).toThrow()
+    const logged = log.mock.calls.flat().join(' ')
+    expect(logged).toContain('ORG_WRITE_SERVICE_SECRET')
+    expect(logged).not.toContain(short)
   })
 })

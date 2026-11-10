@@ -18,7 +18,7 @@ export interface FullOrg {
   members?: Array<{ id: string; userId: string; role: string }>
 }
 
-export function authBase(): string {
+function authBase(): string {
   // Server-side kald til auth → brug container-intern adresse (auth:3000) når
   // sat; iss-claim-URL'en (AUTH_ISSUER = browser-vendt localhost:3002) er ikke
   // nåbar inde fra studios container.

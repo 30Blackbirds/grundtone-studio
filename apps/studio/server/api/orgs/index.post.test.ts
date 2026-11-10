@@ -13,6 +13,8 @@ vi.mock('~~/server/lib/org-membership', () => ({
   createOrganization: (...a: unknown[]) => op(...a),
 }))
 
+const SAME_ORIGIN = { origin: 'https://studio.test', host: 'studio.test' }
+
 const { default: handler } = await import('./index.post')
 
 beforeEach(() => {
@@ -23,6 +25,7 @@ beforeEach(() => {
 describe('POST /api/orgs', () => {
   it('creates as the caller and answers 201', async () => {
     const event = fakeEvent({
+      headers: SAME_ORIGIN,
       body: { name: 'Acme', slug: 'acme' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
     })
@@ -33,6 +36,7 @@ describe('POST /api/orgs', () => {
 
   it('a bad slug is 400 and nothing is called', async () => {
     const event = fakeEvent({
+      headers: SAME_ORIGIN,
       body: { name: 'Acme', slug: 'Not OK' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
     })
@@ -41,8 +45,34 @@ describe('POST /api/orgs', () => {
   })
 
   it('no actor is 401', async () => {
-    await expect(handler(fakeEvent({ body: {}, context: {} }) as never)).rejects.toMatchObject({
+    await expect(
+      handler(fakeEvent({ headers: SAME_ORIGIN, body: {}, context: {} }) as never),
+    ).rejects.toMatchObject({
       statusCode: 401,
     })
+  })
+
+  // 🔴 Per route: a page on another origin is refused before anything runs.
+  it('a cross-origin request is 403 cross_origin, and the operation is never called', async () => {
+    const event = fakeEvent({
+      headers: { origin: 'https://evil.test', host: 'studio.test' },
+      body: { name: 'Acme', slug: 'acme' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'cross_origin' },
+    })
+    expect(op).not.toHaveBeenCalled()
+  })
+
+  it('no Origin at all is refused too', async () => {
+    const event = fakeEvent({
+      headers: { host: 'studio.test' },
+      body: { name: 'Acme', slug: 'acme' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({ statusCode: 403 })
+    expect(op).not.toHaveBeenCalled()
   })
 })

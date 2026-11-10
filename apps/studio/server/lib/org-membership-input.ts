@@ -1,4 +1,4 @@
-import { createError } from 'h3'
+import { createError, getRequestHeader, type H3Event } from 'h3'
 import type { z } from 'zod'
 import type { OrgRole } from './project-access'
 
@@ -36,4 +36,42 @@ export function parseBody<T extends z.ZodTypeAny>(schema: T, raw: unknown): z.in
     })
   }
   return parsed.data
+}
+
+/**
+ * 🔴 CSRF, NOW STUDIO'S JOB. These routes act with the caller's session cookie,
+ * and once studio's server is the one calling auth, auth's own Origin check
+ * sees studio's request, not the browser's page. Without a check here a page on
+ * another site could make a signed-in user's browser change org membership
+ * through studio (a confused deputy).
+ *
+ * Same origin only: the request must carry an Origin whose host is the host it
+ * was sent to, or the host of the configured public app URL. A missing Origin
+ * is refused too; browsers send it on every POST, PATCH and DELETE, and nothing
+ * server-side calls these routes. `Sec-Fetch-Site`, when present (a page cannot
+ * set it), must say `same-origin`.
+ */
+export function assertSameOrigin(event: H3Event, appUrl = process.env.NUXT_PUBLIC_APP_URL): void {
+  const origin = getRequestHeader(event, 'origin')
+  const site = getRequestHeader(event, 'sec-fetch-site')
+  const allowed = new Set(
+    [getRequestHeader(event, 'host'), hostOf(appUrl)].filter((h): h is string => Boolean(h)),
+  )
+  const from = hostOf(origin)
+  if (!from || !allowed.has(from) || (site && site !== 'same-origin')) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Cross-origin request refused',
+      data: { code: 'cross_origin' },
+    })
+  }
+}
+
+function hostOf(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    return new URL(url).host || null
+  } catch {
+    return null
+  }
 }

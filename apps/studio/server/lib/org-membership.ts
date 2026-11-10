@@ -4,40 +4,37 @@ import type { Db } from '../db'
 import { auditLog, orgMember } from '../db/schema'
 import { auditRow, type AuditEventInput } from './audit'
 import { canAssignRole, canManageMember } from './org-membership-input'
-import { authBase } from './org-lookup'
+import { recordOrgWriteIncomplete } from './metrics'
 import { ORG_ROLES, orgRoleHelpers, type OrgRole } from './project-access'
 
 // Studio's writes of org membership. Every change of who holds which org role
 // goes through here, so that org_member always follows it.
 //
-// TWO SYSTEMS, ONE TRANSACTION. Auth keeps its own member table: the active
-// org and the JWT's tenant claim depend on it, and auth's hooks mirror it into
-// the permissions service. So each change is written twice: to auth, through
-// its organization API with the user's own session (auth still decides whether
-// the actor may do it), and to org_member, inside one studio transaction
-// together with the audit row. Postgres and auth share no transaction, so the
-// ORDER is chosen so that no failure leaves studio allowing what auth took away:
+// TWO SYSTEMS. Auth keeps its own member table: the active org and the JWT's
+// tenant claim depend on it, and auth's hooks mirror it into the permissions
+// service. So each change is written twice: to auth, through its organization
+// API with the user's own session (auth still decides whether the actor may do
+// it), and to org_member. Postgres and auth share no transaction, so the ORDER
+// is chosen so that NO failure leaves studio allowing more than auth does:
 //
 //   grant    (create org, accept invitation, a role change that only adds
-//            rights): auth is called inside the open transaction, and studio
-//            commits only after auth said yes. Auth refuses or fails: rollback,
-//            nothing changed. Auth said yes and the commit fails: auth has the
-//            member, studio does not, so studio denies (fail-closed).
+//            rights): auth FIRST; studio writes the row (and its audit row, in
+//            one transaction) only after auth said yes. Auth refuses or does not
+//            answer: nothing is written. Auth said yes and studio's write fails:
+//            the row is missing, so studio denies (fail-closed).
 //
 //   revoke   (delete org, remove member, leave, a role change that takes any
-//            right away): studio writes the lower state first, then calls auth
-//            inside the same transaction. Auth refuses (4xx): rollback, nothing
-//            changed. Auth's answer is unknown (network, 5xx): studio COMMITS
-//            the lower state anyway, and for a role change it removes the row
-//            entirely, because the new role may hold a right auth never gave.
-//            The route answers 502 `auth_pending`. Auth said yes and the commit
-//            fails: the removal is retried once outside the transaction; if that
-//            fails too, the route answers 500 `org_member_stale` and the row is
-//            left behind. That last case is the only one that fails OPEN, and
-//            only while Postgres refuses two writes in a row.
+//            right away): studio's row is removed and COMMITTED FIRST, then auth
+//            is called. Auth refuses (4xx): the removed row is put back. Auth's
+//            answer is unknown (network, 5xx, where auth may have committed):
+//            the row stays removed, 502 `auth_pending`. Auth said yes: for a role
+//            change the new role is written now, after auth agreed, so a right
+//            the new role adds (admin -> billing gains billing) is never held
+//            before auth holds it. Any failure after the first commit leaves too
+//            little access, never too much.
 //
-// What is left behind after a failure is found by comparing auth's members
-// with org_member. Nothing in this module repairs it.
+// Every fail-closed ending is counted (recordOrgWriteIncomplete) and logged.
+// What is left behind is found by comparing auth's members with org_member.
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 type Exec = Db | Tx
@@ -77,35 +74,41 @@ const AUTH_TIMEOUT_MS = 10_000
  */
 export const ORG_WRITE_CREDENTIAL_HEADER = 'x-klanghaus-org-write-credential'
 
+/** Where and how studio's server reaches auth for org writes (membershipDeps). */
+export interface OrgWriteTarget {
+  /** AUTH_INTERNAL_URL only: these calls never go to the public issuer. */
+  base: string
+  /** ORG_WRITE_SERVICE_SECRET; never empty (membershipDeps refuses that). */
+  credential: string
+}
+
 /**
  * Calls auth as the signed-in user: the request's own cookie and origin (auth
- * checks the origin of cookie POSTs), plus the org-write credential when
- * ORG_WRITE_SERVICE_SECRET is set. Unset sends no header: before auth's guard
- * that changes nothing, after it every write is refused (closed, and loud).
+ * checks the origin of cookie POSTs), plus the org-write credential. The
+ * credential is never logged: errors below carry auth's status and data only.
  */
-export function authCaller(event: H3Event): AuthCall {
+export function authCaller(event: H3Event, target: OrgWriteTarget): AuthCall {
   const cookie = getRequestHeader(event, 'cookie')
   const origin = getRequestHeader(event, 'origin')
   return async (path, body) => {
-    const credential = process.env.ORG_WRITE_SERVICE_SECRET
     try {
-      return await $fetch(`${authBase()}/api/auth/organization/${path}`, {
+      return await $fetch(`${target.base}/api/auth/organization/${path}`, {
         method: 'POST',
         body,
         timeout: AUTH_TIMEOUT_MS,
         headers: {
           ...(cookie ? { cookie } : {}),
           ...(origin ? { origin } : {}),
-          ...(credential ? { [ORG_WRITE_CREDENTIAL_HEADER]: credential } : {}),
+          [ORG_WRITE_CREDENTIAL_HEADER]: target.credential,
         },
       })
     } catch (err) {
-      const e = err as { status?: number; statusCode?: number; data?: unknown; message?: string }
+      const e = err as { status?: number; statusCode?: number; data?: unknown }
       const status = e?.status ?? e?.statusCode
       if (status && status >= 400 && status < 500) throw new AuthRefused(status, e.data)
       // A 5xx is NOT "nothing happened": auth may have committed and lost the
       // response. It is unknown, like a timeout.
-      throw new AuthOutcomeUnknown(e?.message ?? String(err))
+      throw new AuthOutcomeUnknown(status ? `auth answered ${status}` : 'auth did not answer')
     }
   }
 }
@@ -164,79 +167,104 @@ async function grant<T>(
   event: H3Event | null,
 ): Promise<T> {
   const audit = deps.audit ?? insertAudit
-  return deps.db.transaction(async (tx) => {
-    let answer: T
-    try {
-      answer = (await deps.auth(path, body)) as T
-    } catch (err) {
-      authError(err)
+  let answer: T
+  try {
+    answer = (await deps.auth(path, body)) as T
+  } catch (err) {
+    authError(err)
+  }
+  try {
+    return await deps.db.transaction(async (tx) => {
+      const entry = await write(tx, answer)
+      await audit(tx, auditRow(event, entry))
+      return answer
+    })
+  } catch (err) {
+    // A 502 badAnswer is already a deliberate refusal to record; anything else
+    // is studio failing after auth said yes. Either way the row is missing.
+    if ((err as { data?: { code?: string } })?.data?.code !== 'auth_unexpected_answer') {
+      recordOrgWriteIncomplete('not_recorded')
+      console.error('[org-membership] auth said yes to', path, 'and studio did not record it')
     }
-    const entry = await write(tx, answer)
-    await audit(tx, auditRow(event, entry))
-    return answer
-  })
+    throw err
+  }
+}
+
+type MemberRow = typeof orgMember.$inferSelect
+
+interface RevokeSteps {
+  /** Removes the rows that hold the right; returns them so they can be put back. */
+  remove: (tx: Tx) => Promise<MemberRow[]>
+  /** After auth said yes: what the change leaves (a role change's new role). */
+  apply?: (tx: Tx) => Promise<void>
+  entry: AuditEventInput
 }
 
 async function revoke<T>(
   deps: MembershipDeps,
   path: string,
   body: Record<string, unknown>,
-  lower: (exec: Exec) => Promise<void>,
-  closeAll: (exec: Exec) => Promise<void>,
-  entry: AuditEventInput,
+  steps: RevokeSteps,
   event: H3Event | null,
 ): Promise<T> {
   const audit = deps.audit ?? insertAudit
-  let authSaidYes = false
-  let pending = false
-  let answer: T | undefined
+  // 1. Studio drops the right and commits, before auth is asked.
+  const removed = await deps.db.transaction((tx) => steps.remove(tx))
+
+  // 2. Auth.
+  let answer: T
+  try {
+    answer = (await deps.auth(path, body)) as T
+  } catch (err) {
+    if (err instanceof AuthRefused) {
+      // Auth decided no: nothing changed there, so put studio's rows back.
+      try {
+        if (removed.length) await deps.db.insert(orgMember).values(removed).onConflictDoNothing()
+      } catch {
+        recordOrgWriteIncomplete('restore_failed')
+        console.error('[org-membership] could not restore org_member after a refused', path)
+      }
+      authError(err)
+    }
+    if (err instanceof AuthOutcomeUnknown) {
+      recordOrgWriteIncomplete('auth_pending')
+      try {
+        await audit(deps.db, auditRow(event, { ...steps.entry, after: { authPending: true } }))
+      } catch {
+        // The access state is already the safe one; the audit row is not.
+      }
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'Removed in studio; auth did not confirm it',
+        data: { code: 'auth_pending' },
+      })
+    }
+    throw err
+  }
+
+  // 3. Auth said yes: write what the change leaves, and the audit row.
   try {
     await deps.db.transaction(async (tx) => {
-      await lower(tx)
-      try {
-        answer = (await deps.auth(path, body)) as T
-        authSaidYes = true
-      } catch (err) {
-        if (!(err instanceof AuthOutcomeUnknown)) throw err
-        pending = true
-        await closeAll(tx)
-      }
-      await audit(tx, auditRow(event, pending ? { ...entry, after: { authPending: true } } : entry))
+      if (steps.apply) await steps.apply(tx)
+      await audit(tx, auditRow(event, steps.entry))
     })
-  } catch (err) {
-    if (authSaidYes) {
-      // Auth removed it and studio's commit did not land: the one way this can
-      // fail open. Retry the removal on its own; report loudly if that fails.
-      try {
-        await closeAll(deps.db)
-      } catch (retryErr) {
-        console.error('[org-membership] org_member left behind after', path, retryErr)
-        throw createError({
-          statusCode: 500,
-          statusMessage: 'Changed in auth; studio could not record it',
-          data: { code: 'org_member_stale' },
-        })
-      }
-      return answer as T
-    }
-    authError(err)
-  }
-  if (pending) {
+  } catch {
+    recordOrgWriteIncomplete('not_recorded')
+    console.error('[org-membership] auth said yes to', path, 'and studio did not record it')
     throw createError({
-      statusCode: 502,
-      statusMessage: 'Removed in studio; auth did not confirm it',
-      data: { code: 'auth_pending' },
+      statusCode: 500,
+      statusMessage: 'Changed in auth; studio holds less access than auth until it is recorded',
+      data: { code: 'org_member_not_recorded' },
     })
   }
-  return answer as T
+  return answer
 }
 
 const rowOf = (orgId: string, userId: string) =>
   and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, userId))
 
-const deleteRow = (orgId: string, userId: string) => async (exec: Exec) => {
-  await exec.delete(orgMember).where(rowOf(orgId, userId))
-}
+const deleteRow = (orgId: string, userId: string) => (tx: Tx) =>
+  tx.delete(orgMember).where(rowOf(orgId, userId)).returning()
 
 function badAnswer(what: string): never {
   // Auth said yes but not in a form studio can record: nothing is written, so
@@ -371,7 +399,15 @@ export async function changeMemberRole(
       event,
     )
   }
-  return revoke(deps, 'update-member-role', body, setRole, deleteRow(orgId, m.userId), entry, event)
+  // Revoke path: the row goes first, and the new role is written only after
+  // auth agreed, so no right of the new role is held early.
+  return revoke(
+    deps,
+    'update-member-role',
+    body,
+    { remove: deleteRow(orgId, m.userId), apply: setRole, entry },
+    event,
+  )
 }
 
 export async function removeMember(
@@ -383,19 +419,19 @@ export async function removeMember(
 ) {
   const m = await memberOf(deps, orgId, memberId)
   assertMayManage(actorRole, m.role)
-  const remove = deleteRow(orgId, m.userId)
   return revoke(
     deps,
     'remove-member',
     { memberIdOrEmail: memberId, organizationId: orgId },
-    remove,
-    remove,
     {
-      organizationId: orgId,
-      action: 'member.removed',
-      targetType: 'member',
-      targetId: m.userId,
-      before: { role: m.role },
+      remove: deleteRow(orgId, m.userId),
+      entry: {
+        organizationId: orgId,
+        action: 'member.removed',
+        targetType: 'member',
+        targetId: m.userId,
+        before: { role: m.role },
+      },
     },
     event,
   )
@@ -407,33 +443,38 @@ export async function leaveOrganization(
   actorId: string,
   orgId: string,
 ) {
-  const remove = deleteRow(orgId, actorId)
+  // Auth fires no hook on leave, so this route is the only thing that ends a
+  // leaver's org role in studio.
   return revoke(
     deps,
     'leave',
     { organizationId: orgId },
-    remove,
-    remove,
-    { organizationId: orgId, action: 'member.left', targetType: 'member', targetId: actorId },
+    {
+      remove: deleteRow(orgId, actorId),
+      entry: {
+        organizationId: orgId,
+        action: 'member.left',
+        targetType: 'member',
+        targetId: actorId,
+      },
+    },
     event,
   )
 }
 
 export async function deleteOrganization(deps: MembershipDeps, event: H3Event, orgId: string) {
-  const removeAll = async (exec: Exec) => {
-    await exec.delete(orgMember).where(eq(orgMember.organizationId, orgId))
-  }
   return revoke(
     deps,
     'delete',
     { organizationId: orgId },
-    removeAll,
-    removeAll,
     {
-      organizationId: orgId,
-      action: 'organization.deleted',
-      targetType: 'organization',
-      targetId: orgId,
+      remove: (tx) => tx.delete(orgMember).where(eq(orgMember.organizationId, orgId)).returning(),
+      entry: {
+        organizationId: orgId,
+        action: 'organization.deleted',
+        targetType: 'organization',
+        targetId: orgId,
+      },
     },
     event,
   )
@@ -472,12 +513,40 @@ export async function inviteMember(
   )
 }
 
+const MIN_CREDENTIAL_BYTES = 32
+
+/**
+ * The org-write target from the environment, or 503 `org_write_unconfigured`
+ * before anything is written or asked. Names what is missing, never a value.
+ */
+export function orgWriteTarget(env: NodeJS.ProcessEnv = process.env): OrgWriteTarget {
+  const base = env.AUTH_INTERNAL_URL
+  const credential = env.ORG_WRITE_SERVICE_SECRET
+  const missing = [
+    ...(base ? [] : ['AUTH_INTERNAL_URL']),
+    ...(credential && Buffer.byteLength(credential) >= MIN_CREDENTIAL_BYTES
+      ? []
+      : [`ORG_WRITE_SERVICE_SECRET (unset or under ${MIN_CREDENTIAL_BYTES} bytes)`]),
+  ]
+  if (missing.length) {
+    recordOrgWriteIncomplete('unconfigured')
+    console.error('[org-membership] org writes are off; missing:', missing.join(', '))
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Org membership changes are not configured on this server',
+      data: { code: 'org_write_unconfigured' },
+    })
+  }
+  return { base: base!, credential: credential! }
+}
+
 /** The production wiring: the real database, auth as the signed-in user. */
 export async function membershipDeps(event: H3Event): Promise<MembershipDeps> {
+  const target = orgWriteTarget()
   const [{ db }, { lookupOrgById }] = await Promise.all([import('../db'), import('./org-lookup')])
   return {
     db,
-    auth: authCaller(event),
+    auth: authCaller(event, target),
     members: async (orgId) => (await lookupOrgById(event, orgId))?.members ?? null,
   }
 }

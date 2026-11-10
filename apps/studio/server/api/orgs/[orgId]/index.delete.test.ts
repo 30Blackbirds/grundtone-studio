@@ -30,6 +30,8 @@ vi.mock('~~/server/lib/project-access', () => {
   }
 })
 
+const SAME_ORIGIN = { origin: 'https://studio.test', host: 'studio.test' }
+
 const { default: handler } = await import('./index.delete')
 
 beforeEach(() => {
@@ -40,6 +42,7 @@ beforeEach(() => {
 describe('DELETE /api/orgs/:orgId', () => {
   it('an owner deletes the org named in the path', async () => {
     const event = fakeEvent({
+      headers: SAME_ORIGIN,
       params: { orgId: 'org-1' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
     })
@@ -53,6 +56,7 @@ describe('DELETE /api/orgs/:orgId', () => {
     await expect(
       handler(
         fakeEvent({
+          headers: SAME_ORIGIN,
           params: { orgId: 'org-1' },
           context: { auth: { sub: 'u-1', tenant: 'org-1' } },
         }) as never,
@@ -60,5 +64,29 @@ describe('DELETE /api/orgs/:orgId', () => {
     ).rejects.toMatchObject({ statusCode: 403 })
     expect(op).not.toHaveBeenCalled()
     orgRole = 'owner'
+  })
+
+  // 🔴 Per route: a page on another origin is refused before anything runs.
+  it('a cross-origin request is 403 cross_origin, and the operation is never called', async () => {
+    const event = fakeEvent({
+      headers: { origin: 'https://evil.test', host: 'studio.test' },
+      params: { orgId: 'org-1' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'cross_origin' },
+    })
+    expect(op).not.toHaveBeenCalled()
+  })
+
+  it('no Origin at all is refused too', async () => {
+    const event = fakeEvent({
+      headers: { host: 'studio.test' },
+      params: { orgId: 'org-1' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({ statusCode: 403 })
+    expect(op).not.toHaveBeenCalled()
   })
 })

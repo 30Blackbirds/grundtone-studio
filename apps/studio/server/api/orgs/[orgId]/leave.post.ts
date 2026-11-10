@@ -1,11 +1,14 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
 import { leaveOrganization, membershipDeps } from '~~/server/lib/org-membership'
+import { assertSameOrigin } from '~~/server/lib/org-membership-input'
 
 defineRouteMeta({
   openAPI: { summary: 'The caller leaves the organization.', tags: ['Org'] },
 })
 
 export default defineEventHandler(async (event) => {
+  // Before anything else: a cross-origin page must not reach the cookie.
+  assertSameOrigin(event)
   const actor = event.context.auth
   if (!actor) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   const orgId = getRouterParam(event, 'orgId')

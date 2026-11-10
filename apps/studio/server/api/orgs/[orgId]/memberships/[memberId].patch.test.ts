@@ -30,6 +30,8 @@ vi.mock('~~/server/lib/project-access', () => {
   }
 })
 
+const SAME_ORIGIN = { origin: 'https://studio.test', host: 'studio.test' }
+
 const { default: handler } = await import('./[memberId].patch')
 
 beforeEach(() => {
@@ -40,6 +42,7 @@ beforeEach(() => {
 describe('PATCH /api/orgs/:orgId/memberships/:memberId', () => {
   it('hands the caller’s role, the member and the new role to the operation', async () => {
     const event = fakeEvent({
+      headers: SAME_ORIGIN,
       params: { orgId: 'org-1', memberId: 'm-1' },
       body: { role: 'admin' },
       context: { auth: { sub: 'u-1', tenant: 'org-1' } },
@@ -53,6 +56,7 @@ describe('PATCH /api/orgs/:orgId/memberships/:memberId', () => {
     await expect(
       handler(
         fakeEvent({
+          headers: SAME_ORIGIN,
           params: { orgId: 'org-1', memberId: 'm-1' },
           body: { role: 'member' },
           context: { auth: { sub: 'u-1', tenant: 'org-1' } },
@@ -61,5 +65,31 @@ describe('PATCH /api/orgs/:orgId/memberships/:memberId', () => {
     ).rejects.toMatchObject({ statusCode: 403 })
     expect(op).not.toHaveBeenCalled()
     orgRole = 'owner'
+  })
+
+  // 🔴 Per route: a page on another origin is refused before anything runs.
+  it('a cross-origin request is 403 cross_origin, and the operation is never called', async () => {
+    const event = fakeEvent({
+      headers: { origin: 'https://evil.test', host: 'studio.test' },
+      params: { orgId: 'org-1', memberId: 'm-1' },
+      body: { role: 'admin' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'cross_origin' },
+    })
+    expect(op).not.toHaveBeenCalled()
+  })
+
+  it('no Origin at all is refused too', async () => {
+    const event = fakeEvent({
+      headers: { host: 'studio.test' },
+      params: { orgId: 'org-1', memberId: 'm-1' },
+      body: { role: 'admin' },
+      context: { auth: { sub: 'u-1', tenant: 'org-1' } },
+    })
+    await expect(handler(event as never)).rejects.toMatchObject({ statusCode: 403 })
+    expect(op).not.toHaveBeenCalled()
   })
 })

@@ -182,7 +182,7 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       expect(await roleOf(org, 'u-gone')).toBeNull()
     })
 
-    it('auth refuses: the row stays (rollback)', async () => {
+    it('auth refuses: the removed row is put back', async () => {
       auth.mockRejectedValue(refused())
       await expect(lib.removeMember(deps(), event, 'owner', org, 'm-gone')).rejects.toMatchObject({
         statusCode: 403,
@@ -204,31 +204,44 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       ])
     })
 
-    it('auth says yes and the commit fails: the removal is retried and lands', async () => {
-      auth.mockResolvedValue({ member: {} })
-      failAudit = true
+    // 🔴 THE ORDER ITSELF: when auth is asked, studio has already committed
+    // the removal. No answer from auth can leave the row in place.
+    it('the row is gone and committed BEFORE auth is asked', async () => {
+      let rowWhenAsked: string | null = 'not asked'
+      auth.mockImplementation(async () => {
+        rowWhenAsked = await roleOf(org, 'u-gone')
+        return { member: {} }
+      })
       await lib.removeMember(deps(), event, 'owner', org, 'm-gone')
-      expect(await roleOf(org, 'u-gone')).toBeNull()
+      expect(rowWhenAsked).toBeNull()
     })
 
-    // 🔴 THE NAMED RESIDUAL: the one order that leaves studio allowing what auth
-    // removed. It is reported (500 org_member_stale), not repaired.
-    it('RESIDUAL fail-open: auth says yes, the commit and the retry fail, row left (500 org_member_stale)', async () => {
+    it('auth says yes and studio’s audit write fails: row stays gone (500, closed)', async () => {
       auth.mockResolvedValue({ member: {} })
       failAudit = true
       vi.spyOn(console, 'error').mockImplementation(() => {})
-      const noDelete = new Proxy(db, {
+      await expect(lib.removeMember(deps(), event, 'owner', org, 'm-gone')).rejects.toMatchObject({
+        statusCode: 500,
+        data: { code: 'org_member_not_recorded' },
+      })
+      expect(await roleOf(org, 'u-gone')).toBeNull()
+    })
+
+    it('auth refuses and putting the row back fails: too little access, never more', async () => {
+      auth.mockRejectedValue(refused())
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const noInsert = new Proxy(db, {
         get: (t, k) =>
-          k === 'delete'
+          k === 'insert'
             ? () => {
-                throw new Error('delete refused (test)')
+                throw new Error('insert refused (test)')
               }
             : Reflect.get(t, k),
       })
       await expect(
-        lib.removeMember(deps({ db: noDelete }), event, 'owner', org, 'm-gone'),
-      ).rejects.toMatchObject({ statusCode: 500, data: { code: 'org_member_stale' } })
-      expect(await roleOf(org, 'u-gone')).toBe('member')
+        lib.removeMember(deps({ db: noInsert }), event, 'owner', org, 'm-gone'),
+      ).rejects.toMatchObject({ statusCode: 403 })
+      expect(await roleOf(org, 'u-gone')).toBeNull()
     })
 
     it('a manager may not remove another manager: refused before auth is asked', async () => {
@@ -275,6 +288,27 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       expect(await roleOf(org, 'u-x')).toBeNull()
     })
 
+    // admin -> billing GAINS billing: that right must not be held before auth
+    // holds it, so while auth is asked the member has no row at all.
+    it('a lateral change holds neither role while auth is asked, then the new one', async () => {
+      await put(org, 'u-x', 'admin')
+      let rowWhenAsked: string | null = 'not asked'
+      auth.mockImplementation(async () => {
+        rowWhenAsked = await roleOf(org, 'u-x')
+        return { role: 'billing' }
+      })
+      await change('admin', 'billing')
+      expect(rowWhenAsked).toBeNull()
+      expect(await roleOf(org, 'u-x')).toBe('billing')
+    })
+
+    it('a demotion refused by auth puts the old role back', async () => {
+      await put(org, 'u-x', 'manager')
+      auth.mockRejectedValue(refused())
+      await expect(change('manager', 'member')).rejects.toMatchObject({ statusCode: 403 })
+      expect(await roleOf(org, 'u-x')).toBe('manager')
+    })
+
     it('a promotion with an unknown answer leaves the OLD role: nothing was granted', async () => {
       await put(org, 'u-x', 'member')
       auth.mockRejectedValue(unknown())
@@ -306,6 +340,15 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
   })
 
   describe('revoke: leave and delete', () => {
+    it('leave with an unknown answer: the row stays removed (auth fires no hook on leave)', async () => {
+      await put(org, 'u-me', 'member')
+      auth.mockRejectedValue(unknown())
+      await expect(lib.leaveOrganization(deps(), event, 'u-me', org)).rejects.toMatchObject({
+        data: { code: 'auth_pending' },
+      })
+      expect(await roleOf(org, 'u-me')).toBeNull()
+    })
+
     it('leave removes only the caller’s row', async () => {
       await put(org, 'u-me', 'member')
       await put(org, 'u-other', 'member')

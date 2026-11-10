@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { z } from 'zod'
-import { ASSIGNABLE, parseBody } from '~~/server/lib/org-membership-input'
+import { assertSameOrigin, ASSIGNABLE, parseBody } from '~~/server/lib/org-membership-input'
 import { changeMemberRole, membershipDeps } from '~~/server/lib/org-membership'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
@@ -13,6 +13,8 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  // Before anything else: a cross-origin page must not reach the cookie.
+  assertSameOrigin(event)
   const orgId = getRouterParam(event, 'orgId')
   const memberId = getRouterParam(event, 'memberId')
   if (!orgId || !memberId) {
