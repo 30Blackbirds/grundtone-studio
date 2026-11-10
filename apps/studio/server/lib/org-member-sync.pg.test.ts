@@ -315,6 +315,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
         multipleRoles: 1,
         removedAfterReread: 0,
         busyOrgs: [],
+        unproven: [],
       })
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'member' }])
       expect(await rows(b)).toEqual([])
@@ -355,6 +356,38 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       expect(c.removedAfterReread).toBe(2)
       // u-owner gone from auth, u-multi demoted to member: neither is kept.
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'admin' }])
+    })
+
+    it.each([
+      ['complete=false', () => (complete = false)],
+      ['no independent count', () => (countOverride = null)],
+      ['a count that does not match', () => (countOverride = 3)],
+    ])('a real run with %s refuses before writing anything', async (_, flip) => {
+      flip()
+      await expect(lib.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
+        lib.BackfillRefused,
+      )
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([])
+    })
+
+    it('an org whose member list is not proven is skipped and named; the other is loaded', async () => {
+      authOrgs[0] = { ...authOrgs[0]!, membersComplete: false }
+      const c = await lib.backfillOrgMembers(db, source, { dryRun: false })
+      expect(c.unproven).toEqual([a])
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([{ userId: 'u-b', role: 'billing' }])
+    })
+
+    it('a second read that fails removes what was just inserted for that org, and stops', async () => {
+      reread = () => {
+        throw new Error('second read failed')
+      }
+      await expect(lib.backfillOrgMembers(db, source, { dryRun: false })).rejects.toThrow(
+        'second read failed',
+      )
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([])
     })
   })
 

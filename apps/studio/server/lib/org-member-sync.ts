@@ -357,6 +357,13 @@ export interface BackfillCounts {
   removedAfterReread: number
   /** Orgs busy with another write: skipped, for a later run. */
   busyOrgs: string[]
+  /** Orgs whose member list is not proven complete: skipped, nothing inserted. */
+  unproven: string[]
+}
+
+/** A real backfill run refused before writing anything. */
+export class BackfillRefused extends Error {
+  override name = 'BackfillRefused'
 }
 
 /**
@@ -369,6 +376,11 @@ export interface BackfillCounts {
  * that the second read does not confirm with the same role, so a member
  * removed between the two reads is not brought back. All of it under that
  * org's lock.
+ *
+ * The guards compare and repair have, applied to a load: a real run refuses a
+ * listing that is not proven complete before it writes anything, and an org
+ * whose member list is not proven is skipped and named. If the second read
+ * fails, the rows just inserted for that org are removed and the run stops.
  */
 export async function backfillOrgMembers(
   db: Db,
@@ -392,9 +404,17 @@ export async function backfillOrgMembers(
     multipleRoles: 0,
     removedAfterReread: 0,
     busyOrgs: [],
+    unproven: [],
+  }
+  if (!opts.dryRun && !complete) {
+    throw new BackfillRefused('the listing is not proven complete: nothing was written')
   }
   for (const org of orgs) {
     c.membersRead += org.members.length
+    if (!membersProven(org)) {
+      c.unproven.push(org.orgId)
+      continue
+    }
     try {
       await loadOrg(org)
     } catch (err) {
@@ -436,7 +456,15 @@ export async function backfillOrgMembers(
         return rows
       })
 
-      const again = await source.readOrg(org.orgId)
+      // A second read that fails confirms nothing: everything just inserted
+      // for this org goes again, and the run stops with the error.
+      let again: AuthOrg | null = null
+      let readFailed: unknown = null
+      try {
+        again = await source.readOrg(org.orgId)
+      } catch (err) {
+        readFailed = err ?? new Error('the second read failed')
+      }
       const confirmed = new Map(
         (again?.members ?? []).map((m) => [m.userId, heldRole(m.role)] as const),
       )
@@ -463,6 +491,7 @@ export async function backfillOrgMembers(
       }
       c.inserted += landed.length - unconfirmed.length
       c.removedAfterReread += unconfirmed.length
+      if (readFailed) throw readFailed
     })
   }
 }
