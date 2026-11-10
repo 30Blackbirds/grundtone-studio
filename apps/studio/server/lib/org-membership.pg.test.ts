@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MembershipDeps } from './org-membership'
 
@@ -249,16 +249,18 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
     it('auth refuses and putting the row back fails: too little access, never more', async () => {
       auth.mockRejectedValue(refused())
       vi.spyOn(console, 'error').mockImplementation(() => {})
-      const noInsert = new Proxy(db, {
-        get: (t, k) =>
-          k === 'insert'
-            ? () => {
-                throw new Error('insert refused (test)')
-              }
-            : Reflect.get(t, k),
-      })
+      // The restore runs on the locked connection; make its insert fail there.
+      const noInsert = (locked: Db) =>
+        new Proxy(locked, {
+          get: (t, k) =>
+            k === 'insert'
+              ? () => {
+                  throw new Error('insert refused (test)')
+                }
+              : Reflect.get(t, k),
+        })
       await expect(
-        lib.removeMember(deps({ db: noInsert }), event, 'owner', org, 'm-gone'),
+        lib.removeMember(deps({ onLocked: noInsert }), event, 'owner', org, 'm-gone'),
       ).rejects.toMatchObject({ statusCode: 403 })
       expect(await roleOf(org, 'u-gone')).toBeNull()
     })
@@ -398,6 +400,7 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
   describe('revoke: leave and delete', () => {
     it('leave with an unknown answer: the row stays removed (auth fires no hook on leave)', async () => {
       await put(org, 'u-me', 'member')
+      members = [{ id: 'm-me', userId: 'u-me', role: 'member' }]
       auth.mockRejectedValue(unknown())
       await expect(lib.leaveOrganization(deps(), event, 'u-me', org)).rejects.toMatchObject({
         data: { code: 'auth_pending' },
@@ -407,6 +410,7 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
 
     it('leave removes only the caller’s row', async () => {
       await put(org, 'u-me', 'member')
+      members = [{ id: 'm-me', userId: 'u-me', role: 'member' }]
       await put(org, 'u-other', 'member')
       auth.mockResolvedValue({})
       await lib.leaveOrganization(deps(), event, 'u-me', org)
@@ -432,6 +436,97 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
         statusCode: 403,
       })
       expect(await roleOf(org, 'u-1')).toBe('owner')
+    })
+  })
+
+  // 🔴 SIKKERHED C2: the lock must never be able to empty the pool. The test
+  // process uses postgres.js defaults like production (max 10 connections).
+  describe('C2: a burst cannot wedge the database', () => {
+    const POOL = 10
+    const limits = { maxConcurrent: 4, waitMs: 1_000 }
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+    /** Answers 'answered' if `select 1` returns within ms, else 'hung'. */
+    const unrelatedQuery = (ms: number) =>
+      Promise.race([db.execute(sql`select 1`).then(() => 'answered'), sleep(ms).then(() => 'hung')])
+
+    const codeOf = (r: unknown) =>
+      r && typeof r === 'object' && 'data' in r
+        ? (r as { data?: { code?: string } }).data?.code
+        : 'ok'
+
+    it('pool size + 1 leaves on ONE org: an unrelated query is answered, all settle, the rest get 503 busy', async () => {
+      const users = Array.from({ length: POOL + 1 }, (_, i) => `burst-${i}`)
+      for (const u of users) await put(org, u, 'member')
+      members = users.map((u) => ({ id: `m-${u}`, userId: u, role: 'member' }))
+      auth.mockImplementation(() => sleep(150).then(() => ({})))
+      const started = Date.now()
+      const all = users.map((u) =>
+        lib.leaveOrganization(deps({ lockLimits: limits }), event, u, org).catch((e: unknown) => e),
+      )
+      expect(await unrelatedQuery(2_000)).toBe('answered')
+      const results = await Promise.all(all)
+      expect(Date.now() - started).toBeLessThan(5_000)
+      const codes = results.map(codeOf)
+      expect(codes.filter((c) => c === 'ok').length).toBe(limits.maxConcurrent)
+      expect(codes.filter((c) => c === 'org_write_busy').length).toBe(
+        POOL + 1 - limits.maxConcurrent,
+      )
+    })
+
+    it('pool size + 1 writes on DIFFERENT orgs: an unrelated query is answered, all settle', async () => {
+      const orgs = Array.from({ length: POOL + 1 }, () => `burst-${randomUUID()}`)
+      for (const o of orgs) await put(o, 'u-b', 'member')
+      members = [{ id: 'm-b', userId: 'u-b', role: 'member' }]
+      auth.mockImplementation(() => sleep(150).then(() => ({})))
+      const all = orgs.map((o) =>
+        lib
+          .leaveOrganization(deps({ lockLimits: limits }), event, 'u-b', o)
+          .catch((e: unknown) => e),
+      )
+      expect(await unrelatedQuery(2_000)).toBe('answered')
+      const codes = (await Promise.all(all)).map(codeOf)
+      expect(codes.filter((c) => c === 'ok').length).toBe(limits.maxConcurrent)
+      expect(codes.every((c) => c === 'ok' || c === 'org_write_busy')).toBe(true)
+      await db.delete(schema.orgMember).where(inArray(schema.orgMember.organizationId, orgs))
+    })
+
+    it('a write waiting on its org gets 503 org_write_busy within the bound', async () => {
+      await put(org, 'u-hold', 'member')
+      await put(org, 'u-wait', 'member')
+      members = [
+        { id: 'm-hold', userId: 'u-hold', role: 'member' },
+        { id: 'm-wait', userId: 'u-wait', role: 'member' },
+      ]
+      let release!: () => void
+      let held!: () => void
+      const holding = new Promise<void>((r) => (held = r))
+      auth.mockImplementationOnce(() => {
+        held()
+        return new Promise((r) => (release = () => r({})))
+      })
+      const first = lib.leaveOrganization(deps({ lockLimits: limits }), event, 'u-hold', org)
+      await holding
+      const started = Date.now()
+      await expect(
+        lib.leaveOrganization(
+          deps({ lockLimits: { ...limits, waitMs: 300 } }),
+          event,
+          'u-wait',
+          org,
+        ),
+      ).rejects.toMatchObject({ statusCode: 503, data: { code: 'org_write_busy' } })
+      expect(Date.now() - started).toBeLessThan(1_500)
+      release()
+      await first
+    })
+
+    it('leave by someone auth does not list as a member: 404 before any lock or auth call', async () => {
+      members = []
+      await expect(lib.leaveOrganization(deps(), event, 'stranger', org)).rejects.toMatchObject({
+        statusCode: 404,
+      })
+      expect(auth).not.toHaveBeenCalled()
     })
   })
 })

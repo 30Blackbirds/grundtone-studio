@@ -1,6 +1,8 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { createError, getRequestHeader, type H3Event } from 'h3'
 import type { Db } from '../db'
+import * as schema from '../db/schema'
 import { auditLog, orgMember } from '../db/schema'
 import { auditRow, type AuditEventInput } from './audit'
 import { canAssignRole, canManageMember } from './org-membership-input'
@@ -70,6 +72,10 @@ export interface MembershipDeps {
   invitationOrg: (invitationId: string) => Promise<string | null>
   /** Auth's view of an org's members, to learn whom a member id names. */
   members: (orgId: string) => Promise<Array<{ id: string; userId: string; role: string }> | null>
+  /** Overrides ORG_LOCK_LIMITS (tests). */
+  lockLimits?: OrgLockLimits
+  /** Wraps the locked connection's database (tests: to make one write fail). */
+  onLocked?: (db: Db) => Db
   /** Inserts the audit row; a test can make it fail to stand in for a failed commit. */
   audit?: (exec: Exec, row: typeof auditLog.$inferInsert) => Promise<void>
 }
@@ -279,21 +285,113 @@ async function revoke<T>(
   return answer
 }
 
+/** How many org-membership writes this process runs at once, and how long one waits for its org. */
+export interface OrgLockLimits {
+  maxConcurrent: number
+  waitMs: number
+}
+
 /**
- * 🔴 ONE MEMBERSHIP WRITE AT A TIME PER ORG (Sikkerhed C1 on #388). Two writes
- * on the same member could otherwise interleave across the auth call: a
- * demotion auth will refuse removes the row and waits; a removal meanwhile
- * gets auth's yes; then the refused demotion puts the row BACK, and studio
- * holds a role auth no longer has. A transaction-scoped advisory lock, held
- * from before the member lookup until the last write, makes them run one
- * after the other. It costs one pooled connection per write while auth is
- * asked (at most the auth timeout).
+ * Well below the database pool (postgres.js default max 10): each write holds
+ * exactly one connection, so at most this many are ever taken by org writes,
+ * and the rest of studio keeps its connections. Per process; studio runs one.
  */
-export async function withOrgLock<T>(db: Db, orgId: string, run: () => Promise<T>): Promise<T> {
-  return db.transaction(async (lock) => {
-    await lock.execute(sql`select pg_advisory_xact_lock(hashtext(${`org_member:${orgId}`}))`)
-    return run()
+export const ORG_LOCK_LIMITS: OrgLockLimits = { maxConcurrent: 4, waitMs: 5_000 }
+
+let activeOrgWrites = 0
+
+function busy(reason: string): never {
+  recordOrgWriteIncomplete('busy')
+  throw createError({
+    statusCode: 503,
+    statusMessage: `Org membership is busy (${reason}); try again`,
+    data: { code: 'org_write_busy' },
   })
+}
+
+/**
+ * 🔴 ONE MEMBERSHIP WRITE AT A TIME PER ORG, ON ONE CONNECTION.
+ *
+ * Why serialise (Sikkerhed C1 on #388): two writes on the same member could
+ * interleave across the auth call. A demotion auth will refuse removes the row
+ * and waits; a removal meanwhile gets auth's yes; then the refused demotion
+ * puts the row BACK, and studio holds a role auth no longer has.
+ *
+ * Why this shape (Sikkerhed C2): a transaction-scoped lock held beside the
+ * operation's own transactions took two pooled connections per write, and a
+ * waiter held one too; ten concurrent writes emptied the pool and every query
+ * in studio hung. So:
+ *   - one RESERVED connection per write holds a SESSION advisory lock, and
+ *     every transaction of the operation runs on that same connection (`run`
+ *     gets it as its database);
+ *   - the wait for the lock is bounded (`waitMs`, polling try-lock), then 503
+ *     `org_write_busy`;
+ *   - at most `maxConcurrent` writes at once in this process; one more gets
+ *     503 `org_write_busy` at once, before it takes any connection.
+ */
+export async function withOrgLockOn<T>(
+  db: Db,
+  orgId: string,
+  run: (locked: Db) => Promise<T>,
+  limits: OrgLockLimits = ORG_LOCK_LIMITS,
+): Promise<T> {
+  if (activeOrgWrites >= limits.maxConcurrent) busy('too many writes at once')
+  activeOrgWrites++
+  let reserved: Awaited<ReturnType<Db['$client']['reserve']>> | undefined
+  try {
+    reserved = await db.$client.reserve()
+    const key = `org_member:${orgId}`
+    const deadline = Date.now() + limits.waitMs
+    for (;;) {
+      const [row] = await reserved<{ ok: boolean }[]>`
+        select pg_try_advisory_lock(hashtext(${key})) as ok`
+      if (row?.ok) break
+      if (Date.now() >= deadline) busy('another write on this organization')
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    try {
+      // drizzle reads the client's parser options, which a reserved connection
+      // does not carry; they are the pool's (already set up by server/db).
+      const conn = Object.assign(reserved, { options: db.$client.options })
+      const locked = drizzle(conn, { schema, casing: 'snake_case' }) as unknown as Db
+      // A reserved connection has no begin(); it is ours alone, so a
+      // transaction is BEGIN/COMMIT on it, and every one stays on it.
+      const rc = reserved
+      locked.transaction = (async (fn: (tx: unknown) => Promise<unknown>) => {
+        await rc`begin`
+        try {
+          const out = await fn(locked)
+          await rc`commit`
+          return out
+        } catch (err) {
+          await rc`rollback`
+          throw err
+        }
+      }) as Db['transaction']
+      return await run(locked)
+    } finally {
+      // A session lock outlives the operation unless released; the connection
+      // goes back to the pool afterwards.
+      await reserved`select pg_advisory_unlock(hashtext(${key}))`
+    }
+  } finally {
+    activeOrgWrites--
+    reserved?.release()
+  }
+}
+
+/** withOrgLockOn for the operations: `run` gets deps whose db is the locked connection. */
+function withOrgLock<T>(
+  deps: MembershipDeps,
+  orgId: string,
+  run: (deps: MembershipDeps) => Promise<T>,
+): Promise<T> {
+  return withOrgLockOn(
+    deps.db,
+    orgId,
+    (db) => run({ ...deps, db: deps.onLocked ? deps.onLocked(db) : db }),
+    deps.lockLimits,
+  )
 }
 
 const rowOf = (orgId: string, userId: string) =>
@@ -374,7 +472,7 @@ export async function acceptInvitation(
     authError(err)
   }
   if (!orgId) throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })
-  return withOrgLock(deps.db, orgId, () =>
+  return withOrgLock(deps, orgId, (deps) =>
     grant<Answer>(
       deps,
       'accept-invitation',
@@ -418,7 +516,7 @@ export async function changeMemberRole(
   memberId: string,
   role: OrgRole,
 ) {
-  return withOrgLock(deps.db, orgId, async () => {
+  return withOrgLock(deps, orgId, async (deps) => {
     const m = await memberOf(deps, orgId, memberId)
     assertMayManage(actorRole, m.role)
     if (!canAssignRole(actorRole, role)) forbidden('Requires a higher org role than the one given')
@@ -471,7 +569,7 @@ export async function removeMember(
   orgId: string,
   memberId: string,
 ) {
-  return withOrgLock(deps.db, orgId, async () => {
+  return withOrgLock(deps, orgId, async (deps) => {
     const m = await memberOf(deps, orgId, memberId)
     assertMayManage(actorRole, m.role)
     return revoke(
@@ -499,9 +597,15 @@ export async function leaveOrganization(
   actorId: string,
   orgId: string,
 ) {
-  return withOrgLock(deps.db, orgId, async () => {
-    // Auth fires no hook on leave, so this route is the only thing that ends a
-    // leaver's org role in studio.
+  // Auth fires no hook on leave, so this route is the only thing that ends a
+  // leaver's org role in studio. A caller who is not a member is refused
+  // before any connection or lock is taken (Sikkerhed C2: leave has no role
+  // check, so it must not let anyone hold the org's lock).
+  const members = await deps.members(orgId)
+  if (!members?.some((m) => m.userId === actorId)) {
+    throw createError({ statusCode: 404, statusMessage: 'Not a member of this organization' })
+  }
+  return withOrgLock(deps, orgId, async (deps) => {
     return revoke(
       deps,
       'leave',
@@ -521,7 +625,7 @@ export async function leaveOrganization(
 }
 
 export async function deleteOrganization(deps: MembershipDeps, event: H3Event, orgId: string) {
-  return withOrgLock(deps.db, orgId, async () => {
+  return withOrgLock(deps, orgId, async (deps) => {
     return revoke(
       deps,
       'delete',
@@ -550,32 +654,58 @@ export async function inviteMember(
   orgId: string,
   input: { email: string; role: OrgRole; resend?: boolean },
 ) {
-  return withOrgLock(deps.db, orgId, async () => {
-    if (!canAssignRole(actorRole, input.role))
-      forbidden('Requires a higher org role than the one given')
-    return grant<{ id?: string }>(
-      deps,
-      'invite-member',
-      {
-        email: input.email,
-        role: input.role,
-        organizationId: orgId,
-        ...(input.resend ? { resend: true } : {}),
-      },
-      async (_tx, invitation) => ({
-        organizationId: orgId,
-        action: 'member.invited',
-        targetType: 'invitation',
-        targetId: invitation?.id,
-        targetLabel: input.email,
-        after: { role: input.role },
-      }),
-      event,
-    )
-  })
+  if (!canAssignRole(actorRole, input.role))
+    forbidden('Requires a higher org role than the one given')
+  return grant<{ id?: string }>(
+    deps,
+    'invite-member',
+    {
+      email: input.email,
+      role: input.role,
+      organizationId: orgId,
+      ...(input.resend ? { resend: true } : {}),
+    },
+    async (_tx, invitation) => ({
+      organizationId: orgId,
+      action: 'member.invited',
+      targetType: 'invitation',
+      targetId: invitation?.id,
+      targetLabel: input.email,
+      after: { role: input.role },
+    }),
+    event,
+  )
 }
 
 const MIN_CREDENTIAL_BYTES = 32
+
+/**
+ * M1 (Sikkerhed): the credential travels in a header that proxies, Sentry and
+ * loggers do not redact the way they redact Authorization and Cookie, so in
+ * production it may only go over https, or over plain http to a host that is
+ * not on the public internet: loopback, a private address, or a single-label
+ * name (a container service such as `auth`, which public DNS cannot answer).
+ */
+export function safeAuthTarget(url: string): boolean {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return false
+  }
+  if (u.protocol === 'https:') return true
+  if (u.protocol !== 'http:') return false
+  const h = u.hostname.replace(/^\[|\]$/g, '')
+  return (
+    h === 'localhost' ||
+    h === '::1' ||
+    /^127\./.test(h) ||
+    /^10\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
+    /^[a-z0-9-]+$/i.test(h)
+  )
+}
 
 /**
  * The org-write target from the environment, or 503 `org_write_unconfigured`
@@ -586,6 +716,13 @@ export function orgWriteTarget(env: NodeJS.ProcessEnv = process.env): OrgWriteTa
   const credential = env.ORG_WRITE_SERVICE_SECRET
   const missing = [
     ...(base ? [] : ['AUTH_INTERNAL_URL']),
+    ...(base && env.NODE_ENV === 'production' && !safeAuthTarget(base)
+      ? ['AUTH_INTERNAL_URL (in production: https, or http only to a private host)']
+      : []),
+    // Certificate checks off would let any host answer for auth and read the credential.
+    ...(env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
+      ? ['NODE_TLS_REJECT_UNAUTHORIZED=0 (must be unset)']
+      : []),
     ...(credential && Buffer.byteLength(credential) >= MIN_CREDENTIAL_BYTES
       ? []
       : [`ORG_WRITE_SERVICE_SECRET (unset or under ${MIN_CREDENTIAL_BYTES} bytes)`]),

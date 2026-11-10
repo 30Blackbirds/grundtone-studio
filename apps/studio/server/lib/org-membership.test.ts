@@ -107,3 +107,57 @@ describe('orgWriteTarget: refused up front, 503, before anything is written or a
     expect(logged).not.toContain(short)
   })
 })
+
+// M1 (Sikkerhed): the credential header is not redacted the way Authorization
+// and Cookie are, so in production it may only travel over https, or over
+// plain http to a host that is not on the public internet.
+describe('orgWriteTarget in production: where the credential may go', () => {
+  const prod = { NODE_ENV: 'production', ORG_WRITE_SERVICE_SECRET: SECRET }
+
+  it.each([
+    ['https to a public host', 'https://auth.example.test'],
+    ['http to a container service name', 'http://auth:3000'],
+    ['http to loopback', 'http://127.0.0.1:3000'],
+    ['http to a private address', 'http://10.11.0.10:3000'],
+    ['http to a 172.16/12 address', 'http://172.20.0.5:3000'],
+    ['http to a 192.168 address', 'http://192.168.1.4'],
+  ])('%s: allowed', (_name, url) => {
+    expect(orgWriteTarget({ ...prod, AUTH_INTERNAL_URL: url })).toMatchObject({ base: url })
+  })
+
+  it.each([
+    ['http to a public host', 'http://auth.example.test'],
+    ['http to a public address', 'http://8.8.8.8'],
+    ['http to 172.32 (outside 172.16/12)', 'http://172.32.0.1'],
+    ['not a URL', 'auth:3000'],
+    ['another scheme', 'ftp://auth.example.test'],
+  ])('%s: 503 org_write_unconfigured', (_name, url) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() => orgWriteTarget({ ...prod, AUTH_INTERNAL_URL: url })).toThrow(
+      expect.objectContaining({ statusCode: 503, data: { code: 'org_write_unconfigured' } }),
+    )
+  })
+
+  it('outside production, http to any host is allowed (local stacks)', () => {
+    expect(
+      orgWriteTarget({
+        ORG_WRITE_SERVICE_SECRET: SECRET,
+        AUTH_INTERNAL_URL: 'http://auth.example.test',
+      }),
+    ).toMatchObject({ base: 'http://auth.example.test' })
+  })
+
+  it('certificate checks turned off (NODE_TLS_REJECT_UNAUTHORIZED=0): 503, in any environment', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const env of [prod, {}]) {
+      expect(() =>
+        orgWriteTarget({
+          ...env,
+          ORG_WRITE_SERVICE_SECRET: SECRET,
+          AUTH_INTERNAL_URL: 'https://auth.example.test',
+          NODE_TLS_REJECT_UNAUTHORIZED: '0',
+        }),
+      ).toThrow(expect.objectContaining({ statusCode: 503 }))
+    }
+  })
+})
