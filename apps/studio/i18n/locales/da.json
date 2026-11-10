@@ -796,7 +796,10 @@
       "asset.font_uploaded": "Uploadede skrifttype",
       "asset.logo_uploaded": "Uploadede logo",
       "audit.exported": "Eksporterede revisionslog",
-      "organization.updated": "Opdaterede organisation"
+      "organization.updated": "Opdaterede organisation",
+      "organization.created": "Oprettede organisation",
+      "organization.deleted": "Slettede organisation",
+      "member.left": "Forlod organisation"
     },
     "loadOlder": "Indlæs ældre",
     "exportCsv": "Eksportér CSV",
