@@ -111,6 +111,11 @@ describe('/api/auth/[...]: org membership writes go through studio', () => {
     '/api/auth/Organization/Leave?x=1',
     '/api/auth/organization/le%61ve',
     '/api/auth/organization/leave%E0%A4%A',
+    // Dot segments: the proxy's fetch resolves them to the same endpoint.
+    '/api/auth/organization/x/../leave',
+    '/api/auth/x/../organization/leave',
+    '/api/auth/organization/%2e%2e/organization/leave',
+    '/api/auth/organization/./leave',
   ])('the spelling %s is refused too', (path) => {
     vi.stubEnv('AUTH_INTERNAL_URL', 'http://auth:3000')
     expect(() => handler({ path })).toThrow(expect.objectContaining({ statusCode: 403 }))

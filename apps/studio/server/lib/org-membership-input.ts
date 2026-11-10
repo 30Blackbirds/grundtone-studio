@@ -108,9 +108,11 @@ export const ORG_WRITE_AUTH_PATHS: readonly string[] = [
 ]
 
 /**
- * True when a request path under /api/auth names one of those writes, in any
- * spelling a router might still match: percent-encoding, doubled or trailing
- * slashes, upper case. A path that cannot be decoded is treated as a write.
+ * True when a request path under /api/auth names one of those writes, in the
+ * spellings that reach the same endpoint: percent-encoding, doubled or
+ * trailing slashes, upper case, and dot segments (`x/../leave`, `./leave`,
+ * `%2e%2e`), resolved the way the proxy's own fetch resolves them. A path that
+ * cannot be decoded is treated as a write.
  */
 export function isOrgWriteAuthPath(path: string): boolean {
   let p = path.split('?')[0]!
@@ -119,10 +121,10 @@ export function isOrgWriteAuthPath(path: string): boolean {
   } catch {
     return true
   }
-  p = p
-    .toLowerCase()
-    .replace(/\/+/g, '/')
-    .replace(/^\/api\/auth\//, '')
-    .replace(/\/+$/, '')
+  p = p.toLowerCase().replace(/\/+/g, '/')
+  // Resolve `.` and `..` segments: the proxy's fetch does, so auth would see
+  // the resolved path.
+  p = new URL(p, 'http://x').pathname
+  p = p.replace(/^\/api\/auth\//, '').replace(/\/+$/, '')
   return ORG_WRITE_AUTH_PATHS.includes(p)
 }
