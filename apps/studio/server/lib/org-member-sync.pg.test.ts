@@ -20,6 +20,10 @@ const a = `oms-${randomUUID()}`
 const b = `oms-${randomUUID()}`
 const gone = `oms-${randomUUID()}`
 const ORGS = [a, b, gone]
+// The test database is shared with the other *.pg suites running in parallel.
+// A complete listing judges every org it covers, so these runs are limited to
+// this file's orgs; without it they would delete the other suites' rows.
+const ours = (orgId: string) => ORGS.includes(orgId)
 
 type AuthOrg = import('./org-member-sync').AuthOrg
 let authOrgs: AuthOrg[]
@@ -93,7 +97,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      const r = await lib.compareOrgMembers(db, source, { repair: false })
+      const r = await lib.compareOrgMembers(db, source, { repair: false, only: ours })
       expect(r.differences.map((d) => `${d.kind}:${d.userId}`).sort()).toEqual([
         'missing:new',
         'role_differs:higher',
@@ -122,7 +126,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      const r = await lib.compareOrgMembers(db, source, { repair: true })
+      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
       expect(r.deleted.map((d) => d.userId).sort()).toEqual(['higher', 'stale'])
       // `lower` stays member (raising it would grant), `new` stays absent.
       expect(await rows(a)).toEqual([
@@ -145,7 +149,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
           ],
         },
       ]
-      await lib.compareOrgMembers(db, source, { repair: true })
+      await lib.compareOrgMembers(db, source, { repair: true, only: ours })
       expect(await rows(a)).toEqual([])
     })
 
@@ -153,8 +157,19 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(gone, 'u1', 'owner')
       authOrgs = []
       complete = true
-      const r = await lib.compareOrgMembers(db, source, { repair: true })
+      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
       expect(r.deleted).toEqual([{ orgId: gone, userId: 'u1', studioRole: 'owner' }])
+    })
+
+    it('an org outside the run’s scope is not judged, even with a complete listing', async () => {
+      await put(gone, 'u1', 'owner')
+      authOrgs = []
+      const r = await lib.compareOrgMembers(db, source, {
+        repair: true,
+        only: (id) => id === a,
+      })
+      expect(r.deleted).toEqual([])
+      expect(await rows(gone)).toEqual([{ userId: 'u1', role: 'owner' }])
     })
 
     // 🔴 A missing org in an INCOMPLETE listing proves nothing.
@@ -162,7 +177,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(gone, 'u1', 'owner')
       authOrgs = []
       complete = false
-      const r = await lib.compareOrgMembers(db, source, { repair: true })
+      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
       expect(r.complete).toBe(false)
       expect(r.deleted).toEqual([])
       expect(await rows(gone)).toEqual([{ userId: 'u1', role: 'owner' }])
@@ -174,7 +189,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
       await put(a, 'late', 'member')
       authOrgs = [{ orgId: a, members: [] }]
       reread = () => ({ orgId: a, members: [{ userId: 'late', role: 'member' }] })
-      const r = await lib.compareOrgMembers(db, source, { repair: true })
+      const r = await lib.compareOrgMembers(db, source, { repair: true, only: ours })
       expect(r.deleted).toEqual([])
       expect(await rows(a)).toEqual([{ userId: 'late', role: 'member' }])
     })
@@ -260,7 +275,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     authOrgs = [{ orgId: a, members: [{ userId: 'u1', role: 'member' }] }]
     reread = () => sleep(150).then(() => authOrgs[0]!)
     const runs = Array.from({ length: 11 }, () =>
-      lib.compareOrgMembers(db, source, { repair: true }).catch((e: unknown) => e),
+      lib.compareOrgMembers(db, source, { repair: true, only: ours }).catch((e: unknown) => e),
     )
     const unrelated = await Promise.race([
       db.execute(sql`select 1`).then(() => 'answered'),

@@ -135,11 +135,21 @@ function exceeds(studioRole: string, authRaw: string): boolean {
 export async function compareOrgMembers(
   db: Db,
   source: MemberSource,
-  opts: { repair: boolean },
+  opts: {
+    repair: boolean
+    /**
+     * Limits the run to the orgs this accepts (default: every org). A complete
+     * listing then means complete for those orgs; others are not touched.
+     */
+    only?: (orgId: string) => boolean
+  },
 ): Promise<CompareReport> {
-  const { orgs, complete } = await source.listOrgs()
+  const inScope = opts.only ?? (() => true)
+  const listing = await source.listOrgs()
+  const complete = listing.complete
+  const orgs = listing.orgs.filter((o) => inScope(o.orgId))
   const listed = new Map(orgs.map((o) => [o.orgId, o]))
-  const unlisted = (await studioOrgIds(db)).filter((id) => !listed.has(id))
+  const unlisted = (await studioOrgIds(db)).filter((id) => inScope(id) && !listed.has(id))
   const judged: Array<[string, AuthOrg | null]> = [
     ...orgs.map((o) => [o.orgId, o] as [string, AuthOrg]),
     ...(complete ? unlisted.map((id) => [id, null] as [string, null]) : []),
