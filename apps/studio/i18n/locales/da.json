@@ -799,7 +799,9 @@
       "organization.updated": "Opdaterede organisation",
       "organization.created": "Oprettede organisation",
       "organization.deleted": "Slettede organisation",
-      "member.left": "Forlod organisation"
+      "member.left": "Forlod organisation",
+      "member.sync_removed": "Fjernet ved afstemning med auth",
+      "member.backfilled": "Indlæst fra auth"
     },
     "loadOlder": "Indlæs ældre",
     "exportCsv": "Eksportér CSV",

@@ -799,7 +799,9 @@
       "organization.updated": "Updated organization",
       "organization.created": "Created organization",
       "organization.deleted": "Deleted organization",
-      "member.left": "Left organization"
+      "member.left": "Left organization",
+      "member.sync_removed": "Removed by sync with auth",
+      "member.backfilled": "Loaded from auth"
     },
     "loadOlder": "Load older",
     "exportCsv": "Export CSV",
