@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
 
   const { t } = useI18n()
   const { state, next } = useOnboardingState()
@@ -17,7 +18,7 @@
   async function submit() {
     submitting.value = true
     error.value = null
-    const res = await organization.create({ name: name.value, slug: slug.value })
+    const res = await orgWrites.create({ name: name.value, slug: slug.value })
     submitting.value = false
     if (res.error) {
       error.value = res.error.message ?? t('onboarding.org.error')

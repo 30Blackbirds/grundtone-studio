@@ -145,6 +145,9 @@ export const NEVER_STUB_AUTH_PATHS: readonly string[] = [
   'organization/remove-member',
   'organization/leave',
   'organization/delete',
+  // Creating an org makes the caller its owner, so it is a right too. Studio
+  // no longer calls it through this proxy (server/api/orgs/index.post.ts does).
+  'organization/create',
 ]
 
 /**
@@ -154,7 +157,6 @@ export const NEVER_STUB_AUTH_PATHS: readonly string[] = [
  * the other seventeen stayed hidden behind a fix for one.
  */
 export const STUBBABLE_AUTH_PATHS: readonly string[] = [
-  'organization/create',
   'organization/update',
   'organization/get-invitation',
   'update-user',
