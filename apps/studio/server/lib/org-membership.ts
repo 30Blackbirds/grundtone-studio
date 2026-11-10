@@ -69,22 +69,42 @@ export interface MembershipDeps {
 
 const AUTH_TIMEOUT_MS = 10_000
 
-/** Calls auth as the signed-in user: the request's own cookie and origin. */
+/**
+ * The header auth will require on its org-membership writes (ClickUp
+ * 1amk32fna12), so that only studio's server can make them. Its value is a
+ * server-only secret: read from process.env here, never from public runtime
+ * config, and never attached by the generic /api/auth proxy.
+ */
+export const ORG_WRITE_CREDENTIAL_HEADER = 'x-klanghaus-org-write-credential'
+
+/**
+ * Calls auth as the signed-in user: the request's own cookie and origin (auth
+ * checks the origin of cookie POSTs), plus the org-write credential when
+ * ORG_WRITE_SERVICE_SECRET is set. Unset sends no header: before auth's guard
+ * that changes nothing, after it every write is refused (closed, and loud).
+ */
 export function authCaller(event: H3Event): AuthCall {
   const cookie = getRequestHeader(event, 'cookie')
   const origin = getRequestHeader(event, 'origin')
   return async (path, body) => {
+    const credential = process.env.ORG_WRITE_SERVICE_SECRET
     try {
       return await $fetch(`${authBase()}/api/auth/organization/${path}`, {
         method: 'POST',
         body,
         timeout: AUTH_TIMEOUT_MS,
-        headers: { ...(cookie ? { cookie } : {}), ...(origin ? { origin } : {}) },
+        headers: {
+          ...(cookie ? { cookie } : {}),
+          ...(origin ? { origin } : {}),
+          ...(credential ? { [ORG_WRITE_CREDENTIAL_HEADER]: credential } : {}),
+        },
       })
     } catch (err) {
       const e = err as { status?: number; statusCode?: number; data?: unknown; message?: string }
       const status = e?.status ?? e?.statusCode
       if (status && status >= 400 && status < 500) throw new AuthRefused(status, e.data)
+      // A 5xx is NOT "nothing happened": auth may have committed and lost the
+      // response. It is unknown, like a timeout.
       throw new AuthOutcomeUnknown(e?.message ?? String(err))
     }
   }

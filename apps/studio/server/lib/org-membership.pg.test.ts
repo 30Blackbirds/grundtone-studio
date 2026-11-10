@@ -211,7 +211,9 @@ describe.skipIf(!DATABASE_URL)('org membership writes (real Postgres)', () => {
       expect(await roleOf(org, 'u-gone')).toBeNull()
     })
 
-    it('auth says yes, the commit fails and the retry fails: 500 org_member_stale, row left', async () => {
+    // 🔴 THE NAMED RESIDUAL: the one order that leaves studio allowing what auth
+    // removed. It is reported (500 org_member_stale), not repaired.
+    it('RESIDUAL fail-open: auth says yes, the commit and the retry fail, row left (500 org_member_stale)', async () => {
       auth.mockResolvedValue({ member: {} })
       failAudit = true
       vi.spyOn(console, 'error').mockImplementation(() => {})
