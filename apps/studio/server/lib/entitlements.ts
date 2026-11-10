@@ -54,6 +54,11 @@ export function clearEntitlementsCacheFor(orgId: string) {
 }
 
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
+  // D-E2 (Allan, 2026-11-10): with billing off there is no plan, and every org
+  // has every feature. Account is not asked. null is what every quota gate
+  // already reads as "allowed"; the one paid feature, provisioning, answers for
+  // billing off before it gets here (requireProvisioningFeature).
+  if (!billingEnabled()) return null
   const baseUrl = process.env.ACCOUNT_URL
   if (!baseUrl) return null
 
@@ -250,36 +255,11 @@ const FEATURE_MESSAGES: Record<Exclude<FeatureVerdict, { allowed: true }>['code'
   feature_not_enabled: "The organization's plan does not include the provisioning API",
 }
 
-/**
- * 🔴 UNDECIDED ON PURPOSE (ClickUp 1amk32fn9r6, decision D-E2). With
- * FEATURE_BILLING=off there is no plan, and what a paid feature does then is
- * Allan's choice: (a) every org has it (self-host), or (b) every org is on the
- * free plan and does not. Picking either here would make that choice in code.
- *
- * Until it is made, the gate refuses with its own code and status, so the
- * answer cannot be mistaken for either side: not 403 `feature_not_enabled`
- * (that is (b)) and not a grant (that is (a)). 501 says "this deployment has
- * not decided", which is the true state. Replace this function, and its cells,
- * with the decided rule.
- */
-export function billingOffFeatureVerdict(): {
-  allowed: false
-  status: 501
-  code: 'billing_off_undecided'
-} {
-  return { allowed: false, status: 501, code: 'billing_off_undecided' }
-}
-
 /** Throws the verdict as an H3 error; returns when the org may use provisioning. */
 export async function requireProvisioningFeature(orgId: string): Promise<void> {
-  if (!billingEnabled()) {
-    const off = billingOffFeatureVerdict()
-    throw createError({
-      statusCode: off.status,
-      statusMessage: 'Paid features with billing off are not decided for this deployment',
-      data: { code: off.code },
-    })
-  }
+  // D-E2: billing off means every org has every feature, so this paid feature
+  // is allowed without asking account. Billing on is unchanged below.
+  if (!billingEnabled()) return
   const verdict = evaluateProvisioningFeature(await getStudioEntitlements(orgId))
   if (verdict.allowed) return
   if (verdict.code === 'entitlements_unavailable') {
