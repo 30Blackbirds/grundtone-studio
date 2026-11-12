@@ -222,10 +222,14 @@ export const projectMember = pgTable(
   ],
 )
 
-// Org roles for the LOCAL authorizer (server/lib/local-authorizer.ts). With
-// AUTHORIZER=pdp the permissions service holds them and this table is unread.
-// It exists because the JWT carries the org id but no role, and studio had no
-// other local record of who holds which org role.
+// Who holds which org role, recorded by studio itself. The JWT carries the org
+// id but no role, and until now studio had no local record of org roles: they
+// lived in auth and, mirrored by auth's hooks, in the permissions service.
+//
+// The studio routes for org membership write it in the same transaction as
+// their audit row. The LOCAL authorizer (server/lib/local-authorizer.ts) reads
+// it; with AUTHORIZER=pdp the permissions service decides and this table is
+// not read for access.
 //
 // One role per (org, user): studio's own UI treats org roles as a single rank
 // (ORG_ROLES), even though the permissions model could store several.
@@ -241,8 +245,8 @@ export const orgMember = pgTable(
   (t) => [
     uniqueIndex('org_member_unique_idx').on(t.organizationId, t.userId),
     index('org_member_user_idx').on(t.userId),
-    // A role the authorizer does not know would grant nothing and look like a
-    // permission bug; refuse it at the write instead.
+    // A role nothing knows would grant nothing and look like a permission bug;
+    // refuse it at the write instead.
     check(
       'org_member_role_known',
       sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,

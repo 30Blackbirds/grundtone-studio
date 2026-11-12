@@ -1,5 +1,5 @@
 {
-  "id": "2fe52e8e-b4eb-4381-84c1-ca5fcc21c25b",
+  "id": "545c81e1-7a9f-470f-b11a-30c5fe8b7fa0",
   "prevId": "4f09a3ef-070f-400e-b89e-f74ed91d8210",
   "version": "7",
   "dialect": "postgresql",
@@ -46,12 +46,8 @@
           "name": "active_version_project_id_project_id_fk",
           "tableFrom": "active_version",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -59,12 +55,8 @@
           "name": "active_version_config_version_id_config_version_id_fk",
           "tableFrom": "active_version",
           "tableTo": "config_version",
-          "columnsFrom": [
-            "config_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["config_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -192,12 +184,8 @@
           "name": "api_key_project_id_project_id_fk",
           "tableFrom": "api_key",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -448,12 +436,8 @@
           "name": "config_version_project_id_project_id_fk",
           "tableFrom": "config_version",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1027,12 +1011,8 @@
           "name": "project_invitation_project_id_project_id_fk",
           "tableFrom": "project_invitation",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1041,98 +1021,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.project_machine_grant": {
-      "name": "project_machine_grant",
-      "schema": "",
-      "columns": {
-        "project_id": {
-          "name": "project_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "api_key_id": {
-          "name": "api_key_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "project_machine_grant_unique_idx": {
-          "name": "project_machine_grant_unique_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "api_key_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "project_machine_grant_project_id_project_id_fk": {
-          "name": "project_machine_grant_project_id_project_id_fk",
-          "tableFrom": "project_machine_grant",
-          "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "project_machine_grant_api_key_id_api_key_id_fk": {
-          "name": "project_machine_grant_api_key_id_api_key_id_fk",
-          "tableFrom": "project_machine_grant",
-          "tableTo": "api_key",
-          "columnsFrom": [
-            "api_key_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "project_machine_grant_editor_only": {
-          "name": "project_machine_grant_editor_only",
-          "value": "\"project_machine_grant\".\"role\" = 'editor'"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.project_member": {
@@ -1233,12 +1121,8 @@
           "name": "project_member_project_id_project_id_fk",
           "tableFrom": "project_member",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

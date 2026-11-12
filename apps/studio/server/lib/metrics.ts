@@ -113,6 +113,26 @@ export function recordAuditWriteFailed(action: string): void {
   }
 }
 
+// An org-membership write that did not end where it should (lib/org-membership.ts).
+// Every one fails CLOSED (too little access, never too much), so this is the
+// signal that something needs a retry or the auth/org_member comparison.
+// `reason` is one of six fixed values: unconfigured, auth_pending,
+// restore_failed, not_recorded, busy, unlock_failed.
+let orgWriteIncomplete: Counter | undefined
+export function recordOrgWriteIncomplete(reason: string): void {
+  try {
+    orgWriteIncomplete ??= metrics
+      .getMeter('grundtone-studio.authz')
+      .createCounter('klanghaus.studio.org_write.incomplete', {
+        unit: '{event}',
+        description: 'Org membership writes that ended fail-closed, not as asked',
+      })
+    orgWriteIncomplete.add(1, { reason })
+  } catch {
+    /* fire-and-forget */
+  }
+}
+
 export function recordPdpUnavailable(reason: string): void {
   try {
     pdpUnavailable ??= metrics

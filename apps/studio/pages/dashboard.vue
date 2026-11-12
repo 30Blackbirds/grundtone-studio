@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
   definePageMeta({ layout: 'app' })
@@ -92,7 +92,7 @@
   async function create() {
     creating.value = true
     error.value = null
-    const res = await organization.create({ name: orgName.value, slug: orgSlug.value })
+    const res = await orgWrites.create({ name: orgName.value, slug: orgSlug.value })
     creating.value = false
     if (res.error) {
       error.value = res.error.message ?? t('orgs.createError')

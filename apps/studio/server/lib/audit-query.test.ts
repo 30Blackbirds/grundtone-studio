@@ -59,15 +59,17 @@ describe('auditConditions', () => {
     expect(params[1]).toBe(after.toISOString())
   })
 
-  it('keeps the composite cursor', () => {
-    const before = new Date('2026-09-17T10:00:00Z')
-    const { sql } = render({
+  it('keeps the composite cursor and passes its timestamp to Postgres as text', () => {
+    const before = '2026-09-17T10:00:00.123456Z'
+    const { sql, params } = render({
       orgId: 'o1',
       before,
       beforeId: '00000000-0000-4000-8000-000000000000',
     })
-    expect(sql).toContain('"audit_log"."created_at" < $2')
+    expect(sql).toContain('"audit_log"."created_at" < $2::timestamptz')
     expect(sql).toContain('"audit_log"."id" < $4')
+    // The microseconds reach the driver; a Date here would have dropped them.
+    expect(params[1]).toBe(before)
   })
 })
 
@@ -85,5 +87,11 @@ describe('auditFilterSchema', () => {
     expect(auditFilterSchema.safeParse({ q: 'a'.repeat(201) }).success).toBe(false)
     expect(auditFilterSchema.safeParse({ after: 'yesterday' }).success).toBe(false)
     expect(auditFilterSchema.safeParse({ after: '2026-09-10T00:00:00Z' }).success).toBe(true)
+  })
+
+  it('accepts the microsecond cursor the list hands back', () => {
+    expect(auditFilterSchema.parse({ before: '2026-11-08T12:00:00.123456Z' }).before).toBe(
+      '2026-11-08T12:00:00.123456Z',
+    )
   })
 })

@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { authClient, organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
 
   definePageMeta({ layout: 'auth' })
 
@@ -27,14 +28,15 @@
   async function accept() {
     accepting.value = true
     acceptError.value = null
-    const res = await organization.acceptInvitation({ invitationId: invitationId.value })
+    const res = await orgWrites.acceptInvitation(invitationId.value)
     accepting.value = false
     if (res.error) {
       acceptError.value = res.error.message ?? t('invitation.acceptError')
       return
     }
-    if (res.data?.invitation.organizationId) {
-      await organization.setActive({ organizationId: res.data.invitation.organizationId })
+    const acceptedOrgId = res.data?.invitation?.organizationId
+    if (acceptedOrgId) {
+      await organization.setActive({ organizationId: acceptedOrgId })
     }
     await navigateTo('/dashboard')
   }

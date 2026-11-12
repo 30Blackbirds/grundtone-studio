@@ -129,7 +129,12 @@ describe('the group a caller is told about', () => {
   })
 
   it('calls a display-only gap "on-request"', () => {
-    expect(unstubbedGroup('organization/create')).toBe('on-request')
+    expect(unstubbedGroup('organization/update')).toBe('on-request')
+  })
+
+  // Creating an org makes the caller its owner: a right, never stubbed.
+  it('org creation is "never"', () => {
+    expect(unstubbedGroup('organization/create')).toBe('never')
   })
 
   it('maps a request path to its stub key', () => {

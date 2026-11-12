@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { organization } from '~~/lib/auth-client'
+  import { orgWrites } from '~~/lib/org-writes'
 
   definePageMeta({ layout: 'app' })
 
@@ -52,7 +53,7 @@
     if (deleteConfirm.value !== slug.value) return
     deleting.value = true
     deleteError.value = null
-    const res = await organization.delete({ organizationId: activeOrg.value.id })
+    const res = await orgWrites.delete(activeOrg.value.id)
     deleting.value = false
     if (res.error) {
       deleteError.value = res.error.message ?? t('orgSettings.deleteError')
