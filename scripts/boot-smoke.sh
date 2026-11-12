@@ -64,45 +64,77 @@ done
 # server/plugins/assert-cdn-base.ts). Fyrer den ikke, er resten af CDN-målingen
 # herunder værdiløs — så vi bevæbner den mod ingenting og ville ikke vide det.
 CDN_HOST=${BOOT_SMOKE_CDN_HOST:-cdn.grundtone.com}
-docker run -d --name "$APP-nocdn" --network "$NET" \
-  -e DATABASE_URL="postgres://postgres:smoke@$DB:5432/postgres" \
-  -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
-  "$IMAGE" >/dev/null
-#
-# 🔴 WAIT FOR IT TO EXIT; DO NOT SAMPLE "is it running?" AFTER A FIXED SLEEP.
-# The first version slept 3s and read State.Running, and called the guard inert
-# because the container was still up — it was still running MIGRATIONS
-# (docker/entrypoint.sh runs them BEFORE the server starts), so it had not yet
-# reached the Nitro plugin. The measurement was impatient, not the guard.
-nocdn_exited=false
-for _ in $(seq 1 30); do
-  if [ "$(docker inspect -f '{{.State.Running}}' "$APP-nocdn")" != 'true' ]; then
-    nocdn_exited=true
-    break
+
+# AUTHORIZER and FEATURE_BILLING have no default: a missing or unknown value is a
+# refusal to start (server/plugins/assert-runtime-flags.ts). The smoke sets the
+# values vitest.config.ts sets, 'pdp' and 'on'. They are TEST values: which
+# FEATURE_BILLING a deployment runs with is Allan's decision (D-E2), not this
+# script's. Every run below that is not about one of the flags gets both, so a
+# refusal can only be the one the run is testing.
+FLAGS=(-e AUTHORIZER=pdp -e FEATURE_BILLING=on)
+
+# expect_refusal <suffix> <name the log must contain> <env args…>
+# Starts the image with the given env and passes only if it EXITS, non-zero,
+# and its log names the variable it refused on.
+expect_refusal() {
+  local name="$APP-$1" needle=$2
+  shift 2
+  docker run -d --name "$name" --network "$NET" \
+    -e DATABASE_URL="postgres://postgres:smoke@$DB:5432/postgres" \
+    -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
+    "$@" "$IMAGE" >/dev/null
+  #
+  # 🔴 WAIT FOR IT TO EXIT; DO NOT SAMPLE "is it running?" AFTER A FIXED SLEEP.
+  # The first version slept 3s and read State.Running, and called the guard inert
+  # because the container was still up — it was still running MIGRATIONS
+  # (docker/entrypoint.sh runs them BEFORE the server starts), so it had not yet
+  # reached the Nitro plugin. The measurement was impatient, not the guard.
+  local exited=false
+  for _ in $(seq 1 30); do
+    if [ "$(docker inspect -f '{{.State.Running}}' "$name")" != 'true' ]; then
+      exited=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$exited" != 'true' ]; then
+    log "✗ the image was STILL RUNNING 60s after starting without a valid $needle — the boot"
+    log "  refusal is inert"
+    docker logs "$name" 2>&1 | tail -20 >&2
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    exit 1
   fi
-  sleep 2
-done
-if [ "$nocdn_exited" != 'true' ]; then
-  log "✗ the image was STILL RUNNING 60s after starting with NUXT_PUBLIC_CDN_BASE unset — the boot"
-  log "  refusal is inert, so every CDN host assertion below would pass on an app that had fallen"
-  log "  back to the request origin"
-  docker logs "$APP-nocdn" 2>&1 | tail -20 >&2
-  docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
-  exit 1
-fi
-# 🔴 Read the log into a variable, then grep a here-string. `docker logs | grep -q`
-# under `set -o pipefail` fails at random: grep -q exits on the first match, docker
-# logs gets SIGPIPE (141), and pipefail turns the FOUND line into a failure — a
-# false "not for the reason we are testing" while the log does name the variable
-# (measured 2026-10-23: same image, red once, green on the next run).
-nocdn_log="$(docker logs "$APP-nocdn" 2>&1)"
-grep -qF 'NUXT_PUBLIC_CDN_BASE' <<<"$nocdn_log" \
-  || { log "✗ the image refused to start, but not for the reason we are testing — its log never names NUXT_PUBLIC_CDN_BASE"; tail -20 <<<"$nocdn_log" >&2; docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true; exit 1; }
-# ↑ The failure branch prints THE READ THAT WAS JUDGED, not a second `docker logs`:
-# a second read is a different object, and it is empty if the container has gone
-# in between ([sikkerhed], #353 verdict).
-docker rm -f "$APP-nocdn" >/dev/null 2>&1 || true
-log "✓ the image refuses to start without NUXT_PUBLIC_CDN_BASE, and says so"
+  # Stopped is not refused: an exit 0 is a process that ended on its own.
+  local code
+  code=$(docker inspect -f '{{.State.ExitCode}}' "$name")
+  if [ "$code" = '0' ]; then
+    log "✗ the image stopped without a valid $needle, but with exit code 0 — not a refusal"
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    exit 1
+  fi
+  # 🔴 Read the log into a variable, then grep a here-string. `docker logs | grep -q`
+  # under `set -o pipefail` fails at random: grep -q exits on the first match, docker
+  # logs gets SIGPIPE (141), and pipefail turns the FOUND line into a failure — a
+  # false "not for the reason we are testing" while the log does name the variable
+  # (measured 2026-10-23: same image, red once, green on the next run).
+  local out
+  out="$(docker logs "$name" 2>&1)"
+  grep -qF "$needle" <<<"$out" \
+    || { log "✗ the image refused to start, but not for the reason we are testing — its log never names $needle"; tail -20 <<<"$out" >&2; docker rm -f "$name" >/dev/null 2>&1 || true; exit 1; }
+  # ↑ The failure branch prints THE READ THAT WAS JUDGED, not a second `docker logs`:
+  # a second read is a different object, and it is empty if the container has gone
+  # in between ([sikkerhed], #353 verdict).
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  log "✓ the image refuses to start without a valid $needle (exit $code), and says so"
+}
+
+expect_refusal nocdn NUXT_PUBLIC_CDN_BASE "${FLAGS[@]}"
+# The two runtime flags, one missing and one unknown, each with everything else
+# set: the boot guard must fire in the IMAGE, not only in the unit cells.
+expect_refusal noauthz AUTHORIZER \
+  -e FEATURE_BILLING=on -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST"
+expect_refusal badbilling FEATURE_BILLING \
+  -e AUTHORIZER=pdp -e FEATURE_BILLING=maybe -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST"
 
 # …and now the real run, configured the way production is: the host is SET, not
 # fallen back to. That is the shape being measured.
@@ -111,6 +143,7 @@ docker run -d --name "$APP" --network "$NET" -p "$PORT:3000" \
   -e NUXT_PUBLIC_AUTH_URL="http://127.0.0.1:9" \
   -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST" \
   -e OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318" \
+  "${FLAGS[@]}" \
   "$IMAGE" >/dev/null
 
 # Assertér at containeren FAKTISK kører, før vi curler. Uden den læses et svar
