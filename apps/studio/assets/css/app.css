@@ -1304,13 +1304,20 @@ main {
   overflow-wrap: anywhere;
 }
 
-/* Table above 920px, cards below — [designer]'s measured breakpoint for
-   R1/R5/R6, not the 640px GTTable stacks at on its own (riff e4o6sixt). Both
-   renderings exist in the markup; `display: none` removes one from the layout
-   AND from the accessibility tree, so only one is ever announced. */
+/* Table from 1024px, cards below. Both renderings exist in the markup;
+   `display: none` removes one from the layout AND from the accessibility tree,
+   so only one is ever announced.
+
+   64rem is not a studio number: it is grundtone's `lg` step (1024px), and
+   `width < 64rem` stacks below it exactly as GTTable's `stackBelow="lg"` does
+   (max-width: 1024px - 0.02px). [designer] measured 920px as the narrowest
+   width where these tables fit (R1/R5/R6, KH-1022) and chose the next library
+   step up (2026-11-12) instead of a studio-only value. Between 920 and 1024
+   the cards show a little longer, which is the safe direction: a table below
+   920 overflows, cards above it only take more height. */
 
 /* 🔴 ONE TABLE/CARDS SWAP, SHARED — members (#309) and API keys use the same
-   pair, so the 920px breakpoint lives in one rule instead of one per screen.
+   pair, so the breakpoint lives in one rule instead of one per screen.
    The same lesson as .card-row: a pattern copied per screen is a pattern
    cured per screen, and one gets forgotten.
    The narrow list owns its own `display` and `gap` and must NOT carry the
@@ -1322,7 +1329,7 @@ main {
   gap: 0.5rem;
 }
 
-@media (width <= 57.5rem) {
+@media (width < 64rem) {
   .table-wide {
     display: none;
   }
