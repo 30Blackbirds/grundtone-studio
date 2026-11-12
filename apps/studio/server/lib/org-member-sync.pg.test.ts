@@ -33,6 +33,8 @@ let reread: (orgId: string) => AuthOrg | null | Promise<AuthOrg | null>
 // A complete listing here carries the independent count a real source must
 // give; `countOverride` lets a cell give a wrong one.
 let countOverride: number | undefined | null
+// The listing's snapshot time: now unless a cell gives another (null = none).
+let snapshotOverride: string | undefined | null
 // Each org's member list is proven complete unless a cell says otherwise, the
 // way a real source must prove it (signal plus an independent count).
 const prove = (o: AuthOrg | null): AuthOrg | null =>
@@ -46,6 +48,8 @@ const source = {
     orgs: authOrgs.map((o) => prove(o)!),
     complete,
     expectedCount: countOverride === null ? undefined : (countOverride ?? authOrgs.length),
+    snapshotAt:
+      snapshotOverride === null ? undefined : (snapshotOverride ?? new Date().toISOString()),
   }),
   readOrg: async (orgId: string) => prove(await reread(orgId)),
 }
@@ -76,6 +80,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     authOrgs = []
     complete = true
     countOverride = undefined
+    snapshotOverride = undefined
     reread = (orgId) => authOrgs.find((o) => o.orgId === orgId) ?? null
   })
 
@@ -303,7 +308,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
 
     it('a dry run writes nothing and counts what it would do', async () => {
       await put(a, 'u-have', 'member')
-      const c = await lib.backfillOrgMembers(db, source, { dryRun: true })
+      const c = await lib.backfillOrgMembers(db, source, { dryRun: true, maxAgeMinutes: 60 })
       expect(c).toEqual({
         dryRun: true,
         complete: true,
@@ -315,6 +320,8 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
         multipleRoles: 1,
         removedAfterReread: 0,
         busyOrgs: [],
+        unproven: [],
+        fenced: [],
       })
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'member' }])
       expect(await rows(b)).toEqual([])
@@ -322,7 +329,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
 
     it('a real run inserts held roles only and never overwrites a row', async () => {
       await put(a, 'u-have', 'member')
-      await lib.backfillOrgMembers(db, source, { dryRun: false })
+      await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
       expect(await rows(a)).toEqual([
         { userId: 'u-have', role: 'member' },
         { userId: 'u-multi', role: 'admin' },
@@ -332,8 +339,8 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     })
 
     it('is idempotent: a second run inserts nothing', async () => {
-      await lib.backfillOrgMembers(db, source, { dryRun: false })
-      const again = await lib.backfillOrgMembers(db, source, { dryRun: false })
+      await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      const again = await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
       expect(again.inserted).toBe(0)
       expect(again.existing).toBe(4)
     })
@@ -351,10 +358,66 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
               ],
             }
           : (authOrgs.find((o) => o.orgId === orgId) ?? null)
-      const c = await lib.backfillOrgMembers(db, source, { dryRun: false })
+      const c = await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
       expect(c.removedAfterReread).toBe(2)
       // u-owner gone from auth, u-multi demoted to member: neither is kept.
       expect(await rows(a)).toEqual([{ userId: 'u-have', role: 'admin' }])
+    })
+
+    it.each([
+      ['complete=false', () => (complete = false)],
+      ['no independent count', () => (countOverride = null)],
+      ['a count that does not match', () => (countOverride = 3)],
+    ])('a real run with %s refuses before writing anything', async (_, flip) => {
+      flip()
+      await expect(
+        lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+      ).rejects.toThrow(lib.BackfillRefused)
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([])
+    })
+
+    it.each([
+      ['no snapshot time', () => (snapshotOverride = null), 60, 'no snapshot time'],
+      [
+        'a snapshot older than maxAgeMinutes',
+        () => (snapshotOverride = new Date(Date.now() - 61 * 60_000).toISOString()),
+        60,
+        'minutes old, over 60',
+      ],
+      [
+        'a snapshot in the future',
+        () => (snapshotOverride = new Date(Date.now() + 10 * 60_000).toISOString()),
+        60,
+        'in the future',
+      ],
+      ['maxAgeMinutes of 0', () => undefined, 0, 'positive number'],
+    ])('a real run with %s refuses before writing anything', async (_, flip, maxAge, why) => {
+      flip()
+      await expect(
+        lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: maxAge }),
+      ).rejects.toThrow(why)
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([])
+    })
+
+    it('an org whose member list is not proven is skipped and named; the other is loaded', async () => {
+      authOrgs[0] = { ...authOrgs[0]!, membersComplete: false }
+      const c = await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
+      expect(c.unproven).toEqual([a])
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([{ userId: 'u-b', role: 'billing' }])
+    })
+
+    it('a second read that fails removes what was just inserted for that org, and stops', async () => {
+      reread = () => {
+        throw new Error('second read failed')
+      }
+      await expect(
+        lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 }),
+      ).rejects.toThrow('second read failed')
+      expect(await rows(a)).toEqual([])
+      expect(await rows(b)).toEqual([])
     })
   })
 
@@ -478,7 +541,7 @@ describe.skipIf(!DATABASE_URL)('org member sync (real Postgres)', () => {
     authOrgs = [{ orgId: a, members: [] }]
     await lib.compareOrgMembers(db, source, { repair: true, scope: ours, maxDeletions: 50 })
     authOrgs = [{ orgId: b, members: [{ userId: 'new', role: 'admin' }] }]
-    await lib.backfillOrgMembers(db, source, { dryRun: false })
+    await lib.backfillOrgMembers(db, source, { dryRun: false, maxAgeMinutes: 60 })
     const audit = await db
       .select({
         org: schema.auditLog.organizationId,
