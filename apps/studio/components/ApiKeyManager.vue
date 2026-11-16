@@ -290,9 +290,8 @@
       <h3 class="text-sm uppercase text-tertiary tracking-wide mb-3">
         {{ t('apiKeys.active') }}
       </h3>
-      <!-- Table above 920px, cards below — [designer]'s breakpoint for R1/R5/
-           R6, not the 640px GTTable stacks at on its own (riff e4o6sixt). Same
-           two-rendering swap as the R5 members page (#309). -->
+      <!-- Table from 1024px (grundtone's `lg`), cards below: the same shared
+           two-rendering swap as the R5 members page (#309), set in app.css. -->
       <div v-if="activeKeys.length" class="table-wide">
         <GTTable
           :caption="t('apiKeys.active')"

@@ -224,16 +224,13 @@
 
     <h2 class="members-section-heading">{{ t('members.active') }}</h2>
 
-    <!-- 🔴 TABLE ABOVE 920px, CARDS BELOW — two renderings, swapped by CSS.
-         GTTable has a `responsive` mode of its own, but it stacks at
-         `width <= 40rem` (640px, measured in @grundtone/vue 3.2.1's index.css).
-         [designer] decided 920px for this screen (KH-1022, "tables on desktop,
-         cards below 920px — measured breakpoint in R1/R5/R6"), so the library's
-         mode would leave a table standing across 640–920px, against a named
-         decision. Rather than restate the library's stacking rules in studio
-         CSS — which would drift the moment the library changes them — the page
-         renders both and `display: none` hides one. `display: none` removes a
-         subtree from the accessibility tree too, so only one is ever announced. -->
+    <!-- 🔴 TABLE FROM 1024px (grundtone's `lg`), CARDS BELOW — two renderings,
+         swapped by one shared rule in app.css (see the comment there for why
+         `lg`). GTTable's own `responsive` mode stacks rows as label:value
+         cells, not as the R5 cards, so [designer] kept the cards (2026-11-12)
+         and the page renders both; `display: none` hides one. `display: none`
+         removes a subtree from the accessibility tree too, so only one is ever
+         announced. -->
     <div class="members-wide table-wide">
       <GTTable
         :caption="t('members.active')"
