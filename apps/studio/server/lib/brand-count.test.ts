@@ -113,6 +113,17 @@ describe('reportBrandCount', () => {
     expect(order).toEqual(['count', 'fetch'])
   })
 
+  // Checked before ACCOUNT_URL: here the URL is set, and still nothing goes out.
+  it('with FEATURE_BILLING=off: no count, no call, even with ACCOUNT_URL set', async () => {
+    process.env.FEATURE_BILLING = 'off'
+    try {
+      await expect(reportBrandCount('org-1')).resolves.toEqual({ kind: 'billing_off' })
+      expect(order).toEqual([])
+    } finally {
+      process.env.FEATURE_BILLING = 'on'
+    }
+  })
+
   it('is dormant without ACCOUNT_URL: no count, no call', async () => {
     delete process.env.ACCOUNT_URL
     await expect(reportBrandCount('org-1')).resolves.toEqual({ kind: 'dormant' })

@@ -1,5 +1,6 @@
 import { createError } from 'h3'
 import { z } from 'zod'
+import { billingEnabled } from './runtime-flags'
 
 // Studio-side client for account's entitlements-API, per the locked contract
 // .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md (2026-07-29):
@@ -53,6 +54,11 @@ export function clearEntitlementsCacheFor(orgId: string) {
 }
 
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
+  // D-E2 (Allan, 2026-11-10): with billing off there is no plan, and every org
+  // has every feature. Account is not asked. null is what every quota gate
+  // already reads as "allowed"; the one paid feature, provisioning, answers for
+  // billing off before it gets here (requireProvisioningFeature).
+  if (!billingEnabled()) return null
   const baseUrl = process.env.ACCOUNT_URL
   if (!baseUrl) return null
 
@@ -251,6 +257,9 @@ const FEATURE_MESSAGES: Record<Exclude<FeatureVerdict, { allowed: true }>['code'
 
 /** Throws the verdict as an H3 error; returns when the org may use provisioning. */
 export async function requireProvisioningFeature(orgId: string): Promise<void> {
+  // D-E2: billing off means every org has every feature, so this paid feature
+  // is allowed without asking account. Billing on is unchanged below.
+  if (!billingEnabled()) return
   const verdict = evaluateProvisioningFeature(await getStudioEntitlements(orgId))
   if (verdict.allowed) return
   if (verdict.code === 'entitlements_unavailable') {

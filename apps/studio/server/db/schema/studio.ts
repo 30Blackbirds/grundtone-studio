@@ -226,10 +226,10 @@ export const projectMember = pgTable(
 // id but no role, and until now studio had no local record of org roles: they
 // lived in auth and, mirrored by auth's hooks, in the permissions service.
 //
-// Nothing writes or reads this table yet. The studio routes for org membership
-// (create, invite accept, role change, remove, leave, delete) will write it in
-// the same transaction as their audit row, and the local authorizer will read
-// it. Until then it is empty, and every access decision is unchanged.
+// The studio routes for org membership write it in the same transaction as
+// their audit row. The LOCAL authorizer (server/lib/local-authorizer.ts) reads
+// it; with AUTHORIZER=pdp the permissions service decides and this table is
+// not read for access.
 //
 // One role per (org, user): studio's own UI treats org roles as a single rank
 // (ORG_ROLES), even though the permissions model could store several.
@@ -251,6 +251,27 @@ export const orgMember = pgTable(
       'org_member_role_known',
       sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,
     ),
+  ],
+)
+
+// Machine (per-project secret key) grants for the LOCAL authorizer: the
+// counterpart of the permissions model's `editor: [user, machine]`. A key can
+// only ever be editor, never admin, so a key cannot raise its own rights.
+export const projectMachineGrant = pgTable(
+  'project_machine_grant',
+  {
+    projectId: uuid()
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    apiKeyId: uuid()
+      .notNull()
+      .references(() => apiKey.id, { onDelete: 'cascade' }),
+    role: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('project_machine_grant_unique_idx').on(t.projectId, t.apiKeyId),
+    check('project_machine_grant_editor_only', sql`${t.role} = 'editor'`),
   ],
 )
 

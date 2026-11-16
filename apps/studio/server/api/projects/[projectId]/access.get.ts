@@ -1,4 +1,4 @@
-import { batchCheckProjects } from '~~/server/lib/pdp'
+import { batchCheckProjects } from '~~/server/lib/authorizer'
 import type { ProjectRole } from '~~/server/lib/project-access'
 
 // Returns the current user's effective project role, decided by the PDP. Used

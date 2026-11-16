@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { project } from '../db/schema'
 import { lookupOrgById } from './org-lookup'
-import { checkOrg, checkProject } from './pdp'
+import { checkOrg, checkProject } from './authorizer'
 
 // Two-layer permissions, Sentry-style — now adjudicated by the central
 // Permissions PDP (Beslutning O). The PDP's OpenFGA model implements the same

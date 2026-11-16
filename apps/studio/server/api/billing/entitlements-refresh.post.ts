@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
 import { clearEntitlementsCacheFor } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
+import { requireBillingEnabled } from '~~/server/lib/runtime-flags'
 
 const bodySchema = z.object({ organizationSlug: z.string().min(1) })
 
@@ -15,6 +16,7 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  requireBillingEnabled()
   const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
 
   // Membership-scoped lookup is the gate; busting a cache is harmless beyond

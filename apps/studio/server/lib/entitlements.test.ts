@@ -281,6 +281,56 @@ describe('requireProvisioningFeature — the real client, both null branches', (
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  // D-E2 (Allan, 2026-11-10): billing off = every org has every feature, and
+  // account is not asked. The free org is the one that matters: with billing
+  // on it is refused (the next cells), with billing off it is not.
+  it('FEATURE_BILLING=off: a free org gets the feature, and account is not asked', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'off')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent())
+    await expect(requireProvisioningFeature('org-free')).resolves.toBeUndefined()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('FEATURE_BILLING=off: also with no account configured at all (self-host)', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'off')
+    vi.stubEnv('ACCOUNT_URL', '')
+    await expect(requireProvisioningFeature('org-any')).resolves.toBeUndefined()
+  })
+
+  it('FEATURE_BILLING=off: quotas read no plan, so none applies', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'off')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent({ limits: { 'studio.projects': 0 } }))
+    const entitlements = await getStudioEntitlements('org-zero')
+    expect(entitlements).toBeNull()
+    expect(evaluateProjectQuota(entitlements, 99)).toEqual({ allowed: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // 🔴 Billing ON must not inherit the billing-off rule: the same free org and
+  // the same zero quota are refused as before.
+  it('FEATURE_BILLING=on: the same free org is refused 403 feature_not_enabled', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'on')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent())
+    await expect(requireProvisioningFeature('org-free-on')).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'feature_not_enabled' },
+    })
+  })
+
+  it('FEATURE_BILLING=on: the same zero quota refuses', async () => {
+    vi.stubEnv('FEATURE_BILLING', 'on')
+    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
+    answer(ent({ limits: { 'studio.projects': 0 } }))
+    const entitlements = await getStudioEntitlements('org-zero-on')
+    expect(evaluateProjectQuota(entitlements, 0)).toMatchObject({
+      allowed: false,
+      reason: 'quota_exceeded',
+    })
+  })
+
   it('AC-E1 end to end: a free org → 403 feature_not_enabled', async () => {
     vi.stubEnv('ACCOUNT_URL', 'https://account.test')
     answer(ent())

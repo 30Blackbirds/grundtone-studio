@@ -5,6 +5,7 @@ import { mintAccountUserToken } from '~~/server/lib/account-user-token'
 import { assertBetaPurchasesClosed } from '~~/server/lib/beta-purchases'
 import { PORTAL_KEY } from '~~/server/lib/entitlements'
 import { requireAuthedRequest, requireOrg } from '~~/server/lib/org-request'
+import { requireBillingEnabled } from '~~/server/lib/runtime-flags'
 
 const bodySchema = z.object({ organizationSlug: z.string().min(1) })
 
@@ -18,6 +19,7 @@ defineRouteMeta({
 })
 
 export default defineEventHandler(async (event) => {
+  requireBillingEnabled()
   const { actor, data } = requireAuthedRequest(event, bodySchema, await readBody(event))
 
   const org = await requireOrg(event, actor, data.organizationSlug, 'billing')

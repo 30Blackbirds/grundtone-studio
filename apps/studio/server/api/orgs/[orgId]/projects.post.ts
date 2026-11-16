@@ -6,7 +6,7 @@ import { project } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { evaluateProjectQuota, getStudioEntitlements } from '~~/server/lib/entitlements'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
-import { grantMachineProjectRole, linkProjectToOrg } from '~~/server/lib/pdp'
+import { grantMachineProjectRole, linkProjectToOrg } from '~~/server/lib/authorizer'
 
 // Create a project with a provisioning key (KH-964 AC-B).
 //

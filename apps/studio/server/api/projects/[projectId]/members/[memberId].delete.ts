@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { projectMember } from '~~/server/db/schema'
-import { revokeProjectRole } from '~~/server/lib/pdp'
+import { revokeProjectRole } from '~~/server/lib/authorizer'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { PROJECT_ROLES, requireProjectAccess, type ProjectRole } from '~~/server/lib/project-access'
 
