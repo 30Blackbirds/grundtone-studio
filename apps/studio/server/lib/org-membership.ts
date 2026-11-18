@@ -671,6 +671,21 @@ export async function leaveOrganization(
   })
 }
 
+/**
+ * Hand ownership to another member (oidc mode). In better-auth mode ownership
+ * lives in the auth service and this operation does not exist.
+ */
+export async function transferOwnership(
+  deps: MembershipDeps,
+  event: H3Event,
+  orgId: string,
+  targetUserId: string,
+  stepDownTo?: OrgRole,
+) {
+  if (authMode() !== 'oidc') throw createError({ statusCode: 404 })
+  return local.transferOwnershipLocal(deps.db, event, orgId, targetUserId, stepDownTo)
+}
+
 export async function deleteOrganization(deps: MembershipDeps, event: H3Event, orgId: string) {
   if (authMode() === 'oidc') return local.deleteOrganizationLocal(deps.db, event, orgId)
   return withOrgLock(deps, orgId, async (deps) => {

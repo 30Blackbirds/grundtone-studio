@@ -730,7 +730,10 @@
     "removeBody": "Remove this person from the organization. They lose access to every project immediately.",
     "removeAction": "Remove from organization",
     "confirmRemove": "Remove this member from the organization? They lose access to every project immediately.",
-    "cannotManageHierarchy": "You can't change a role at or above your own."
+    "cannotManageHierarchy": "You can't change a role at or above your own.",
+    "transferAction": "Make owner and step down",
+    "confirmTransfer": "This member becomes an owner and you become a manager. You cannot undo this yourself.",
+    "transferError": "Could not transfer ownership"
   },
   "verifyEmail": {
     "title": "Check your inbox",
@@ -963,7 +966,8 @@
     "leftOrg": "You have left the organization",
     "inviteSent": "Invitation sent",
     "inviteResent": "Invitation resent",
-    "upgraded": "Your plan has been upgraded."
+    "upgraded": "Your plan has been upgraded.",
+    "ownershipTransferred": "Ownership transferred"
   },
   "dashboard": {
     "title": "Dashboard",

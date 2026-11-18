@@ -65,5 +65,8 @@ export const orgWrites = {
   removeMember: (orgId: string, memberId: string) =>
     call<unknown>(`/api/orgs/${seg(orgId)}/memberships/${seg(memberId)}`, 'DELETE'),
 
+  transferOwnership: (orgId: string, userId: string) =>
+    call<unknown>(`/api/orgs/${seg(orgId)}/ownership-transfer`, 'POST', { userId }),
+
   leave: (orgId: string) => call<unknown>(`/api/orgs/${seg(orgId)}/leave`, 'POST'),
 }
