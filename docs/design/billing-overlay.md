@@ -292,9 +292,11 @@ code the owner wrote.
    proposed: it breaks forks and signatures and gains little for plan prices that are on a public
    pricing page anyway.
 2. **Keys.** Measured: no provider keys or webhook secrets appear in the tree or `.env.example`;
-   `ACCOUNT_S2S_TOKEN` is read from env and not committed. A secret-scan of the full history
-   (Gitleaks is active on GitHub) was not run for this note; do that before declaring the history
-   clean.
+   `ACCOUNT_S2S_TOKEN` is read from env and not committed. Measured 2026-11-18: Gitleaks 8.30.1 over
+   627 commits (all refs in a fresh clone) found no leaks with the repo's own config. With the
+   default ruleset only it reports 2 `generic-api-key` hits, both in the historical `docs/MVP.md` (a
+   fake install-snippet publishable key, already allowlisted). Gitleaks matches known key formats
+   and entropy, so a plain unformatted token value would not be caught.
 3. **Sub-processor and legal texts.** The public `sub-processors` page and terms name a payment
    provider. After the move, the public page must list only what the operator configures; the hosted
    service's list lives in the overlay. The existing legal texts are the hosted service's own and
