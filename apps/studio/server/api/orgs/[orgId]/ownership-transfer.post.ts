@@ -1,8 +1,7 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { z } from 'zod'
-import { db } from '~~/server/db'
 import { assertSameOrigin, parseBody } from '~~/server/lib/org-membership-input'
-import { transferOwnershipLocal } from '~~/server/lib/org-membership-local'
+import { membershipDeps, transferOwnership } from '~~/server/lib/org-membership'
 import { authMode } from '~~/server/lib/oidc/config'
 
 defineRouteMeta({
@@ -25,5 +24,5 @@ export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, 'orgId')
   if (!orgId) throw createError({ statusCode: 400, statusMessage: 'orgId required' })
   const body = parseBody(bodySchema, await readBody(event))
-  return transferOwnershipLocal(db, event, orgId, body.userId, body.stepDownTo)
+  return transferOwnership(await membershipDeps(event), event, orgId, body.userId, body.stepDownTo)
 })

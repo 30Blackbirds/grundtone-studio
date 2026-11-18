@@ -5,10 +5,10 @@ import { fakeEvent, mockH3 } from '~~/tests/helpers/endpoint-fixtures'
 // writes is measured in server/lib/ownership-transfer.pg.test.ts.
 
 vi.mock('h3', () => mockH3())
-vi.mock('~~/server/db', () => ({ db: 'DB' }))
 const op = vi.fn()
-vi.mock('~~/server/lib/org-membership-local', () => ({
-  transferOwnershipLocal: (...a: unknown[]) => op(...a),
+vi.mock('~~/server/lib/org-membership', () => ({
+  membershipDeps: async () => 'DEPS',
+  transferOwnership: (...a: unknown[]) => op(...a),
 }))
 let mode = 'oidc'
 vi.mock('~~/server/lib/oidc/config', () => ({ authMode: () => mode }))
@@ -39,7 +39,7 @@ beforeEach(() => {
 describe('POST /api/orgs/:orgId/ownership-transfer', () => {
   it('passes the org, target and step-down role to the store', async () => {
     await call({ body: { userId: 'u-2', stepDownTo: 'member' } })
-    expect(op).toHaveBeenCalledWith('DB', expect.anything(), 'org-1', 'u-2', 'member')
+    expect(op).toHaveBeenCalledWith('DEPS', expect.anything(), 'org-1', 'u-2', 'member')
   })
 
   it('does not exist in better-auth mode', async () => {

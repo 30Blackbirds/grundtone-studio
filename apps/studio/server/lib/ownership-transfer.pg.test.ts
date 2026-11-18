@@ -18,6 +18,7 @@ let db: Db
 let schema: typeof import('~~/server/db/schema')
 let local: typeof import('./org-membership-local')
 let orgs: typeof import('./local-orgs')
+let ops: typeof import('./org-membership')
 
 const userIds: string[] = []
 const orgIds: string[] = []
@@ -40,6 +41,7 @@ describe.skipIf(!DATABASE_URL)('ownership transfer (real Postgres)', () => {
     schema = await import('~~/server/db/schema')
     local = await import('./org-membership-local')
     orgs = await import('./local-orgs')
+    ops = await import('./org-membership')
   })
   beforeEach(() => {
     vi.stubEnv('AUTH_MODE', 'oidc')
@@ -85,7 +87,7 @@ describe.skipIf(!DATABASE_URL)('ownership transfer (real Postgres)', () => {
       ).map((m) => [m.userId, m.role]),
     )
   const transfer = (u: U | null, orgId: string, to: string, stepDownTo?: 'member' | 'manager') =>
-    local.transferOwnershipLocal(db, ev(u), orgId, to, stepDownTo)
+    ops.transferOwnership({ db } as never, ev(u), orgId, to, stepDownTo)
 
   describe('denials', () => {
     it('a manager, an admin and an outsider cannot transfer; nothing changes', async () => {
@@ -126,7 +128,7 @@ describe.skipIf(!DATABASE_URL)('ownership transfer (real Postgres)', () => {
     const m = await add('member')
     expect(await transfer(owner, orgId, m.id)).toEqual({ ok: true })
     expect(await roles(orgId)).toEqual({ [owner.id]: 'manager', [m.id]: 'owner' })
-    const log = await db
+    const auditRows = await db
       .select()
       .from(schema.auditLog)
       .where(
@@ -135,7 +137,7 @@ describe.skipIf(!DATABASE_URL)('ownership transfer (real Postgres)', () => {
           eq(schema.auditLog.action, 'member.role_changed'),
         ),
       )
-    expect(log).toHaveLength(2)
+    expect(auditRows).toHaveLength(2)
     // The previous owner no longer can.
     expect(await status(transfer(owner, orgId, m.id))).toBe(403)
   })
