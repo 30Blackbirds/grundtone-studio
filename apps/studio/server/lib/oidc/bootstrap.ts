@@ -1,7 +1,14 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { Db } from '../../db'
-import { appUser, auditLog, orgInvitation, orgMember, organization } from '../../db/schema'
+import {
+  appUser,
+  auditLog,
+  orgInvitation,
+  orgMember,
+  organization,
+  userIdentity,
+} from '../../db/schema'
 import { auditRow } from '../audit'
 import { INVITATION_TTL_MS } from '../local-orgs'
 
@@ -24,6 +31,67 @@ export type BootstrapResult =
   | { kind: 'invitation'; organizationId: string; created: boolean; token: string; expiresAt: Date }
 
 export class BootstrapError extends Error {}
+
+/**
+ * Owner by IdP identity (issuer + subject), the form to prefer: it depends on
+ * no e-mail address, so it cannot be claimed by whoever can register that
+ * address at the IdP. The Studio user is created now with no e-mail; the first
+ * login finds it by (issuer, subject) and fills in the claims. Idempotent.
+ */
+export async function bootstrapOwnerBySubject(
+  db: Db,
+  input: { issuer: string; subject: string; orgSlug: string; orgName?: string },
+): Promise<{ organizationId: string; created: boolean; userCreated: boolean }> {
+  const issuer = input.issuer.trim()
+  const subject = input.subject.trim()
+  if (!issuer || !subject || subject.length > 255)
+    throw new BootstrapError('invalid issuer or subject')
+  if (!SLUG.test(input.orgSlug)) throw new BootstrapError('invalid organisation slug')
+  return db.transaction(async (tx) => {
+    let [org] = await tx.select().from(organization).where(eq(organization.slug, input.orgSlug))
+    let created = false
+    if (!org) {
+      const name = input.orgName?.trim()
+      if (!name || name.length > 200) {
+        throw new BootstrapError('organisation does not exist: pass a name to create it')
+      }
+      ;[org] = await tx
+        .insert(organization)
+        .values({ id: randomUUID(), name, slug: input.orgSlug })
+        .returning()
+      created = true
+    }
+    const orgId = org!.id
+    const [known] = await tx
+      .select({ userId: userIdentity.userId })
+      .from(userIdentity)
+      .where(and(eq(userIdentity.issuer, issuer), eq(userIdentity.subject, subject)))
+    let userId = known?.userId
+    if (!userId) {
+      userId = randomUUID()
+      await tx.insert(appUser).values({ id: userId })
+      await tx.insert(userIdentity).values({ issuer, subject, userId })
+    }
+    await tx
+      .insert(orgMember)
+      .values({ organizationId: orgId, userId, role: 'owner' })
+      .onConflictDoUpdate({
+        target: [orgMember.organizationId, orgMember.userId],
+        set: { role: 'owner' },
+      })
+    await tx.insert(auditLog).values(
+      auditRow(null, {
+        organizationId: orgId,
+        action: 'member.added',
+        targetType: 'organization',
+        targetId: orgId,
+        targetLabel: `sub:${subject}`,
+        actorEmail: 'operator',
+      }),
+    )
+    return { organizationId: orgId, created, userCreated: !known }
+  })
+}
 
 export async function bootstrapOwner(
   db: Db,

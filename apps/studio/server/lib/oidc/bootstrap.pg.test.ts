@@ -188,4 +188,69 @@ describe.skipIf(!DATABASE_URL)('owner bootstrap (real Postgres)', () => {
       expect(await sessions.disableUser(db, plain.id)).toBe(true)
     })
   })
+
+  it('makes the identity owner without any e-mail, idempotently, and login finds the same user', async () => {
+    const { resolveUser } = await import('./identity')
+    const issuer = 'https://idp.example.com'
+    const subject = `sub-${randomUUID()}`
+    const s = `boot-${randomUUID().slice(0, 8)}`
+    const first = await b.bootstrapOwnerBySubject(db, {
+      issuer,
+      subject,
+      orgSlug: s,
+      orgName: 'Acme',
+    })
+    const again = await b.bootstrapOwnerBySubject(db, { issuer, subject, orgSlug: s })
+    expect(first).toMatchObject({ created: true, userCreated: true })
+    expect(again).toMatchObject({ created: false, userCreated: false })
+    const rows = await db
+      .select()
+      .from(schema.orgMember)
+      .where(eq(schema.orgMember.organizationId, first.organizationId))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.role).toBe('owner')
+    const [u] = await db.select().from(schema.appUser).where(eq(schema.appUser.id, rows[0]!.userId))
+    expect(u!.email).toBeNull()
+    // The first login resolves to THAT user, not a new one.
+    const cfg = { jit: true, allowedEmailDomains: [], requireEmailVerified: true } as never
+    const login = await resolveUser(db, cfg, {
+      issuer,
+      subject,
+      email: 'x@example.com',
+      emailVerified: true,
+      name: 'X',
+    })
+    expect(login).toEqual({ id: rows[0]!.userId, created: false })
+    const [filled] = await db
+      .select()
+      .from(schema.appUser)
+      .where(eq(schema.appUser.id, rows[0]!.userId))
+    expect(filled!.email).toBe('x@example.com')
+    // A different issuer with the same subject is a different person.
+    const other = await b.bootstrapOwnerBySubject(db, {
+      issuer: 'https://other.example.com',
+      subject,
+      orgSlug: s,
+    })
+    expect(other.userCreated).toBe(true)
+    await expect(
+      b.bootstrapOwnerBySubject(db, { issuer: '', subject, orgSlug: s }),
+    ).rejects.toThrow(b.BootstrapError)
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.organizationId, first.organizationId))
+    await db
+      .delete(schema.orgMember)
+      .where(eq(schema.orgMember.organizationId, first.organizationId))
+    await db.delete(schema.organization).where(eq(schema.organization.id, first.organizationId))
+    await db.delete(schema.appUser).where(
+      inArray(
+        schema.appUser.id,
+        (
+          await db
+            .select({ id: schema.userIdentity.userId })
+            .from(schema.userIdentity)
+            .where(eq(schema.userIdentity.subject, subject))
+        ).map((r) => r.id),
+      ),
+    )
+  })
 })
