@@ -5,13 +5,14 @@
 
   const session = useSession()
   const { t } = useI18n()
-  const isOidc = (await useAuthMode()).value === 'oidc'
+  const authMode = useAuthMode()
+  const isOidc = computed(() => authMode.value === 'oidc')
 
   // Name, e-mail, password and account deletion belong to the identity provider
   // in oidc mode, so those parts are not offered here.
   const tabs = computed(() => [
     { id: 'profile', label: t('account.tabs.profile') },
-    ...(isOidc ? [] : [{ id: 'security', label: t('account.tabs.security') }]),
+    ...(isOidc.value ? [] : [{ id: 'security', label: t('account.tabs.security') }]),
     { id: 'organizations', label: t('account.tabs.organizations') },
     { id: 'privacy', label: t('account.tabs.privacy') },
   ])

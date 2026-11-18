@@ -5,7 +5,9 @@
   definePageMeta({ layout: 'auth' })
 
   const { t } = useI18n()
-  const authMode = await useAuthMode()
+  // The page decides what to ask for from the mode, so wait for it.
+  await useFetch('/api/features', { key: 'features' })
+  const authMode = useAuthMode()
   const isOidc = authMode.value === 'oidc'
   const route = useRoute()
   const invitationId = computed(() => route.params.id as string)

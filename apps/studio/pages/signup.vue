@@ -5,9 +5,9 @@
   definePageMeta({ layout: 'auth' })
 
   const { t } = useI18n()
-  const authMode = await useAuthMode()
+  const authMode = useAuthMode()
   // Accounts are created at the identity provider; the first sign-in creates the Studio user.
-  if (authMode.value === 'oidc') await navigateTo('/login')
+  watch(authMode, (m) => m === 'oidc' && navigateTo('/login'), { immediate: true })
   const name = ref('')
   const email = ref('')
   const password = ref('')

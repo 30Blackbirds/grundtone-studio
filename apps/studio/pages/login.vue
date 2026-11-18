@@ -5,7 +5,7 @@
   definePageMeta({ layout: 'auth' })
 
   const { t } = useI18n()
-  const authMode = await useAuthMode()
+  const authMode = useAuthMode()
   const route = useRoute()
   const email = ref('')
   const password = ref('')
