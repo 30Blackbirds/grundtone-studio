@@ -55,6 +55,7 @@
     "jose": "^6.2.3",
     "marked": "^18.0.14",
     "nodemailer": "^10.1.0",
+    "openid-client": "6.9.0",
     "postgres": "^3.4.9",
     "tsx": "^4.23.15",
     "vue": "^3.5.43",
