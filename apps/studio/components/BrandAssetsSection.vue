@@ -4,7 +4,7 @@
   // assets publiceres MED farve-tokens i samme kladde/publicér-cyklus (sidens
   // header er den fælles linje). Font-delen er TO slots (Font 1/overskrift +
   // Font 2/brødtekst) med Allan-loftet "4 fontfiler i alt" på tværs af begge.
-  import { MAX_FONT_FILES_TOTAL } from '~~/lib/plan-catalog'
+  import { MAX_FONT_FILES_TOTAL } from '~~/lib/limits'
   import type { FontSlot, Tokens } from '~~/server/lib/tokens'
 
   const props = defineProps<{ projectId: string; canEdit: boolean }>()
