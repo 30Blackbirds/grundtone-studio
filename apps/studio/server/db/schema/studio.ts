@@ -477,3 +477,49 @@ export const appSession = pgTable(
     index('app_session_expires_idx').on(t.expiresAt),
   ],
 )
+
+// ─── Studio-owned organisations (AUTH_MODE=oidc) ──────────────────────────
+// In better-auth mode organisations live in the auth service and these two
+// tables stay empty. org_member (above) is shared: its organizationId is this
+// table's id in oidc mode, the auth service's in better-auth mode, which is why
+// it carries no foreign key.
+
+export const organization = pgTable(
+  'organization',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    slug: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('organization_slug_unique_idx').on(t.slug)],
+)
+
+// An invitation changes no role until it is accepted. Only the SHA-256 of the
+// token is stored; the plaintext goes out once, in the link.
+export const orgInvitation = pgTable(
+  'org_invitation',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: text()
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    // Lower-cased.
+    email: text().notNull(),
+    role: text().notNull(),
+    tokenHash: text().notNull(),
+    invitedBy: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    revokedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('org_invitation_token_idx').on(t.tokenHash),
+    index('org_invitation_org_idx').on(t.organizationId),
+    check(
+      'org_invitation_role_known',
+      sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,
+    ),
+  ],
+)
