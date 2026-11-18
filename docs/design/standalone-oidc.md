@@ -256,16 +256,14 @@ Tests lead each slice, starting with the denial and isolation paths: wrong `iss`
 last-owner removal races, disabled-user requests, claim attempting to override a local role or to
 grant `owner`.
 
-## Decisions requested
+## Decisions (confirmed by the maintainer)
 
-1. Default `ORG_CREATION=operator` in `oidc` mode (proposed), or `users`?
-2. Allow multiple owners and owner transfer in Studio (proposed), or keep owner non-assignable?
-3. `OIDC_REQUIRE_EMAIL_VERIFIED` default `true` (proposed). IdPs that never send `email_verified`
-   then cannot accept e-mail-matched invitations or bootstrap grants, and the operator must pre-link
-   by `--owner-sub`.
-4. Account actions that Better Auth hosted (password reset, change e-mail, account deletion webhook,
-   GDPR export call) are the IdP's job in `oidc` mode; Studio keeps only local user-data
-   deletion/export. Acceptable?
+1. `ORG_CREATION` defaults to `operator` in `oidc` mode.
+2. Multiple owners and owner transfer are allowed in Studio.
+3. `OIDC_REQUIRE_EMAIL_VERIFIED` defaults to `true`. IdPs that never send `email_verified` cannot
+   accept e-mail-matched invitations or bootstrap grants; the operator pre-links by `--owner-sub`.
+4. Password reset, change of e-mail and account deletion are the IdP's job in `oidc` mode. Studio
+   keeps only local user-data deletion/export.
 
 ## Out of scope
 
