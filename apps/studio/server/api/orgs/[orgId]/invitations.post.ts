@@ -1,12 +1,12 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { z } from 'zod'
-import { assertSameOrigin, ASSIGNABLE, parseBody } from '~~/server/lib/org-membership-input'
+import { assertSameOrigin, assignableRoles, parseBody } from '~~/server/lib/org-membership-input'
 import { inviteMember, membershipDeps } from '~~/server/lib/org-membership'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
 const bodySchema = z.object({
   email: z.string().email().max(320),
-  role: z.enum(ASSIGNABLE),
+  role: z.enum(assignableRoles()),
   resend: z.boolean().optional(),
 })
 

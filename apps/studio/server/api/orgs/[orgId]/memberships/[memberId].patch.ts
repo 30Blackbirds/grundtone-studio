@@ -1,12 +1,12 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3'
 import { z } from 'zod'
-import { assertSameOrigin, ASSIGNABLE, parseBody } from '~~/server/lib/org-membership-input'
+import { assertSameOrigin, assignableRoles, parseBody } from '~~/server/lib/org-membership-input'
 import { changeMemberRole, membershipDeps } from '~~/server/lib/org-membership'
 import { requireOrgRole } from '~~/server/lib/project-access'
 
 // `memberId` is auth's member id, as the members page has it.
 
-const bodySchema = z.object({ role: z.enum(ASSIGNABLE) })
+const bodySchema = z.object({ role: z.enum(assignableRoles()) })
 
 defineRouteMeta({
   openAPI: { summary: "Changes a member's org role; requires org admin or higher.", tags: ['Org'] },
