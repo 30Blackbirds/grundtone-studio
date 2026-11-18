@@ -3,9 +3,9 @@
 Project-specific review context for Cursor Bugbot. Bugbot inkluderer denne fil når den reviewer hver
 PR i dette repo. Hierarkisk: subdirektorier kan have egen BUGBOT.md der augmenterer denne rod.
 
-Worker-ejer: **[grundtone]** (prompt: `klanghaus/.orchestration/prompts/grundtone.md`).
+Worker-ejer: **[grundtone]** (prompt: `30blackbirds/.orchestration/prompts/grundtone.md`).
 
-## Standing rules (gælder ALLE KlangHaus-repos)
+## Standing rules (gælder ALLE 30blackbirds-repos)
 
 - **INGEN `Co-Authored-By`** i commits eller PR-bodies (org-konvention).
 - **Conventional commits** + commitlint scope-enum. Type-enum låst i
@@ -58,12 +58,13 @@ Bugbot bør **flagge som Medium Severity** hvis disse brydes:
 - **OTel-initialisering AFTER static imports:** auto-instrumentations hooker ikke ind. Flyt
   OTel-init til separat bootstrap-fil + brug `NODE_OPTIONS='--import=...'`.
 - **Manglende `tenant.id`-resource-attribut (Beslutning J2c):** alle OTel-spans skal bære
-  `tenant.id` (eller `klanghaus` for KlangHaus' egne tjenester). Kardinalitet kan ikke backfilles.
+  `tenant.id` (eller `30blackbirds` for 30blackbirds' egne tjenester). Kardinalitet kan ikke
+  backfilles.
 
 ## Kanonisk reference
 
-- `klanghaus/.orchestration/PLAN.md` — alle Beslutninger A→
-- `klanghaus/.orchestration/QUALITY-GATES.md` — Beslutning L+M+N gate-detaljer
-- `klanghaus/.orchestration/GITHUB-RULES.md` — branch-protection + repo-konvention
-- `klanghaus/.orchestration/BUGBOT-RULES.md` — [review]-tab kanonisk input til denne fil
+- `30blackbirds/.orchestration/PLAN.md` — alle Beslutninger A→
+- `30blackbirds/.orchestration/QUALITY-GATES.md` — Beslutning L+M+N gate-detaljer
+- `30blackbirds/.orchestration/GITHUB-RULES.md` — branch-protection + repo-konvention
+- `30blackbirds/.orchestration/BUGBOT-RULES.md` — [review]-tab kanonisk input til denne fil
 - `CLAUDE.md` (root) — repo-specifik build/test/dev/secrets-konvention

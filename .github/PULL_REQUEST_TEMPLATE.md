@@ -1,24 +1,20 @@
-## Hvad + hvorfor
+## What and why
 
-<!-- Closes #N — required (Beslutning M, fra 2026-06-12) -->
+<!-- What does this change, and why? Link the issue it closes: `Closes #N`. -->
 
-## Tjekliste
+## Checklist
 
-- [ ] Issue linket (`Closes #N`)
-- [ ] Tests added/updated
-- [ ] Coverage holder baseline (branch, ikke line — se `QUALITY-GATES.md` L2)
-- [ ] Typecheck/lint grøn lokalt (`pnpm lint && pnpm typecheck` /
-      `golangci-lint run && go vet ./...`)
-- [ ] Docs opdateret (hvis API/kontrakt ændret)
-- [ ] Breaking change → changeset eller CHANGELOG-note
-- [ ] Ingen secrets/keys i diff
-- [ ] SAST/vuln-scan grøn (CI viser)
-- [ ] Verificeret end-to-end i lokalt Tilt-stack (Beslutning P)
+- [ ] Issue linked (`Closes #N`)
+- [ ] Tests added or updated
+- [ ] `pnpm lint && pnpm typecheck && pnpm test` pass locally
+- [ ] Docs updated, if behaviour, configuration or an API contract changed
+- [ ] Breaking change: a changeset or CHANGELOG note is included
+- [ ] No secrets, keys or personal data in the diff
 
-## Test plan
+## How it was tested
 
-<!-- hvad blev verificeret, hvordan -->
+<!-- What you verified, and how. -->
 
-## Risiko / rollback
+## Risk and rollback
 
-<!-- hvad sker der hvis denne PR går galt; rollback-plan -->
+<!-- What happens if this goes wrong, and how to roll it back. -->

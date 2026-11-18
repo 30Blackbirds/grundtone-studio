@@ -33,7 +33,7 @@ services:
       retries: 20
 
   app:
-    image: ghcr.io/klanghaus/grundtone-studio:${IMAGE_TAG:-0.1.2}
+    image: ghcr.io/30blackbirds/grundtone-studio:${IMAGE_TAG:-0.1.2}
     env_file:
       - local-test.env
     ports:

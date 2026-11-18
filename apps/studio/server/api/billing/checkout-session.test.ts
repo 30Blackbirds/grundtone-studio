@@ -185,10 +185,10 @@ describe('beta-værnet (Beslutning AL / jura studio-beta-1.0 pkt. 2)', () => {
 
   // 🔴 POSITIV KONTROL. Uden den beviser testene ovenfor kun, at ALT afvises —
   // og en gate, der afviser alt, er ikke til at skelne fra en i stykker.
-  // KlangHaus' egne orgs skal komme FORBI værnet (Allans tillæg), og det ses
+  // 30blackbirds' egne orgs skal komme FORBI værnet (Allans tillæg), og det ses
   // ved, at kaldet nu fejler på den dormante 503 i stedet: et andet svar,
   // længere nede i handleren.
-  it('lader KlangHaus egne orgs passere værnet (Allans tillæg)', async () => {
+  it('lader 30blackbirds egne orgs passere værnet (Allans tillæg)', async () => {
     process.env.STUDIO_INTERNAL_ORG_IDS = 'org-internal'
     nextOrg = { id: 'org-internal', members: [{ userId: 'user-1', role: 'owner' }] }
 

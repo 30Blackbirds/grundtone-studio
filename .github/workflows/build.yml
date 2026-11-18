@@ -354,7 +354,7 @@ jobs:
       - name: Boot-smoke the pushed image
         if: github.event_name != 'pull_request'
         run: |
-          # github.repository har store bogstaver (KlangHaus/…) — docker kræver
+          # github.repository har store bogstaver (30Blackbirds/…) — docker kræver
           # lowercase repo-navne (metadata-action lowercaser selv, rå env gør ikke)
           IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.push.outputs.digest }}"
           scripts/boot-smoke.sh "$IMAGE" > /dev/null
@@ -433,7 +433,7 @@ jobs:
       # er. [taktart]s fund, reproduceret paa vores EGET image (aa3bf9a):
       #   pinnet (repo+workflow-fil+tilladte refs)  exit 0
       #   andet repo                                exit 12
-      #   bredt '^https://github\.com/KlangHaus/'   exit 0   ← ACCEPTERER
+      #   bredt '^https://github\.com/30Blackbirds/'   exit 0   ← ACCEPTERER
       # Det brede moenster fra ADR-0003 §D godkender altsaa enhver signatur fra
       # ethvert workflow i ethvert repo i orgen. Fristelsen — naar vores
       # workflow hedder build.yml og forlaegget hedder release.yml — er at
@@ -452,8 +452,8 @@ jobs:
         env:
           IMAGE: ${{ steps.sign.outputs.image }}
           ISSUER: https://token.actions.githubusercontent.com
-          PINNED: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
-          WRONG: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/release\.yml@.*$
+          PINNED: ^https://github\.com/30Blackbirds/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+          WRONG: ^https://github\.com/30Blackbirds/grundtone-studio/\.github/workflows/release\.yml@.*$
         run: |
           set -euo pipefail
           [ -n "$IMAGE" ] || { echo "::error::intet image at verificere — signerings-steppet gav ingen output"; exit 1; }
@@ -602,7 +602,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.gate.outputs.relevant == 'true'
         env:
           ISSUER: https://token.actions.githubusercontent.com
-          PINNED: ^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
+          PINNED: ^https://github\.com/30Blackbirds/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
         run: |
           set -euo pipefail
           NAME="${REGISTRY}/$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"

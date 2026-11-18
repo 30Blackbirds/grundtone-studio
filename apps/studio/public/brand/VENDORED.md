@@ -5,7 +5,7 @@ IP-deling ved sidevisning). De kopieres i stedet fra `@grundtone/core`'s `packag
 og **vendoring fryser filen**: indtil 2026-08-19 var logoet den blå placeholder fra core@2.22.0,
 byte-identisk, og ingen core-release ville have rettet det (studio#225).
 
-Kilde: KlangHaus/grundtone PR #140 (head `c1cc0de`), det officielle mærke.
+Kilde: 30Blackbirds/grundtone PR #140 (head `c1cc0de`), det officielle mærke.
 
 | fil (public/)        | kilde i core            | sha256 (16)      |
 | -------------------- | ----------------------- | ---------------- |

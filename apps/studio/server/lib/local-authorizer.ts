@@ -9,7 +9,7 @@ import type { OrgRelation, PdpVerdict, ProjectAction } from './pdp'
 // answered from studio's own Postgres (AUTHORIZER=local).
 //
 // 🔴 THE RULES ARE THE PERMISSIONS MODEL'S, NOT NEW ONES. They are copied from
-// KlangHaus/permissions model/klanghaus.fga (bddb430a, 2026-10-10), so the two
+// 30Blackbirds/permissions model/klanghaus.fga (bddb430a, 2026-10-10), so the two
 // authorizers give the same verdict for the same grants:
 //
 //   organization  owner, admin, manager, member, billing are SEPARATE direct

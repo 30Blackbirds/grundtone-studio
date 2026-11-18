@@ -12,7 +12,7 @@ import AccountEmailForm from './AccountEmailForm.vue'
 const changeEmailMock = vi.fn(async (_args: unknown) => ({ error: null }))
 vi.mock('~~/lib/auth-client', () => ({
   changeEmail: (args: unknown) => changeEmailMock(args),
-  useSession: () => ref({ data: { user: { email: 'current@klanghaus.dk', emailVerified: true } } }),
+  useSession: () => ref({ data: { user: { email: 'current@example.com', emailVerified: true } } }),
 }))
 
 vi.stubGlobal('useRuntimeConfig', () => ({ public: { appUrl: 'https://studio.test' } }))
@@ -57,15 +57,15 @@ describe('AccountEmailForm', () => {
   it('success copy references the CURRENT email (where the confirmation is sent)', async () => {
     const w = mount(AccountEmailForm, { global })
     const inputs = w.findAll('[data-test="gt-input"]')
-    await inputs[1].setValue('new@klanghaus.dk')
+    await inputs[1].setValue('new@example.com')
     await w.find('form').trigger('submit')
     await flushPromises()
 
     const alert = w.find('[data-test="gt-alert"][data-variant="success"]')
     expect(alert.exists()).toBe(true)
     expect(alert.text()).toContain('account.email.pending')
-    expect(alert.text()).toContain('current@klanghaus.dk')
-    expect(alert.text()).not.toContain('new@klanghaus.dk')
+    expect(alert.text()).toContain('current@example.com')
+    expect(alert.text()).not.toContain('new@example.com')
   })
 
   it('always shows the flow hint about current-address confirmation', () => {

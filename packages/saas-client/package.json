@@ -1,6 +1,7 @@
 {
   "name": "@grundtone/saas-client",
   "private": true,
+  "license": "AGPL-3.0-only",
   "version": "0.0.1",
   "description": "Runtime SDK for Grundtone Studio — fetches tokens from CDN and applies them as CSS variables",
   "type": "module",

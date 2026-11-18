@@ -81,19 +81,19 @@ beforeEach(() => magicLinkMock.mockClear())
 describe('login magic-link', () => {
   it('sends the link with the shared email + redirect callback and shows sent-state', async () => {
     const w = mount(Login, { global })
-    await w.find('[data-test="GTInput"]').setValue('allan@klanghaus.dk')
+    await w.find('[data-test="GTInput"]').setValue('user@example.com')
     await magicButton(w).trigger('click')
     await flushPromises()
 
     expect(magicLinkMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        email: 'allan@klanghaus.dk',
+        email: 'user@example.com',
         callbackURL: '/dashboard',
         fetchOptions: { headers: { 'x-captcha-response': 'altcha-token' } },
       }),
     )
     expect(w.text()).toContain('magicLink.sentHeading')
-    expect(w.text()).toContain('allan@klanghaus.dk')
+    expect(w.text()).toContain('user@example.com')
   })
 
   it('refuses to send without an email — inline error, no call', async () => {

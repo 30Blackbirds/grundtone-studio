@@ -190,7 +190,7 @@ export const ACCOUNT_PLAN_KEYS = [
 export type AccountPlanKey = (typeof ACCOUNT_PLAN_KEYS)[number]
 
 // null = a plan account assigns but Studio does not sell: legacy (unlimited,
-// every org that predates the free tier) and internal (KlangHaus' own org).
+// every org that predates the free tier) and internal (30blackbirds' own org).
 // Neither has a catalog entry, so neither has a cap or an overage rate.
 const CATALOG_KEY_BY_ACCOUNT_KEY: Record<AccountPlanKey, PlanKey | null> = {
   'studio-free': 'studio_free',

@@ -1,6 +1,7 @@
 {
   "name": "@grundtone-studio/studio",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "version": "0.0.0",
   "description": "Grundtone Studio — Nuxt 3 SaaS app",

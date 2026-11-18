@@ -1,6 +1,7 @@
 {
   "name": "@grundtone-studio/tokens-cli",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "version": "0.0.0",
   "description": "Headless CLI for managing Grundtone Studio project design tokens via a per-project secret key",
