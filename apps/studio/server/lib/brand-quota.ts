@@ -9,6 +9,7 @@ import {
   type BrandQuotaVerdict,
   type Entitlements,
 } from '~~/server/lib/entitlements'
+import { SELF_HOST_PLAN_KEY } from '~~/server/lib/entitlements-self-host'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -51,7 +52,10 @@ export async function assertBrandCapacity(
     recordQuotaFailOpen('studio.brands', 'entitlements_unavailable')
   }
 
-  const hardCap = planForAccountKey(entitlements?.planKey)?.hardCap ?? false
+  // A self-host limit is a cap: there is no overage plan to bill the excess to.
+  const hardCap =
+    planForAccountKey(entitlements?.planKey)?.hardCap ??
+    entitlements?.planKey === SELF_HOST_PLAN_KEY
   const claim: BrandClaim = { organizationId, entitlements, hardCap }
   assertAllowed(claim, needsCount(claim) ? await countActiveBrands(db, organizationId) : 0)
   return claim

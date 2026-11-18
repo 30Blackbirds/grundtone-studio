@@ -2,6 +2,7 @@ import { createJwtVerifier, verifyFailureCode } from '~~/server/lib/jwt'
 import { getCookie, getRequestHeader, type H3Event } from 'h3'
 import { authenticateMachineKey } from '~~/server/lib/machine-auth'
 import { authenticateProvisioningKey } from '~~/server/lib/provisioning-auth'
+import { authMode } from '~~/server/lib/oidc/config'
 // 🔴 THIS IMPORT MUST STAY EAGER AND UNCONDITIONAL — it is load-bearing, and
 // not for the symbols it brings in.
 //
@@ -119,6 +120,20 @@ export default defineEventHandler(async (event) => {
       tenant: DEV_BYPASS_ORG.id,
       email: DEV_BYPASS_USER.email,
     } satisfies AuthActor
+    return
+  }
+
+  // Generic OIDC (AUTH_MODE=oidc): Studio's own session cookie. The Better Auth
+  // exchange below is not attempted, so a better-auth cookie means nothing here.
+  if (authMode() === 'oidc') {
+    const { authenticateOidcSession } = await import('~~/server/lib/oidc/request')
+    const actor = await authenticateOidcSession(event)
+    if (actor) {
+      event.context.auth = actor satisfies AuthActor
+      return
+    }
+    await authenticateMachineKey(event)
+    await authenticateProvisioningKey(event)
     return
   }
 

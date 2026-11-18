@@ -868,10 +868,12 @@
       "submit": "Change email",
       "pending": "We've sent a confirmation email to your CURRENT address ({email}). Confirm there to complete the change.",
       "error": "Could not request email change",
+      "managedByIdp": "Your e-mail address is managed by your identity provider. Change it there.",
       "flowHint": "For security, the change is confirmed from your current address — only then does the new one take effect."
     },
     "verification": {
       "banner": "Verify your email address to secure your account.",
+      "idp": "Your identity provider has not verified this address. Verify it there.",
       "resend": "Resend verification email",
       "resent": "Verification email sent.",
       "error": "Could not send verification email"

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-  import { changeEmail, useSession } from '~~/lib/auth-client'
+  import { changeEmail } from '~~/lib/auth-client'
 
   const { t } = useI18n()
-  const session = useSession()
+  const identity = useAccountIdentity()
   const config = useRuntimeConfig()
 
   const newEmail = ref('')
@@ -10,8 +10,8 @@
   const sent = ref(false)
   const error = ref<string | null>(null)
 
-  const currentEmail = computed(() => session.value.data?.user?.email ?? '')
-  const emailVerified = computed(() => session.value.data?.user?.emailVerified === true)
+  const currentEmail = computed(() => identity.value.email)
+  const emailVerified = computed(() => identity.value.emailVerified)
 
   async function submit() {
     pending.value = true
@@ -41,9 +41,13 @@
       }}
     </p>
 
-    <hr class="my-2" />
+    <p v-if="identity.managedByIdp" class="text-tertiary text-sm m-0">
+      {{ t('account.email.managedByIdp') }}
+    </p>
 
-    <form class="flex flex-col gap-4" @submit.prevent="submit">
+    <hr v-if="!identity.managedByIdp" class="my-2" />
+
+    <form v-if="!identity.managedByIdp" class="flex flex-col gap-4" @submit.prevent="submit">
       <GTInput
         v-model="newEmail"
         type="email"

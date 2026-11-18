@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  boolean,
   check,
   index,
   integer,
@@ -394,5 +395,131 @@ export const tenantEventOutbox = pgTable(
     index('tenant_event_outbox_due_idx')
       .on(t.nextAttemptAt)
       .where(sql`${t.deliveredAt} IS NULL AND ${t.parkedAt} IS NULL`),
+  ],
+)
+
+// ─── Standalone OIDC login (AUTH_MODE=oidc) ───────────────────────────────
+// See docs/design/standalone-oidc.md. These tables are only written in oidc
+// mode; better-auth mode never touches them.
+
+// A person known to Studio. `id` is Studio's own key. It is deliberately NOT the
+// IdP subject: the (issuer, subject) pair lives in user_identity, so one IdP
+// subject can never be confused with another IdP's.
+export const appUser = pgTable('app_user', {
+  id: text().primaryKey(),
+  email: text(),
+  emailVerified: boolean().notNull().default(false),
+  name: text(),
+  // Set by the instance operator. A disabled user is refused at login and (once
+  // sessions exist) at every request.
+  disabledAt: timestamp({ withTimezone: true }),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp({ withTimezone: true }),
+})
+
+// (issuer, subject) -> user. Two identities are never merged because their
+// e-mail addresses match.
+export const userIdentity = pgTable(
+  'user_identity',
+  {
+    issuer: text().notNull(),
+    subject: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('user_identity_unique_idx').on(t.issuer, t.subject),
+    index('user_identity_user_idx').on(t.userId),
+  ],
+)
+
+// One row per login attempt in flight. The browser holds only the random state
+// (in a cookie); the PKCE verifier and nonce stay here, and the row is deleted
+// when the callback consumes it, so a callback URL can be used once.
+export const oidcLogin = pgTable(
+  'oidc_login',
+  {
+    // SHA-256 of the state value.
+    stateHash: text().primaryKey(),
+    codeVerifier: text().notNull(),
+    nonce: text().notNull(),
+    // Same-origin relative path to return to after login.
+    next: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index('oidc_login_expires_idx').on(t.expiresAt)],
+)
+
+// Browser sessions in AUTH_MODE=oidc. The cookie holds a random token; only its
+// SHA-256 is stored, so a leaked table cannot be replayed as cookies. Disabling
+// a user deletes their rows, and every lookup re-reads the user, so a disabled
+// user is out on the next request, not when a token expires.
+export const appSession = pgTable(
+  'app_session',
+  {
+    tokenHash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    // Chosen inside Studio (the JWT "org" claim does not exist in oidc mode).
+    activeOrganizationId: text(),
+    // Kept server-side only, as the id_token_hint of RP-initiated logout.
+    idToken: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    // Absolute end of life; idle timeout is checked against lastSeenAt.
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index('app_session_user_idx').on(t.userId),
+    index('app_session_expires_idx').on(t.expiresAt),
+  ],
+)
+
+// ─── Studio-owned organisations (AUTH_MODE=oidc) ──────────────────────────
+// In better-auth mode organisations live in the auth service and these two
+// tables stay empty. org_member (above) is shared: its organizationId is this
+// table's id in oidc mode, the auth service's in better-auth mode, which is why
+// it carries no foreign key.
+
+export const organization = pgTable(
+  'organization',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    slug: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('organization_slug_unique_idx').on(t.slug)],
+)
+
+// An invitation changes no role until it is accepted. Only the SHA-256 of the
+// token is stored; the plaintext goes out once, in the link.
+export const orgInvitation = pgTable(
+  'org_invitation',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: text()
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    // Lower-cased.
+    email: text().notNull(),
+    role: text().notNull(),
+    tokenHash: text().notNull(),
+    invitedBy: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    revokedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('org_invitation_token_idx').on(t.tokenHash),
+    index('org_invitation_org_idx').on(t.organizationId),
+    check(
+      'org_invitation_role_known',
+      sql`${t.role} IN ('owner', 'manager', 'admin', 'member', 'billing')`,
+    ),
   ],
 )
