@@ -166,7 +166,7 @@ export async function completeLogin(
   search: string,
   cookieState: string | undefined,
   now = new Date(),
-): Promise<{ claims: VerifiedClaims; next: string }> {
+): Promise<{ claims: VerifiedClaims; next: string; idToken: string }> {
   const params = new URLSearchParams(search)
   const state = params.get('state')
   if (!cookieState || !state || !sameString(cookieState, state)) {
@@ -242,7 +242,27 @@ export async function completeLogin(
       name: displayName(profile),
     },
     next: isSafeNext(attempt.next) ? attempt.next : '/',
+    idToken: tokens.id_token!,
   }
+}
+
+/**
+ * Where to send the browser to end the IdP's own session (RP-initiated logout),
+ * or null when the IdP advertises no end_session_endpoint, in which case logout
+ * is local only.
+ */
+export async function endSessionUrl(
+  cfg: OidcConfig,
+  idToken: string | null,
+): Promise<string | null> {
+  const config = await discover(cfg)
+  if (!config.serverMetadata().end_session_endpoint) return null
+  const params: Record<string, string> = {
+    client_id: cfg.clientId,
+    post_logout_redirect_uri: new URL('/', cfg.redirectUri).href,
+  }
+  if (idToken) params.id_token_hint = idToken
+  return client.buildEndSessionUrl(config, params).href
 }
 
 function displayName(profile: Record<string, unknown>): string | null {

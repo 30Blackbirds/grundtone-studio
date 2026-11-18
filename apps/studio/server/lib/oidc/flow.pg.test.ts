@@ -294,3 +294,43 @@ describe.skipIf(!DATABASE_URL)('OIDC login flow (fake IdP, real Postgres)', () =
     expect(rows).toHaveLength(0)
   })
 })
+
+describe.skipIf(!DATABASE_URL)('RP-initiated logout URL', () => {
+  it('points at end_session_endpoint with the hint, client and a fixed return URL', async () => {
+    const { endSessionUrl } = await import('./flow')
+    const local = await startFakeIdp()
+    try {
+      const c = readOidcConfig({
+        AUTHORIZER: 'local',
+        OIDC_ISSUER: local.issuer,
+        OIDC_CLIENT_ID: local.clientId,
+        OIDC_REDIRECT_URI: REDIRECT,
+      })
+      const url = new URL((await endSessionUrl(c, 'the-id-token'))!)
+      expect(url.origin + url.pathname).toBe(`${local.issuer}/logout`)
+      expect(url.searchParams.get('id_token_hint')).toBe('the-id-token')
+      expect(url.searchParams.get('client_id')).toBe('studio')
+      expect(url.searchParams.get('post_logout_redirect_uri')).toBe('https://studio.example.com/')
+      expect(new URL((await endSessionUrl(c, null))!).searchParams.has('id_token_hint')).toBe(false)
+    } finally {
+      await local.close()
+    }
+  })
+
+  it('is null when the IdP has no end_session_endpoint: logout is local only', async () => {
+    const { endSessionUrl } = await import('./flow')
+    const local = await startFakeIdp()
+    local.endSession = false
+    try {
+      const c = readOidcConfig({
+        AUTHORIZER: 'local',
+        OIDC_ISSUER: local.issuer,
+        OIDC_CLIENT_ID: local.clientId,
+        OIDC_REDIRECT_URI: REDIRECT,
+      })
+      expect(await endSessionUrl(c, 'x')).toBeNull()
+    } finally {
+      await local.close()
+    }
+  })
+})

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { authMode, isSafeNext, oidcStateCookie, OidcConfigError, readOidcConfig } from './config'
+import {
+  authMode,
+  isSafeNext,
+  oidcSessionCookie,
+  oidcStateCookie,
+  OidcConfigError,
+  readOidcConfig,
+} from './config'
 
 const base = {
   AUTHORIZER: 'local',
@@ -35,6 +42,8 @@ describe('readOidcConfig', () => {
       requireEmailVerified: true,
       allowedEmailDomains: [],
       jit: true,
+      sessionIdleMs: 8 * 3600_000,
+      sessionMaxMs: 7 * 24 * 3600_000,
     })
   })
 
@@ -56,6 +65,10 @@ describe('readOidcConfig', () => {
     ['OIDC_ID_TOKEN_ALG', 'HS256', /OIDC_ID_TOKEN_ALG/],
     ['OIDC_REQUIRE_EMAIL_VERIFIED', 'maybe', /OIDC_REQUIRE_EMAIL_VERIFIED/],
     ['OIDC_REDIRECT_URI', 'http://studio.example.com/cb', /must be https/],
+    ['OIDC_SESSION_IDLE_HOURS', '0', /OIDC_SESSION_IDLE_HOURS/],
+    ['OIDC_SESSION_IDLE_HOURS', '1.5', /OIDC_SESSION_IDLE_HOURS/],
+    ['OIDC_SESSION_MAX_DAYS', '9999', /OIDC_SESSION_MAX_DAYS/],
+    ['OIDC_SESSION_MAX_DAYS', 'abc', /OIDC_SESSION_MAX_DAYS/],
   ])('refuses %s = %s', (name, value, message) => {
     expect(() => readOidcConfig({ ...base, [name]: value })).toThrow(message)
   })
@@ -133,5 +146,26 @@ describe('oidcStateCookie', () => {
       name: 'studio_oidc',
       secure: false,
     })
+  })
+})
+
+describe('oidcSessionCookie', () => {
+  it('is __Host- prefixed and Secure over https, bare on http localhost', () => {
+    expect(oidcSessionCookie({ redirectUri: 'https://s.example.com/cb' })).toEqual({
+      name: '__Host-studio_session',
+      secure: true,
+    })
+    expect(oidcSessionCookie({ redirectUri: 'http://localhost:3000/cb' })).toEqual({
+      name: 'studio_session',
+      secure: false,
+    })
+  })
+})
+
+describe('session lifetimes', () => {
+  it('can be set', () => {
+    expect(
+      readOidcConfig({ ...base, OIDC_SESSION_IDLE_HOURS: '2', OIDC_SESSION_MAX_DAYS: '1' }),
+    ).toMatchObject({ sessionIdleMs: 2 * 3600_000, sessionMaxMs: 24 * 3600_000 })
   })
 })

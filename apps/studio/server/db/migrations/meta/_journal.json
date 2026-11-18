@@ -127,6 +127,20 @@
       "when": 1795007694421,
       "tag": "0017_oidc_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795008843407,
+      "tag": "0018_oidc_session",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795009173811,
+      "tag": "0019_local_organizations",
+      "breakpoints": true
     }
   ]
 }
