@@ -5,15 +5,22 @@
   definePageMeta({ layout: 'auth' })
 
   const { t } = useI18n()
+  // The page decides what to ask for from the mode, so wait for it.
+  await useFetch('/api/features', { key: 'features' })
+  const authMode = useAuthMode()
+  const isOidc = authMode.value === 'oidc'
   const route = useRoute()
   const invitationId = computed(() => route.params.id as string)
 
   const session = await authClient.getSession()
   const isAuthed = computed(() => Boolean(session.data?.session))
 
+  // In oidc mode the link carries a one-use token and there is no preview of
+  // who invited whom: only the signed-in, invited address can accept it.
   const { data: invitation, error: loadError } = await useAsyncData(
     `invitation-${invitationId.value}`,
     async () => {
+      if (isOidc) return { organizationName: '', email: '' }
       const res = await organization.getInvitation({
         query: { id: invitationId.value },
         fetchOptions: { headers: useRequestHeaders(['cookie']) as HeadersInit },
@@ -35,14 +42,14 @@
       return
     }
     const acceptedOrgId = res.data?.invitation?.organizationId
-    if (acceptedOrgId) {
+    if (acceptedOrgId && !isOidc) {
       await organization.setActive({ organizationId: acceptedOrgId })
     }
     await navigateTo('/dashboard')
   }
 
   async function reject() {
-    await organization.rejectInvitation({ invitationId: invitationId.value })
+    if (!isOidc) await organization.rejectInvitation({ invitationId: invitationId.value })
     await navigateTo('/dashboard')
   }
 </script>
@@ -52,7 +59,8 @@
     <GTAlert v-if="loadError" variant="error" :heading="t('invitation.notFound')" class="mb-4" />
 
     <template v-else-if="invitation">
-      <p>
+      <p v-if="isOidc">{{ t('invitation.bodyGeneric') }}</p>
+      <p v-else>
         {{
           t('invitation.body', {
             org: invitation.organizationName,

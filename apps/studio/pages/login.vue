@@ -5,6 +5,7 @@
   definePageMeta({ layout: 'auth' })
 
   const { t } = useI18n()
+  const authMode = useAuthMode()
   const route = useRoute()
   const email = ref('')
   const password = ref('')
@@ -12,6 +13,9 @@
   const pending = ref(false)
 
   const redirect = computed(() => (route.query.redirect as string) || '/dashboard')
+  // The IdP's own page does the signing in; this only hands the visitor over,
+  // and carries on to where they were going.
+  const idpHref = computed(() => `/api/oidc/login?next=${encodeURIComponent(redirect.value)}`)
   const resetSuccess = computed(() => route.query.reset === 'success')
 
   // ── Magic-link (task #13, the R9 prototype's "eller"-path) ────────────────
@@ -85,55 +89,66 @@
 
 <template>
   <AuthCard :title="t('auth.login.title')">
-    <GTAlert
-      v-if="resetSuccess"
-      variant="success"
-      :heading="t('auth.login.resetSuccess')"
-      class="mb-4"
-    />
-
-    <form class="flex flex-col gap-4" @submit.prevent="submit">
-      <GTInput
-        v-model="email"
-        type="email"
-        :label="t('auth.email')"
-        required
-        autocomplete="email"
-      />
-      <GTPasswordInput
-        v-model="password"
-        :label="t('auth.password')"
-        required
-        autocomplete="current-password"
-      />
-      <GTAlert v-if="error" variant="error" :heading="error" :aria-label="t('auth.login.error')" />
-      <GTButton type="submit" :loading="pending" block>{{ t('auth.login.submit') }}</GTButton>
-    </form>
-
-    <!-- "eller"-separator + magic-link — the R9 prototype's secondary path. -->
-    <div class="auth-separator text-tertiary text-sm" aria-hidden="true">
-      {{ t('auth.login.or') }}
+    <div v-if="authMode === 'oidc'" class="flex flex-col gap-4">
+      <p class="m-0 text-tertiary">{{ t('auth.oidc.intro') }}</p>
+      <GTButton :href="idpHref" block>{{ t('auth.oidc.continue') }}</GTButton>
     </div>
-    <GTAlert v-if="magicSent" variant="success" :heading="t('auth.login.magicLink.sentHeading')">
-      {{ t('auth.login.magicLink.sentBody', { email }) }}
-    </GTAlert>
     <template v-else>
-      <GTAlert v-if="magicError" variant="error" :heading="magicError" />
-      <GTButton variant="outlined" block :loading="magicPending" @click="sendMagicLink">
-        {{ t('auth.login.magicLink.send') }}
-      </GTButton>
-    </template>
+      <GTAlert
+        v-if="resetSuccess"
+        variant="success"
+        :heading="t('auth.login.resetSuccess')"
+        class="mb-4"
+      />
 
-    <!-- Secondary paths gathered under the form, centred ([designer] 2026-09-17):
+      <form class="flex flex-col gap-4" @submit.prevent="submit">
+        <GTInput
+          v-model="email"
+          type="email"
+          :label="t('auth.email')"
+          required
+          autocomplete="email"
+        />
+        <GTPasswordInput
+          v-model="password"
+          :label="t('auth.password')"
+          required
+          autocomplete="current-password"
+        />
+        <GTAlert
+          v-if="error"
+          variant="error"
+          :heading="error"
+          :aria-label="t('auth.login.error')"
+        />
+        <GTButton type="submit" :loading="pending" block>{{ t('auth.login.submit') }}</GTButton>
+      </form>
+
+      <!-- "eller"-separator + magic-link — the R9 prototype's secondary path. -->
+      <div class="auth-separator text-tertiary text-sm" aria-hidden="true">
+        {{ t('auth.login.or') }}
+      </div>
+      <GTAlert v-if="magicSent" variant="success" :heading="t('auth.login.magicLink.sentHeading')">
+        {{ t('auth.login.magicLink.sentBody', { email }) }}
+      </GTAlert>
+      <template v-else>
+        <GTAlert v-if="magicError" variant="error" :heading="magicError" />
+        <GTButton variant="outlined" block :loading="magicPending" @click="sendMagicLink">
+          {{ t('auth.login.magicLink.send') }}
+        </GTButton>
+      </template>
+
+      <!-- Secondary paths gathered under the form, centred ([designer] 2026-09-17):
          login link above, then forgot password, then sign up. -->
-    <div class="flex flex-col items-center gap-2 mt-4 text-sm">
-      <NuxtLink to="/forgot-password" class="auth-card__standalone-link">
-        {{ t('auth.login.forgotPassword') }}
-      </NuxtLink>
-      <p class="m-0 text-tertiary">
-        {{ t('auth.login.noAccount') }}
-        <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
-      </p>
-    </div>
+      <div class="flex flex-col items-center gap-2 mt-4 text-sm">
+        <NuxtLink to="/forgot-password" class="auth-card__standalone-link">
+          {{ t('auth.login.forgotPassword') }}
+        </NuxtLink>
+        <p class="m-0 text-tertiary">
+          {{ t('auth.login.noAccount') }}
+          <NuxtLink to="/signup">{{ t('auth.login.createAccount') }}</NuxtLink>
+        </p>
+      </div>
+    </template>
   </AuthCard>
 </template>

@@ -248,7 +248,11 @@
       "requestNewLink": "Request a new link",
       "error": "Could not update password"
     },
-    "backToSignIn": "Back to sign in"
+    "backToSignIn": "Back to sign in",
+    "oidc": {
+      "intro": "Sign in with your organisation's account.",
+      "continue": "Continue to sign in"
+    }
   },
   "orgs": {
     "title": "Organizations",
@@ -841,7 +845,8 @@
     "reject": "Decline",
     "acceptError": "Could not accept invitation",
     "notFound": "Invitation not found or expired",
-    "signInRequired": "Sign in or create an account to accept the invitation."
+    "signInRequired": "Sign in or create an account to accept the invitation.",
+    "bodyGeneric": "You have been invited to join an organisation. Accept with the account the invitation was sent to."
   },
   "skip": {
     "toContent": "Skip to main content"
@@ -911,7 +916,8 @@
       "blocked": "You cannot delete your account yet:",
       "soleOwner": "You are the sole owner of {org}",
       "error": "Could not delete account"
-    }
+    },
+    "idpManaged": "Your name, e-mail address and password are managed at your identity provider."
   },
   "orgSettings": {
     "title": "Organization settings",

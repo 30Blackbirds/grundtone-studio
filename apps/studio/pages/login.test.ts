@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 
 import Login from './login.vue'
 
@@ -22,6 +22,7 @@ vi.mock('~~/composables/useAltcha', () => ({
 
 vi.stubGlobal('useRoute', () => ({ query: {} }))
 vi.stubGlobal('navigateTo', vi.fn())
+vi.stubGlobal('useAuthMode', () => ref('better-auth'))
 vi.stubGlobal('definePageMeta', vi.fn())
 vi.stubGlobal('useI18n', () => ({
   t: (key: string, params?: Record<string, unknown>) =>
@@ -103,5 +104,19 @@ describe('login magic-link', () => {
 
     expect(magicLinkMock).not.toHaveBeenCalled()
     expect(w.text()).toContain('magicLink.emailRequired')
+  })
+})
+
+// In oidc mode the page hands over to the IdP instead of showing a password form.
+describe('login in oidc mode', () => {
+  it('shows one continue link to /api/oidc/login carrying the redirect, and no form', async () => {
+    vi.stubGlobal('useAuthMode', () => ref('oidc'))
+    vi.stubGlobal('useRoute', () => ({ query: { redirect: '/orgs/acme' } }))
+    const w = mount(Login, { global })
+    await flushPromises()
+    expect(w.find('form').exists()).toBe(false)
+    expect(w.text()).toContain('auth.oidc.continue')
+    vi.stubGlobal('useRoute', () => ({ query: {} }))
+    vi.stubGlobal('useAuthMode', () => ref('better-auth'))
   })
 })
