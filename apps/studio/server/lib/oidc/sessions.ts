@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { eq, lte } from 'drizzle-orm'
+import { and, eq, isNull, lte, ne } from 'drizzle-orm'
 import type { Db } from '../../db'
-import { appSession, appUser } from '../../db/schema'
+import { appSession, appUser, orgMember, organization } from '../../db/schema'
 import type { OidcConfig } from './config'
 
 // Studio-owned browser sessions (AUTH_MODE=oidc). See
@@ -109,8 +109,44 @@ export async function purgeExpiredSessions(db: Db, now = new Date()): Promise<vo
  * sessions are deleted now. Role rows are kept so re-enabling restores access.
  * Returns false for an unknown user.
  */
+export class LastOwnerError extends Error {
+  constructor(readonly organizationIds: string[]) {
+    super('user is the only enabled owner of an organisation')
+  }
+}
+
 export async function disableUser(db: Db, userId: string, now = new Date()): Promise<boolean> {
   return db.transaction(async (tx) => {
+    // An organisation must keep an enabled owner (as the member routes already
+    // enforce): disabling its last one would leave nobody able to manage it.
+    const [current] = await tx
+      .select({ disabledAt: appUser.disabledAt })
+      .from(appUser)
+      .where(eq(appUser.id, userId))
+    const sole = current?.disabledAt
+      ? []
+      : await tx
+          .select({ orgId: orgMember.organizationId })
+          .from(orgMember)
+          .where(and(eq(orgMember.userId, userId), eq(orgMember.role, 'owner')))
+    const blocking: string[] = []
+    for (const { orgId } of sole) {
+      await tx.select().from(organization).where(eq(organization.id, orgId)).for('update')
+      const others = await tx
+        .select({ id: orgMember.userId })
+        .from(orgMember)
+        .innerJoin(appUser, eq(appUser.id, orgMember.userId))
+        .where(
+          and(
+            eq(orgMember.organizationId, orgId),
+            eq(orgMember.role, 'owner'),
+            ne(orgMember.userId, userId),
+            isNull(appUser.disabledAt),
+          ),
+        )
+      if (others.length === 0) blocking.push(orgId)
+    }
+    if (blocking.length) throw new LastOwnerError(blocking)
     const updated = await tx
       .update(appUser)
       .set({ disabledAt: now })

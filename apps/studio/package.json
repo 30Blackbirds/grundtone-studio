@@ -21,6 +21,7 @@
     "db:migrate:local": "tsx --env-file=.env server/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "bootstrap:owner": "tsx --env-file=.env server/db/bootstrap-owner.ts",
     "db:seed": "tsx --env-file=.env server/db/seed.ts",
     "bundle:size": "node scripts/bundle-size.mjs"
   },
