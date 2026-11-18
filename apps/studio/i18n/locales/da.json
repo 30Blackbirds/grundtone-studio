@@ -248,7 +248,11 @@
       "requestNewLink": "Anmod om nyt link",
       "error": "Kunne ikke opdatere adgangskode"
     },
-    "backToSignIn": "Tilbage til log ind"
+    "backToSignIn": "Tilbage til log ind",
+    "oidc": {
+      "intro": "Log ind med din organisations konto.",
+      "continue": "Fortsæt til log ind"
+    }
   },
   "orgs": {
     "title": "Organisationer",
@@ -841,7 +845,8 @@
     "reject": "Afvis",
     "acceptError": "Kunne ikke acceptere invitation",
     "notFound": "Invitation kunne ikke findes eller er udløbet",
-    "signInRequired": "Log ind eller opret en konto for at acceptere invitationen."
+    "signInRequired": "Log ind eller opret en konto for at acceptere invitationen.",
+    "bodyGeneric": "Du er inviteret til en organisation. Accepter med den konto, invitationen er sendt til."
   },
   "skip": {
     "toContent": "Spring til hovedindhold"
@@ -911,7 +916,8 @@
       "blocked": "Du kan ikke slette din konto endnu:",
       "soleOwner": "Du er eneste ejer af {org}",
       "error": "Kunne ikke slette konto"
-    }
+    },
+    "idpManaged": "Dit navn, din e-mailadresse og din adgangskode administreres hos din identitetsudbyder."
   },
   "orgSettings": {
     "title": "Organisationsindstillinger",

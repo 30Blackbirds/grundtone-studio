@@ -5,10 +5,13 @@
 
   const session = useSession()
   const { t } = useI18n()
+  const isOidc = (await useAuthMode()).value === 'oidc'
 
+  // Name, e-mail, password and account deletion belong to the identity provider
+  // in oidc mode, so those parts are not offered here.
   const tabs = computed(() => [
     { id: 'profile', label: t('account.tabs.profile') },
-    { id: 'security', label: t('account.tabs.security') },
+    ...(isOidc ? [] : [{ id: 'security', label: t('account.tabs.security') }]),
     { id: 'organizations', label: t('account.tabs.organizations') },
     { id: 'privacy', label: t('account.tabs.privacy') },
   ])
@@ -28,13 +31,16 @@
     <GTTabs :tabs="tabs">
       <GTTabPanel id="profile">
         <GTCard :title="t('account.tabs.profile')">
-          <AccountProfileForm />
-          <hr class="my-6" />
-          <AccountEmailForm />
+          <p v-if="isOidc" class="m-0 text-tertiary">{{ t('account.idpManaged') }}</p>
+          <template v-else>
+            <AccountProfileForm />
+            <hr class="my-6" />
+            <AccountEmailForm />
+          </template>
         </GTCard>
       </GTTabPanel>
 
-      <GTTabPanel id="security">
+      <GTTabPanel v-if="!isOidc" id="security">
         <GTCard :title="t('account.tabs.security')">
           <AccountPasswordForm />
         </GTCard>
@@ -50,7 +56,7 @@
         <GTCard :title="t('account.privacy.export')" class="mb-6">
           <AccountDataExport />
         </GTCard>
-        <AccountDeleteSection />
+        <AccountDeleteSection v-if="!isOidc" />
       </GTTabPanel>
     </GTTabs>
   </section>
