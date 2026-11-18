@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { MAX_FONT_FILES_TOTAL } from '~~/lib/plan-catalog'
+import { MAX_FONT_FILES_TOTAL } from '~~/lib/limits'
 import { CSS_COLOR_PATTERN, CSS_LENGTH_PATTERN } from '~~/utils/css-values'
 
 const cssColor = z
@@ -219,8 +219,8 @@ export function slotFileCount(slot: FontSlot): number {
   return slot.source === 'custom' ? Object.keys(slot.files).length : slot.weights.length
 }
 
-// Loftet bor i lib/plan-catalog.ts (config-hjemmet, jura-krav) — re-eksporteret
-// her så schema-forbrugere har ét import-sted.
+// The cap lives in lib/limits.ts (product limits, independent of any plan or
+// payment provider) and is re-exported here so schema consumers have one import site.
 export { MAX_FONT_FILES_TOTAL }
 
 export const tokensSchema = z

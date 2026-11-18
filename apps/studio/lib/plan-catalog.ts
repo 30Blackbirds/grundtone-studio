@@ -221,10 +221,3 @@ export function planNameKeyForAccountKey(key: string | null | undefined): string
   if (!key || !isAccountPlanKey(key)) return null
   return CATALOG_KEY_BY_ACCOUNT_KEY[key] ?? key.replace('-', '_')
 }
-
-// Jura/Allan-låst loft 2026-08-04: "4 fontfiler i alt" på tværs af de to
-// font-slots (fil-formulering så kursiv-filer utvetydigt tæller med). Bor
-// HER som config-konstant (ikke spredt i valideringer) så en senere
-// justering — fx Enterprise-forhøjelse — er ét sted. Skal fremgå af /plans
-// (aftale-kilden) og må bevidst IKKE stå i ToS.
-export const MAX_FONT_FILES_TOTAL = 4
