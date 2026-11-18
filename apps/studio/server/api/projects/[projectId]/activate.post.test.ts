@@ -79,10 +79,9 @@ vi.mock('~~/server/lib/css-renderer', () => ({ renderTokensCss: () => renderToke
 
 let brandClaim: unknown = null
 let capacityThrows: unknown = null
-vi.mock('~~/server/lib/brand-count', () => ({
-  reportBrandCount: (orgId: string) => {
+vi.mock('~~/server/lib/brand-hooks', () => ({
+  notifyBrandCountChanged: (orgId: string) => {
     log.push(`report:${orgId}`)
-    return Promise.resolve({ kind: 'applied' })
   },
 }))
 vi.mock('~~/server/lib/brand-quota', () => ({

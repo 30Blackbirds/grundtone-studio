@@ -4,7 +4,7 @@ import { db } from '~~/server/db'
 import { activeVersion, configVersion, fontLicenceAttestation } from '~~/server/db/schema'
 import { recordAuditEvent } from '~~/server/lib/audit'
 import { assertBrandCapacity, claimBrandSlot } from '~~/server/lib/brand-quota'
-import { reportBrandCount } from '~~/server/lib/brand-count'
+import { notifyBrandCountChanged } from '~~/server/lib/brand-hooks'
 import { purgeProjectCdn } from '~~/server/lib/bunny'
 import { requireProjectAccess } from '~~/server/lib/project-access'
 import { copyObject, paths, putObject } from '~~/server/lib/storage'
@@ -101,9 +101,9 @@ export default defineEventHandler(async (event) => {
     return updated
   })
 
-  // A new brand changes what account bills (overage). Not awaited: the publish
-  // does not wait on billing, and the daily reconcile repairs a lost report.
-  if (brandClaim) void reportBrandCount(access.organization.id)
+  // A new brand changes the org's brand count. Listeners (see brand-hooks.ts)
+  // are told but not awaited: the publish never waits on them.
+  if (brandClaim) notifyBrandCountChanged(access.organization.id)
 
   // ─── Phase B — upload immutable archive blobs ───────────────────────────
   const assets = referencedAssets(tokens)
