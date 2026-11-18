@@ -82,12 +82,13 @@ RUN --mount=type=secret,id=sentry_auth_token \
 RUN pnpm --filter @grundtone-studio/studio deploy --legacy --ignore-scripts /deploy
 
 # Assertion-only (deref sker nu in-place i build-RUN'et ovenfor, så pnpm
-# deploy kopierer rigtige filer fra fødslen): de tre multi-versions-pakker
+# deploy kopierer rigtige filer fra fødslen): de to multi-versions-pakker
 # der blev tabt i runde 4 SKAL findes, og .output må være 100% symlink-frit.
+# @opentelemetry/api-logs is not asserted: with the 2026-11 OTel bumps (#396) Nitro no longer
+# emits it, nothing in the bundle references it, and the booted image passes boot-smoke.
 # Boot-smoken i build.yml er den endelige gate på det EKSPORTEREDE image.
 RUN test -f /deploy/.output/server/node_modules/@opentelemetry/core/package.json \
  && test -f /deploy/.output/server/node_modules/@opentelemetry/resources/package.json \
- && test -f /deploy/.output/server/node_modules/@opentelemetry/api-logs/package.json \
  && [ -z "$(find /deploy/.output -type l | head -1)" ]
 
 # Nitro beholder `unhead` som external men dens trace misser den transitive
