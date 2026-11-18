@@ -30,6 +30,63 @@ export interface OidcConfig {
   sessionIdleMs: number
   /** A session ends this long after login, however active. */
   sessionMaxMs: number
+  /**
+   * Optional, OFF unless both OIDC_ROLE_CLAIM and OIDC_ROLE_MAP are set: org
+   * roles granted from an IdP claim at login. Never owner; a role assigned in
+   * Studio always wins over one from the claim.
+   */
+  roleMapping: RoleMapping | null
+}
+
+export type ClaimRole = 'billing' | 'member' | 'admin' | 'manager'
+export interface RoleMapping {
+  claim: string
+  /** claim value -> grants (org slug + role). */
+  grants: Map<string, Array<{ orgSlug: string; role: ClaimRole }>>
+}
+
+const CLAIM_ROLES: readonly ClaimRole[] = ['billing', 'member', 'admin', 'manager']
+
+/**
+ * `OIDC_ROLE_MAP` is a comma-separated list of `value=org-slug:role`, e.g.
+ * `studio-admins=acme:admin,acme-billing=acme:billing`. Owner is refused here:
+ * ownership is only ever given inside Studio.
+ */
+export function parseRoleMapping(
+  claimRaw: string | undefined,
+  mapRaw: string | undefined,
+): RoleMapping | null {
+  const claim = claimRaw?.trim()
+  const map = mapRaw?.trim()
+  if (!claim && !map) return null
+  if (!claim || !map) {
+    throw new OidcConfigError('OIDC_ROLE_CLAIM and OIDC_ROLE_MAP must be set together (or neither)')
+  }
+  if (!/^[A-Za-z0-9_.:/-]{1,100}$/.test(claim)) {
+    throw new OidcConfigError('OIDC_ROLE_CLAIM must be a plain claim name')
+  }
+  const grants = new Map<string, Array<{ orgSlug: string; role: ClaimRole }>>()
+  for (const entry of map
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)) {
+    const m = /^([^=\s]{1,200})=([a-z0-9-]{1,100}):([a-z]+)$/.exec(entry)
+    if (!m)
+      throw new OidcConfigError(
+        `OIDC_ROLE_MAP entry ${JSON.stringify(entry)} must be value=org-slug:role`,
+      )
+    const [, value, orgSlug, role] = m as unknown as [string, string, string, string]
+    if (!CLAIM_ROLES.includes(role as ClaimRole)) {
+      throw new OidcConfigError(
+        `OIDC_ROLE_MAP role ${JSON.stringify(role)} must be one of ${CLAIM_ROLES.join(', ')} (never owner)`,
+      )
+    }
+    const list = grants.get(value) ?? []
+    list.push({ orgSlug, role: role as ClaimRole })
+    grants.set(value, list)
+  }
+  if (grants.size === 0) throw new OidcConfigError('OIDC_ROLE_MAP has no entries')
+  return { claim, grants }
 }
 
 const ASYMMETRIC_ALGS = [
@@ -165,6 +222,7 @@ export function readOidcConfig(env: Env = process.env): OidcConfig {
     jit: flag('OIDC_JIT', env.OIDC_JIT, true),
     sessionIdleMs: hours('OIDC_SESSION_IDLE_HOURS', env.OIDC_SESSION_IDLE_HOURS, 8, 24 * 30),
     sessionMaxMs: hours('OIDC_SESSION_MAX_DAYS', env.OIDC_SESSION_MAX_DAYS, 7, 365, 24),
+    roleMapping: parseRoleMapping(env.OIDC_ROLE_CLAIM, env.OIDC_ROLE_MAP),
   }
 }
 

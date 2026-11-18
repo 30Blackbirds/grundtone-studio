@@ -8,7 +8,7 @@ import {
   OidcLoginError,
   startLogin,
 } from './flow'
-import { readOidcConfig, type OidcConfig } from './config'
+import { parseRoleMapping, readOidcConfig, type OidcConfig } from './config'
 import { startFakeIdp, type FakeIdp } from './fake-idp'
 
 // The login flow against a fake IdP and a REAL Postgres (oidc_login). Denial
@@ -249,6 +249,26 @@ describe.skipIf(!DATABASE_URL)('OIDC login flow (fake IdP, real Postgres)', () =
           expected,
         )
       }
+    })
+
+    it('reads the role claim only when a mapping is configured, as a list of strings', async () => {
+      let { state, nonce } = await begin()
+      idp.next = { nonce, claims: { groups: ['admins', 7, 'staff'] } }
+      expect(
+        (await completeLogin(db, cfg, callback(state), state)).claims.roleValues,
+      ).toBeUndefined()
+      const mapped = { ...cfg, roleMapping: parseRoleMapping('groups', 'admins=acme:admin') }
+      ;({ state, nonce } = await begin())
+      idp.next = { nonce, claims: { groups: ['admins', 7, 'staff'] } }
+      expect((await completeLogin(db, mapped, callback(state), state)).claims.roleValues).toEqual([
+        'admins',
+        'staff',
+      ])
+      ;({ state, nonce } = await begin())
+      idp.next = { nonce, claims: { groups: { admins: true } } }
+      expect((await completeLogin(db, mapped, callback(state), state)).claims.roleValues).toEqual(
+        [],
+      )
     })
 
     it('falls back to preferred_username, then the e-mail local part, for the name', async () => {

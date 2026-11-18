@@ -57,6 +57,8 @@ export interface VerifiedClaims {
   email: string | null
   emailVerified: boolean
   name: string | null
+  /** Values of the configured role claim (only read when a mapping is set). */
+  roleValues?: string[]
 }
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
@@ -240,10 +242,18 @@ export async function completeLogin(
       // Some IdPs send the string "true"; nothing else counts as verified.
       emailVerified: profile.email_verified === true || profile.email_verified === 'true',
       name: displayName(profile),
+      ...(cfg.roleMapping ? { roleValues: claimValues(profile[cfg.roleMapping.claim]) } : {}),
     },
     next: isSafeNext(attempt.next) ? attempt.next : '/',
     idToken: tokens.id_token!,
   }
+}
+
+/** A claim as a list of strings: a string or an array of strings; anything else is none. */
+export function claimValues(raw: unknown): string[] {
+  if (typeof raw === 'string') return raw ? [raw] : []
+  if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === 'string' && v !== '')
+  return []
 }
 
 /**

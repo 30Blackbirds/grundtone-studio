@@ -6,6 +6,7 @@ import {
   oidcStateCookie,
   OidcConfigError,
   readOidcConfig,
+  parseRoleMapping,
 } from './config'
 
 const base = {
@@ -167,5 +168,48 @@ describe('session lifetimes', () => {
     expect(
       readOidcConfig({ ...base, OIDC_SESSION_IDLE_HOURS: '2', OIDC_SESSION_MAX_DAYS: '1' }),
     ).toMatchObject({ sessionIdleMs: 2 * 3600_000, sessionMaxMs: 24 * 3600_000 })
+  })
+})
+
+describe('parseRoleMapping (OIDC_ROLE_CLAIM + OIDC_ROLE_MAP)', () => {
+  it('is off when neither is set, and refuses one without the other', () => {
+    expect(parseRoleMapping(undefined, undefined)).toBeNull()
+    expect(parseRoleMapping('', '  ')).toBeNull()
+    expect(() => parseRoleMapping('groups', undefined)).toThrow(/together/)
+    expect(() => parseRoleMapping(undefined, 'a=acme:admin')).toThrow(/together/)
+  })
+
+  it('never maps to owner, and refuses an unknown role or a malformed entry', () => {
+    expect(() => parseRoleMapping('groups', 'admins=acme:owner')).toThrow(/never owner/)
+    expect(() => parseRoleMapping('groups', 'admins=acme:superuser')).toThrow(/must be one of/)
+    expect(() => parseRoleMapping('groups', 'admins=Acme Corp:admin')).toThrow(
+      /value=org-slug:role/,
+    )
+    expect(() => parseRoleMapping('groups', 'admins')).toThrow(/value=org-slug:role/)
+    expect(() => parseRoleMapping('bad claim!', 'a=acme:admin')).toThrow(/claim name/)
+  })
+
+  it('parses several grants, including two per value', () => {
+    const m = parseRoleMapping('groups', 'admins=acme:admin, admins=beta:member,pay=acme:billing')!
+    expect(m.claim).toBe('groups')
+    expect(m.grants.get('admins')).toEqual([
+      { orgSlug: 'acme', role: 'admin' },
+      { orgSlug: 'beta', role: 'member' },
+    ])
+    expect(m.grants.get('pay')).toEqual([{ orgSlug: 'acme', role: 'billing' }])
+  })
+
+  it('readOidcConfig carries it, and leaves it null by default', () => {
+    const base = {
+      AUTHORIZER: 'local',
+      OIDC_ISSUER: 'https://idp.example.com',
+      OIDC_CLIENT_ID: 'c',
+      NUXT_PUBLIC_APP_URL: 'https://s.example.com',
+    }
+    expect(readOidcConfig(base).roleMapping).toBeNull()
+    expect(
+      readOidcConfig({ ...base, OIDC_ROLE_CLAIM: 'groups', OIDC_ROLE_MAP: 'a=acme:admin' })
+        .roleMapping?.claim,
+    ).toBe('groups')
   })
 })
