@@ -1,9 +1,10 @@
 {
   "name": "grundtone-studio-monorepo",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "version": "0.0.0",
-  "description": "Private commercial SaaS for configuring Grundtone design systems",
+  "description": "Open-source, self-hostable studio for configuring Grundtone design systems",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
