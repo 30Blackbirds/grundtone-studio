@@ -128,6 +128,15 @@ describe('assertBrandCapacity', () => {
     expect(recordQuotaDenial).toHaveBeenCalledWith('studio.brands')
   })
 
+  it('enforces a self-host brand limit as a hard cap (no catalog plan, no overage to bill)', async () => {
+    state.activeBrands = 5
+    getStudioEntitlements.mockResolvedValue(ent('self-host', 5))
+    await expect(assertBrandCapacity('org-1', 'p-new')).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'brand_quota_exceeded', limit: 5, planKey: 'self-host' },
+    })
+  })
+
   // account returns the free plan as `studio-free` (hyphen). Studio once
   // compared that to its own `studio_free` and found no hard cap.
   it('🔴 refuses the 3rd brand on Free when account spells it studio-free', async () => {

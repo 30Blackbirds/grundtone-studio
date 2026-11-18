@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { z } from 'zod'
 import { billingEnabled } from './runtime-flags'
+import { selfHostProvider } from './entitlements-self-host'
 
 // Studio-side client for account's entitlements-API, per the locked contract
 // .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md (2026-07-29):
@@ -53,24 +54,55 @@ export function clearEntitlementsCacheFor(orgId: string) {
   cache.delete(orgId)
 }
 
+/**
+ * Where an org's entitlements come from. `get` answers null for "no plan /
+ * unknown"; callers keep their own fail-open (quotas) and fail-closed (paid
+ * feature) rules. `invalidate` drops any cached answer for one org.
+ */
+export interface EntitlementsProvider {
+  get(orgId: string): Promise<Entitlements | null>
+  invalidate?(orgId: string): void
+}
+
+/** Account-service provider: the HTTP client above, with its cache. */
+export const accountProvider: EntitlementsProvider = {
+  async get(orgId) {
+    const baseUrl = process.env.ACCOUNT_URL
+    if (!baseUrl) return null
+
+    const cached = cache.get(orgId)
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity
+    if (cached && age < TTL_MS) return cached.body
+    if (cached && age < STALE_MAX_MS) {
+      // Stale-while-revalidate: answer from cache now, refresh in the background.
+      void refresh(baseUrl, orgId, cached)
+      return cached.body
+    }
+    return await refresh(baseUrl, orgId, cached)
+  },
+  invalidate: clearEntitlementsCacheFor,
+}
+
+let override: EntitlementsProvider | null = null
+
+/** Extension point: a layer or plugin installs its own provider. Pass null to reset. */
+export function setEntitlementsProvider(provider: EntitlementsProvider | null): void {
+  override = provider
+}
+
+/** The provider in force: an installed one, else self-host (billing off) or account. */
+export function currentEntitlementsProvider(): EntitlementsProvider {
+  if (override) return override
+  return billingEnabled() ? accountProvider : selfHostProvider
+}
+
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
   // D-E2 (Allan, 2026-11-10): with billing off there is no plan, and every org
-  // has every feature. Account is not asked. null is what every quota gate
-  // already reads as "allowed"; the one paid feature, provisioning, answers for
-  // billing off before it gets here (requireProvisioningFeature).
-  if (!billingEnabled()) return null
-  const baseUrl = process.env.ACCOUNT_URL
-  if (!baseUrl) return null
-
-  const cached = cache.get(orgId)
-  const age = cached ? Date.now() - cached.fetchedAt : Infinity
-  if (cached && age < TTL_MS) return cached.body
-  if (cached && age < STALE_MAX_MS) {
-    // Stale-while-revalidate: answer from cache now, refresh in the background.
-    void refresh(baseUrl, orgId, cached)
-    return cached.body
-  }
-  return await refresh(baseUrl, orgId, cached)
+  // has every feature. Account is not asked; limits, if any, come from the
+  // environment (STUDIO_LIMIT_*). null is what every quota gate already reads
+  // as "allowed"; the one paid feature, provisioning, answers for billing off
+  // before it gets here (requireProvisioningFeature).
+  return currentEntitlementsProvider().get(orgId)
 }
 
 async function refresh(
