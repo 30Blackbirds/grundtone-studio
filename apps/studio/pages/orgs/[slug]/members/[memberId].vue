@@ -18,7 +18,16 @@
   const slug = computed(() => route.params.slug as string)
   const memberId = computed(() => route.params.memberId as string)
 
-  const { activeOrg, role: actorRole } = useOrgContext()
+  const { activeOrg, role: actorRole, refreshActiveMember } = useOrgContext()
+  const authMode = useAuthMode()
+  // oidc mode only: ownership lives in Studio, and an owner may hand it over.
+  const canTransfer = computed(
+    () =>
+      authMode.value === 'oidc' &&
+      actorRole.value === 'owner' &&
+      !!currentRole.value &&
+      currentRole.value !== 'owner',
+  )
 
   const { data: members, refresh } = await useAsyncData(
     () => `member-detail-${memberId.value}`,
@@ -123,6 +132,28 @@
   }
 
   const toast = useToast()
+  const transferOpen = ref(false)
+  const transferring = ref(false)
+  const transferError = ref<string | null>(null)
+
+  async function confirmTransfer() {
+    if (!activeOrg.value?.id || !member.value?.userId) return
+    transferring.value = true
+    transferError.value = null
+    try {
+      const res = await orgWrites.transferOwnership(activeOrg.value.id, member.value.userId)
+      if (res.error) {
+        transferError.value = res.error.message ?? t('memberDetail.transferError')
+        return
+      }
+      transferOpen.value = false
+      toast.success(t('toasts.ownershipTransferred'))
+      await Promise.all([refresh(), refreshActiveMember()])
+    } finally {
+      transferring.value = false
+    }
+  }
+
   const removeOpen = ref(false)
   const removingMember = ref(false)
 
@@ -276,6 +307,9 @@
         </GTButton>
         <span v-else />
         <div class="flex items-center gap-3">
+          <GTButton v-if="canTransfer" variant="outlined" @click="transferOpen = true">
+            {{ t('memberDetail.transferAction') }}
+          </GTButton>
           <span v-if="!canManage" class="text-tertiary text-sm">
             {{ t('memberDetail.cannotManageHierarchy') }}
           </span>
@@ -289,6 +323,16 @@
         </div>
       </footer>
       <GTAlert v-if="saveError" variant="error" :heading="saveError" />
+      <GTAlert v-if="transferError" variant="error" :heading="transferError" />
+
+      <ConfirmDialog
+        v-model:open="transferOpen"
+        :title="t('memberDetail.transferAction')"
+        :message="t('memberDetail.confirmTransfer')"
+        :confirm-label="t('memberDetail.transferAction')"
+        :loading="transferring"
+        @confirm="confirmTransfer"
+      />
 
       <ConfirmDialog
         v-model:open="removeOpen"

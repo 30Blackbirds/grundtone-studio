@@ -304,6 +304,63 @@ export async function removeMember(
   })
 }
 
+/**
+ * Hand ownership to another member in one step: the target becomes owner and
+ * the caller steps down to `stepDownTo`. Only an owner may do this; the target
+ * must be an enabled member other than the caller. The organisation keeps an
+ * enabled owner throughout, so there is no moment without one.
+ */
+export async function transferOwnership(
+  db: Db,
+  actor: Actor,
+  orgId: string,
+  targetUserId: string,
+  stepDownTo: OrgRole = 'manager',
+): Promise<void> {
+  if (!isRole(stepDownTo) || stepDownTo === 'owner' || targetUserId === actor.id) {
+    throw new LocalOrgError('invalid_input')
+  }
+  await db.transaction(async (tx) => {
+    await lockOrg(tx, orgId)
+    if ((await roleIn(tx, orgId, actor.id)) !== 'owner') throw new LocalOrgError('forbidden')
+    const [target] = await tx
+      .select({ role: orgMember.role, disabledAt: appUser.disabledAt })
+      .from(orgMember)
+      .leftJoin(appUser, eq(appUser.id, orgMember.userId))
+      .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, targetUserId)))
+    if (!target || !isRole(target.role)) throw new LocalOrgError('not_found')
+    // A disabled user cannot sign in, so handing them the organisation would
+    // leave it with no owner who can act.
+    if (target.disabledAt) throw new LocalOrgError('invalid_input')
+    const changes: Array<[string, OrgRole, OrgRole]> = [
+      [targetUserId, target.role, 'owner'],
+      [actor.id, 'owner', stepDownTo],
+    ]
+    for (const [userId, before, after] of changes) {
+      if (before === after) continue
+      await tx
+        .update(orgMember)
+        .set({ role: after })
+        .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, userId)))
+      await tx.insert(auditLog).values(
+        audit(actor, {
+          organizationId: orgId,
+          action: 'member.role_changed',
+          targetType: 'member',
+          targetId: userId,
+          before: { role: before },
+          after: { role: after },
+        }),
+      )
+    }
+  })
+}
+
+/** The caller's own role in an org, or not_found if they are not a member. */
+export async function roleOf(db: Db, actor: Actor, orgId: string): Promise<OrgRole> {
+  return db.transaction((tx) => roleIn(tx, orgId, actor.id))
+}
+
 /** Any member may leave, unless they are the last enabled owner. */
 export async function leaveOrganization(db: Db, actor: Actor, orgId: string): Promise<void> {
   await db.transaction(async (tx) => {

@@ -730,7 +730,10 @@
     "removeBody": "Fjern denne person fra organisationen. De mister øjeblikkeligt adgang til alle projekter.",
     "removeAction": "Fjern fra organisationen",
     "confirmRemove": "Fjern dette medlem fra organisationen? De mister øjeblikkeligt adgang til alle projekter.",
-    "cannotManageHierarchy": "Du kan ikke ændre en rolle på eller over dit eget niveau."
+    "cannotManageHierarchy": "Du kan ikke ændre en rolle på eller over dit eget niveau.",
+    "transferAction": "Gør til ejer og træd tilbage",
+    "confirmTransfer": "Medlemmet bliver ejer, og du bliver manager. Du kan ikke selv fortryde det.",
+    "transferError": "Kunne ikke overdrage ejerskabet"
   },
   "verifyEmail": {
     "title": "Tjek din indbakke",
@@ -963,7 +966,8 @@
     "leftOrg": "Du har forladt organisationen",
     "inviteSent": "Invitation sendt",
     "inviteResent": "Invitation gensendt",
-    "upgraded": "Din plan er opgraderet."
+    "upgraded": "Din plan er opgraderet.",
+    "ownershipTransferred": "Ejerskabet er overdraget"
   },
   "dashboard": {
     "title": "Dashboard",

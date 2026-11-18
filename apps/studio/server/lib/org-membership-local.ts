@@ -7,6 +7,7 @@ import { localeFromEvent, orgInviteEmail } from './email-templates'
 import * as store from './local-orgs'
 import { LocalOrgError } from './local-orgs'
 import { readOidcConfig } from './oidc/config'
+import { canAssignRole, ORG_RANK } from './org-membership-input'
 import type { OrgRole } from './project-access'
 
 // The oidc-mode half of server/lib/org-membership.ts: the same operations the
@@ -166,6 +167,37 @@ export async function leaveOrganizationLocal(db: Db, event: H3Event, orgId: stri
     toHttp(err)
   }
   return { ok: true }
+}
+
+export async function transferOwnershipLocal(
+  db: Db,
+  event: H3Event,
+  orgId: string,
+  targetUserId: string,
+  stepDownTo?: OrgRole,
+) {
+  try {
+    await store.transferOwnership(db, actorOf(event), orgId, targetUserId, stepDownTo)
+  } catch (err) {
+    toHttp(err)
+  }
+  return { ok: true }
+}
+
+/** The caller's role and the roles it may give, for the member pages. */
+export async function myRolesLocal(db: Db, event: H3Event, orgId: string) {
+  let role: OrgRole
+  try {
+    role = await store.roleOf(db, actorOf(event), orgId)
+  } catch (err) {
+    toHttp(err)
+  }
+  const mayManage = role === 'owner' || role === 'manager'
+  return {
+    role,
+    assignable: mayManage ? ORG_RANK.filter((r) => canAssignRole(role, r)) : [],
+    mayTransferOwnership: role === 'owner',
+  }
 }
 
 export async function deleteOrganizationLocal(db: Db, event: H3Event, orgId: string) {
