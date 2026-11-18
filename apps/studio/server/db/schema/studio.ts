@@ -451,3 +451,29 @@ export const oidcLogin = pgTable(
   },
   (t) => [index('oidc_login_expires_idx').on(t.expiresAt)],
 )
+
+// Browser sessions in AUTH_MODE=oidc. The cookie holds a random token; only its
+// SHA-256 is stored, so a leaked table cannot be replayed as cookies. Disabling
+// a user deletes their rows, and every lookup re-reads the user, so a disabled
+// user is out on the next request, not when a token expires.
+export const appSession = pgTable(
+  'app_session',
+  {
+    tokenHash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    // Chosen inside Studio (the JWT "org" claim does not exist in oidc mode).
+    activeOrganizationId: text(),
+    // Kept server-side only, as the id_token_hint of RP-initiated logout.
+    idToken: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    // Absolute end of life; idle timeout is checked against lastSeenAt.
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index('app_session_user_idx').on(t.userId),
+    index('app_session_expires_idx').on(t.expiresAt),
+  ],
+)

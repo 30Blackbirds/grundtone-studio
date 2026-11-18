@@ -1,3 +1,4 @@
+import { authMode } from '~~/server/lib/oidc/config'
 import { billingEnabled } from '~~/server/lib/runtime-flags'
 
 // Which optional surfaces this deployment has, so the UI hides what the server
@@ -9,11 +10,11 @@ defineRouteMeta({
   openAPI: {
     summary: 'Which optional features this deployment has enabled.',
     description:
-      'Public and cheap: no auth, no DB. `billing` mirrors FEATURE_BILLING. The UI uses it to hide the billing page and its link.',
+      'Public and cheap: no auth, no DB. `billing` mirrors FEATURE_BILLING; `authMode` is `better-auth` or `oidc`. The UI uses them to hide what this deployment does not have.',
     tags: ['System'],
   },
 })
 
 export default defineEventHandler(() => {
-  return { billing: billingEnabled() }
+  return { billing: billingEnabled(), authMode: authMode() }
 })

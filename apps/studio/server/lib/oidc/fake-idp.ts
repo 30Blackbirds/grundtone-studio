@@ -29,6 +29,8 @@ export interface FakeIdp {
   userinfo: Record<string, unknown> | null
   /** What discovery claims the issuer is; undefined means the real one. */
   metadataIssuer: string | undefined
+  /** Whether discovery advertises end_session_endpoint. */
+  endSession: boolean
   tokenRequests: URLSearchParams[]
   /** The nonce of the most recent authorization request seen by the test. */
   close(): Promise<void>
@@ -50,6 +52,7 @@ export async function startFakeIdp(clientId = 'studio'): Promise<FakeIdp> {
     next: {},
     userinfo: null,
     metadataIssuer: undefined,
+    endSession: true,
     tokenRequests: [],
     close: () => new Promise((resolve) => server.close(() => resolve())),
   }
@@ -67,6 +70,7 @@ export async function startFakeIdp(clientId = 'studio'): Promise<FakeIdp> {
         token_endpoint: `${issuer}/token`,
         jwks_uri: `${issuer}/jwks`,
         userinfo_endpoint: `${issuer}/userinfo`,
+        ...(idp.endSession ? { end_session_endpoint: `${issuer}/logout` } : {}),
         response_types_supported: ['code'],
         subject_types_supported: ['public'],
         id_token_signing_alg_values_supported: ['RS256'],

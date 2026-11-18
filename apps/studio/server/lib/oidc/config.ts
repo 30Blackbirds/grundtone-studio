@@ -26,6 +26,10 @@ export interface OidcConfig {
   requireEmailVerified: boolean
   allowedEmailDomains: string[]
   jit: boolean
+  /** A session ends after this long without a request. */
+  sessionIdleMs: number
+  /** A session ends this long after login, however active. */
+  sessionMaxMs: number
 }
 
 const ASYMMETRIC_ALGS = [
@@ -82,6 +86,15 @@ function flag(name: string, value: string | undefined, fallback: boolean): boole
   if (raw === 'true' || raw === 'on' || raw === '1') return true
   if (raw === 'false' || raw === 'off' || raw === '0') return false
   throw new OidcConfigError(`${name} must be true/on/1 or false/off/0`)
+}
+
+function hours(name: string, value: string | undefined, fallback: number, max: number, unit = 1) {
+  const raw = value?.trim()
+  const n = raw ? Number(raw) : fallback
+  if (!Number.isInteger(n) || n < 1 || n > max) {
+    throw new OidcConfigError(`${name} must be a whole number from 1 to ${max}`)
+  }
+  return n * unit * 60 * 60 * 1000
 }
 
 /**
@@ -150,6 +163,8 @@ export function readOidcConfig(env: Env = process.env): OidcConfig {
     ),
     allowedEmailDomains,
     jit: flag('OIDC_JIT', env.OIDC_JIT, true),
+    sessionIdleMs: hours('OIDC_SESSION_IDLE_HOURS', env.OIDC_SESSION_IDLE_HOURS, 8, 24 * 30),
+    sessionMaxMs: hours('OIDC_SESSION_MAX_DAYS', env.OIDC_SESSION_MAX_DAYS, 7, 365, 24),
   }
 }
 
@@ -173,4 +188,13 @@ export function oidcStateCookie(cfg: Pick<OidcConfig, 'redirectUri'>): {
 } {
   const secure = new URL(cfg.redirectUri).protocol === 'https:'
   return { name: secure ? '__Host-studio_oidc' : 'studio_oidc', secure }
+}
+
+/** The session cookie. Same `__Host-` rule as the state cookie. */
+export function oidcSessionCookie(cfg: Pick<OidcConfig, 'redirectUri'>): {
+  name: string
+  secure: boolean
+} {
+  const secure = new URL(cfg.redirectUri).protocol === 'https:'
+  return { name: secure ? '__Host-studio_session' : 'studio_session', secure }
 }

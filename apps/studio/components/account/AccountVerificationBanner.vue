@@ -1,11 +1,12 @@
 <script setup lang="ts">
-  import { authClient, useSession } from '~~/lib/auth-client'
+  import { authClient } from '~~/lib/auth-client'
 
   const { t } = useI18n()
-  const session = useSession()
+  const identity = useAccountIdentity()
 
-  const email = computed(() => session.value.data?.user?.email ?? '')
-  const show = computed(() => session.value.data?.user?.emailVerified !== true)
+  const email = computed(() => identity.value.email)
+  // Nothing is shown until the source has answered; an unknown is not "unverified".
+  const show = computed(() => identity.value.loaded && !identity.value.emailVerified)
 
   const resending = ref(false)
   const resent = ref(false)
@@ -31,7 +32,17 @@
 
 <template>
   <GTAlert v-if="show" variant="warning" :heading="t('account.verification.banner')">
-    <GTButton variant="secondary" size="sm" :loading="resending" class="mt-2" @click="resend">
+    <p v-if="identity.managedByIdp" class="text-sm mt-2 mb-0">
+      {{ t('account.verification.idp') }}
+    </p>
+    <GTButton
+      v-else
+      variant="secondary"
+      size="sm"
+      :loading="resending"
+      class="mt-2"
+      @click="resend"
+    >
       {{ t('account.verification.resend') }}
     </GTButton>
     <p v-if="resent" class="text-sm mt-2 mb-0">{{ t('account.verification.resent') }}</p>
