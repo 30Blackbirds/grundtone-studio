@@ -177,12 +177,12 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
    - a **legal-processors registry** so the sub-processor table is data a layer can extend;
    - the brand-count-changed hook called from publish and activate (today `reportBrandCount` is
      called inline in both routes).
-4. **Proposed name and skeleton (not created).** Working name `30Blackbirds/grundtone-studio-cloud`
-   (private), to be confirmed by the owner before anything is created. Skeleton: `package.json`,
-   `nuxt.config.ts` with `extends` pointing at a pinned Studio release tag, `server/` for the
-   provider, billing routes and tasks, `pages/` for billing and plans, an `i18n/` layer for provider
-   copy, and its own CI. A local scaffold of the same shape exists outside this repository for
-   trying the layer; it contains no code yet. No GitHub repository exists.
+4. **Repository and skeleton.** `30Blackbirds/grundtone-studio-cloud`, private, created 2026-11-18.
+   It holds only a skeleton: `package.json`, a README, and `nuxt.config.ts` whose `extends` points
+   at Studio at a pinned ref (a `main` commit after B1 to B3, until a release tag contains them). B5
+   adds `server/` for the provider, billing routes and tasks, `pages/` for billing and plans, an
+   `i18n/` layer for provider copy, and its own CI. That Studio builds as a layer from a pinned
+   GitHub ref is not verified yet; B5 checks it.
 5. **Unused features cost nothing.** Without the overlay, none of the billing code exists in the
    build, so the self-host image has no dormant billing path.
 
@@ -327,11 +327,10 @@ Decided by the project owner on 2026-11-18 (relayed by the PM session):
 1. **Contributor basis:** the principle is adopted: **a CLA before the first external PR** to the
    public core. No legal text is written, because legal is parked and the project name is a working
    name with no company behind it. `CONTRIBUTING.md` states only that external PRs wait for a CLA.
-2. **Overlay repository:** approved in principle, **not created**. The name above is a proposal; the
-   owner confirms it, then the repository is created.
+2. **Overlay repository:** approved and created as a private repository (see section 3b, item 4).
 3. **`tenant_event_outbox` / `tenantProvisioned`:** SaaS-only. It moves with the overlay. The public
    core gets a small first-served extension point instead (B4, after studio-oidc-roles has changed
    `org-lookup.ts`).
 
-Sequencing: slices B1 to B3 start now on the public side (PR 417 and the slice PRs that follow it);
-B4 onward waits for the studio-oidc-roles routes slice.
+Sequencing: slices B1 to B3 are merged (PRs 417, 421, 420). B4 onward waits for the
+studio-oidc-roles routes slice.
