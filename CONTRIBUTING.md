@@ -53,6 +53,12 @@ the server.
 5. Once green, request a review
 6. Merge via **Squash and merge**. The PR title becomes the commit subject — make it conventional.
 
+## Contributions from outside
+
+Pull requests from people outside the maintainers are not merged until a contributor licence
+agreement (CLA) is in place. The CLA is not written yet. Open an issue to discuss a change first; a
+PR can be opened, but it waits.
+
 ## Tags + releases
 
 A semver tag on `main` (`vX.Y.Z`) builds, signs (cosign) and publishes the release image through

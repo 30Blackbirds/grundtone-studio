@@ -146,16 +146,16 @@ and no call to account.
 
 ### 3a. What moves
 
-| Moves to the overlay                                                                                                                                      | Public replacement                                                                                       |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `server/api/billing/*` (checkout, portal, overview, refresh)                                                                                              | none; routes are absent in self-host                                                                     |
-| `server/lib/billing-read.ts`, `account-relay.ts`, `account-user-token.ts`, the HTTP half of `entitlements.ts`, `reportBrandCount`                         | the `EntitlementsProvider` implementation in the overlay                                                 |
-| `server/tasks/billing/brand-count-reconcile.ts` and its `scheduledTasks` entry                                                                            | overlay's own `nuxt.config` adds it                                                                      |
-| `lib/plan-catalog.ts` prices, overage, `BETA_MODE`, account-key map                                                                                       | `lib/limits.ts` keeps only `MAX_FONT_FILES_TOTAL`                                                        |
-| `pages/plans.vue`, `pages/orgs/[slug]/billing.vue`, `/plans` CSS                                                                                          | public org pages stop linking to `/plans` unless a billing surface is registered                         |
-| `beta-purchases.ts`, `beta-guard-log.ts`                                                                                                                  | gone from public                                                                                         |
-| provider copy in `da.json` / `en.json`, the `stripe` entry in `LegalProcessorsTable.vue` and `sub-processors.vue`, payment sections of terms/privacy text | public legal pages show the processors the **operator** configures                                       |
-| `tenant-outbox.ts` + `tenantProvisioned`                                                                                                                  | stays public only if it is a generic "tenant event" hook; otherwise moves. Open question, see decision 3 |
+| Moves to the overlay                                                                                                                                      | Public replacement                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `server/api/billing/*` (checkout, portal, overview, refresh)                                                                                              | none; routes are absent in self-host                                             |
+| `server/lib/billing-read.ts`, `account-relay.ts`, `account-user-token.ts`, the HTTP half of `entitlements.ts`, `reportBrandCount`                         | the `EntitlementsProvider` implementation in the overlay                         |
+| `server/tasks/billing/brand-count-reconcile.ts` and its `scheduledTasks` entry                                                                            | overlay's own `nuxt.config` adds it                                              |
+| `lib/plan-catalog.ts` prices, overage, `BETA_MODE`, account-key map                                                                                       | `lib/limits.ts` keeps only `MAX_FONT_FILES_TOTAL`                                |
+| `pages/plans.vue`, `pages/orgs/[slug]/billing.vue`, `/plans` CSS                                                                                          | public org pages stop linking to `/plans` unless a billing surface is registered |
+| `beta-purchases.ts`, `beta-guard-log.ts`                                                                                                                  | gone from public                                                                 |
+| provider copy in `da.json` / `en.json`, the `stripe` entry in `LegalProcessorsTable.vue` and `sub-processors.vue`, payment sections of terms/privacy text | public legal pages show the processors the **operator** configures               |
+| `tenant-outbox.ts` + `tenantProvisioned`                                                                                                                  | moves with the overlay (decided: SaaS-only, see section 8)                       |
 
 ### 3b. How the overlay plugs in (one repo, no fork)
 
@@ -177,7 +177,13 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
    - a **legal-processors registry** so the sub-processor table is data a layer can extend;
    - the brand-count-changed hook called from publish and activate (today `reportBrandCount` is
      called inline in both routes).
-4. **Unused features cost nothing.** Without the overlay, none of the billing code exists in the
+4. **Proposed name and skeleton (not created).** Working name `30Blackbirds/grundtone-studio-cloud`
+   (private), to be confirmed by the owner before anything is created. Skeleton: `package.json`,
+   `nuxt.config.ts` with `extends` pointing at a pinned Studio release tag, `server/` for the
+   provider, billing routes and tasks, `pages/` for billing and plans, an `i18n/` layer for provider
+   copy, and its own CI. A local scaffold of the same shape exists outside this repository for
+   trying the layer; it contains no code yet. No GitHub repository exists.
+5. **Unused features cost nothing.** Without the overlay, none of the billing code exists in the
    build, so the self-host image has no dormant billing path.
 
 ### 3c. CI and releases of the overlay
@@ -210,16 +216,16 @@ session before starting.
 Each slice is one small PR with green local tests and no behaviour change for the hosted service
 until B5.
 
-| #   | Slice                                                                                                                                                                          | Touches                                                         | Needs from oidc-roles                              |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- |
-| B0  | This note                                                                                                                                                                      | `docs/design/`                                                  | nothing                                            |
-| B1  | Introduce `EntitlementsProvider` and the self-host provider; wrap the existing HTTP client as the "account" provider selected by `ACCOUNT_URL`; keep `FEATURE_BILLING` working | `server/lib/entitlements*`                                      | nothing                                            |
-| B2  | Move `MAX_FONT_FILES_TOTAL` to `lib/limits.ts`; split `plan-catalog.ts` into limits (public) and catalog (stays for now)                                                       | `lib/`, `tokens.ts`, `BrandAssetsSection.vue`                   | nothing                                            |
-| B3  | Replace inline `reportBrandCount` calls with a `brandCountChanged` hook; keep behaviour                                                                                        | publish, activate, `brand-count.ts`                             | nothing                                            |
-| B4  | Navigation registry and legal-processors registry; sidebar and legal table read them; billing link registered by existing code                                                 | `AppSidebar.vue`, `LegalProcessorsTable.vue`, `features.get.ts` | **local-orgs slice landed** (sidebar and org gate) |
-| B5  | Stand up the private overlay repo; copy-then-delete: overlay gets routes, task, pages, catalog with prices, relay, provider copy; public tree drops them in the same release   | many; see 3a                                                    | B4                                                 |
-| B6  | Neutral copy: remove provider names from public locales, comments and `CLAUDE.md`; processors table driven by registry                                                         | `i18n`, comments                                                | B4                                                 |
-| B7  | Tests: contract fixture layer; delete moved tests from public                                                                                                                  | `tests/`                                                        | B5                                                 |
+| #   | Slice                                                                                                                                                                                                                                           | Touches                                                         | Needs from oidc-roles                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
+| B0  | This note                                                                                                                                                                                                                                       | `docs/design/`                                                  | nothing                                            |
+| B1  | Introduce `EntitlementsProvider` and the self-host provider; wrap the existing HTTP client as the "account" provider selected by `ACCOUNT_URL`; keep `FEATURE_BILLING` working                                                                  | `server/lib/entitlements*`                                      | nothing                                            |
+| B2  | Move `MAX_FONT_FILES_TOTAL` to `lib/limits.ts`; split `plan-catalog.ts` into limits (public) and catalog (stays for now)                                                                                                                        | `lib/`, `tokens.ts`, `BrandAssetsSection.vue`                   | nothing                                            |
+| B3  | Replace inline `reportBrandCount` calls with a `brandCountChanged` hook (`server/lib/brand-hooks.ts`); keep behaviour. The first-served hook for the outbox is deferred to B4: it lives in `org-lookup.ts`, which studio-oidc-roles is changing | publish, activate, `brand-count.ts`                             | nothing                                            |
+| B4  | Navigation registry and legal-processors registry; sidebar and legal table read them; billing link registered by existing code                                                                                                                  | `AppSidebar.vue`, `LegalProcessorsTable.vue`, `features.get.ts` | **local-orgs slice landed** (sidebar and org gate) |
+| B5  | Stand up the private overlay repo; copy-then-delete: overlay gets routes, task, pages, catalog with prices, relay, provider copy; public tree drops them in the same release                                                                    | many; see 3a                                                    | B4                                                 |
+| B6  | Neutral copy: remove provider names from public locales, comments and `CLAUDE.md`; processors table driven by registry                                                                                                                          | `i18n`, comments                                                | B4                                                 |
+| B7  | Tests: contract fixture layer; delete moved tests from public                                                                                                                                                                                   | `tests/`                                                        | B5                                                 |
 
 B5 is the only slice with a hosted-service rollout risk. It ships as one coordinated release of the
 public tag plus the overlay.
@@ -230,11 +236,11 @@ public tag plus the overlay.
   invoices and prices live in account.
 - `org_member.role` keeps the value `billing`. Existing migrations (`0003`, `0015`) are history and
   are not edited. Any change to roles belongs to studio-oidc-roles.
-- `tenant_event_outbox` (migration `0014`) was created for account. If it turns out to be SaaS-only,
-  the table stays in the public schema as harmless history; a new migration may drop it later, never
-  an edit of `0014`. Overlay-owned tables, if ever needed, live in the overlay's own migration
-  folder with their own journal and a table-name prefix, so two migration sets never share a
-  sequence.
+- `tenant_event_outbox` (migration `0014`) was created for account and is SaaS-only (decided, see
+  section 8). The table stays in the public schema as harmless history; a new migration may drop it
+  later, never an edit of `0014`. Overlay-owned tables, if ever needed, live in the overlay's own
+  migration folder with their own journal and a table-name prefix, so two migration sets never share
+  a sequence.
 - Self-host needs **no** new table: limits come from env or file.
 
 ## 6. Licence and contributor basis
@@ -274,7 +280,8 @@ deployment.
 **Before accepting any external PR**, add a DCO (`Signed-off-by`) or a CLA that grants the right to
 relicense. Without it, an external contribution to the public core is AGPL-only and would limit the
 owner's ability to relicense that part. Recommendation: **CLA**, because the stated goal is a
-proprietary overlay and a possible dual licence. See decision 1.
+proprietary overlay and a possible dual licence. See section 8: the principle is adopted, no legal
+text is written yet, and `CONTRIBUTING.md` says external PRs wait for it.
 
 AGPL note for the overlay: the overlay is a separate work that extends the AGPL core. If the hosted
 service offers the combined work over a network, the AGPL's source-offer duty applies to the
@@ -313,14 +320,18 @@ code the owner wrote.
 8. **Account contract.** The overlay depends on account's API shape; a change there now breaks the
    overlay build, not the public core. This is the intended direction.
 
-## 8. Decisions needed from the project owner
+## 8. Decisions
 
-1. **Contributor basis:** adopt a CLA (recommended) or a DCO before the first external PR to the
-   public core.
-2. **Overlay repository:** approve creating a private overlay repository (name and visibility), and
-   the Nuxt-layer approach consuming a pinned Studio tag. This note creates none.
-3. **Scope of the move:** is `tenant_event_outbox` / `tenantProvisioned` SaaS-only (moves with the
-   overlay) or a generic tenant-event hook that stays public?
+Decided by the project owner on 2026-11-18 (relayed by the PM session):
 
-(Proposed, not decisions: start slices B1 to B3 now and B4 onward after the local-orgs slice of
-studio-oidc-roles has merged.)
+1. **Contributor basis:** the principle is adopted: **a CLA before the first external PR** to the
+   public core. No legal text is written, because legal is parked and the project name is a working
+   name with no company behind it. `CONTRIBUTING.md` states only that external PRs wait for a CLA.
+2. **Overlay repository:** approved in principle, **not created**. The name above is a proposal; the
+   owner confirms it, then the repository is created.
+3. **`tenant_event_outbox` / `tenantProvisioned`:** SaaS-only. It moves with the overlay. The public
+   core gets a small first-served extension point instead (B4, after studio-oidc-roles has changed
+   `org-lookup.ts`).
+
+Sequencing: slices B1 to B3 start now on the public side (PR 417 and the slice PRs that follow it);
+B4 onward waits for the studio-oidc-roles routes slice.
