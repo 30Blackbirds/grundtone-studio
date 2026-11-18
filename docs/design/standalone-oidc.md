@@ -147,6 +147,26 @@ accept / remove / role change write **only** to Studio's database (single transa
 row); the "write auth first / revoke first" ordering in `org-membership.ts` is not used there. In
 `better-auth` mode nothing changes.
 
+### E-mail verification and outgoing e-mail
+
+Studio adds **no** e-mail infrastructure for sign-in. In `oidc` mode, verifying an address is the
+IdP's job and Studio trusts the `email_verified` claim:
+
+- `OIDC_REQUIRE_EMAIL_VERIFIED=true` (default): an address counts only if the claim is `true`.
+  Unverified addresses never match an invitation, never satisfy the domain allowlist and never
+  consume a bootstrap grant.
+- A self-hoster whose IdP does not verify addresses (or never sends the claim) can set it to
+  `false`. The consequence must be understood: **anyone who can register at that IdP with an address
+  can claim a pending invitation or bootstrap grant for that address.** Use it only with an IdP
+  whose sign-up is closed or controlled, and prefer `--owner-sub` for the first owner. The README
+  states this next to the variable.
+- The account verification banner and the "e-mail verified" indicator
+  (`AccountVerificationBanner.vue`, `AccountEmailForm.vue`) read the Better Auth session today. In
+  `oidc` mode they read the stored claim (`app_user.email_verified`, refreshed at every login), and
+  offer no "resend verification" action: the text points to the IdP instead.
+- The existing optional SMTP configuration (`SMTP_HOST`, empty = log only) stays, and is used
+  **only** for organisation invitations (and in `better-auth` mode). It is not needed to sign in.
+
 ## Roles and permissions (from the code)
 
 Roles are stored in `org_member` (one role per user per organisation), `project_member`, and
@@ -260,8 +280,10 @@ grant `owner`.
 
 1. `ORG_CREATION` defaults to `operator` in `oidc` mode.
 2. Multiple owners and owner transfer are allowed in Studio.
-3. `OIDC_REQUIRE_EMAIL_VERIFIED` defaults to `true`. IdPs that never send `email_verified` cannot
-   accept e-mail-matched invitations or bootstrap grants; the operator pre-links by `--owner-sub`.
+3. `OIDC_REQUIRE_EMAIL_VERIFIED` defaults to `true`; e-mail verification is the IdP's job and no new
+   SMTP infrastructure is added (see "E-mail verification and outgoing e-mail"). IdPs that never
+   send `email_verified` cannot accept e-mail-matched invitations or bootstrap grants unless the
+   operator turns the requirement off (with the stated risk) or pre-links by `--owner-sub`.
 4. Password reset, change of e-mail and account deletion are the IdP's job in `oidc` mode. Studio
    keeps only local user-data deletion/export.
 
