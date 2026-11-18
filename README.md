@@ -8,6 +8,7 @@ Multi-tenant, self-hostable, open source.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
 
+[grundtone.dev](https://grundtone.dev) ·
 [Grundtone design system](https://github.com/30Blackbirds/grundtone) ·
 [Contributing](./CONTRIBUTING.md) · [Security](./SECURITY.md)
 
@@ -19,6 +20,9 @@ Grundtone Studio is the management layer for [Grundtone](https://github.com/30Bl
 design systems. Organisations create projects (design-system instances), edit design tokens,
 colours, fonts and logos in a web UI, publish a version, and every consuming app picks it up through
 a small runtime SDK and an API key.
+
+A hosted version of Studio is offered separately at [grundtone.dev](https://grundtone.dev). This
+repository is the code you can run yourself.
 
 ## Features
 
