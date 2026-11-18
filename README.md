@@ -43,6 +43,7 @@ repository is the code you can run yourself.
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
 - [Self-hosting](#self-hosting)
+- [Error monitoring (Sentry, optional)](#error-monitoring-sentry-optional)
 - [Development](#development)
 - [Repository layout](#repository-layout)
 - [Contributing](#contributing)
@@ -190,6 +191,86 @@ pending database migrations before the server starts. Read [`CHANGELOG.md`](./CH
 State lives in two places: the PostgreSQL database and the S3 bucket. Back up both, for example
 `pg_dump "$DATABASE_URL" > studio.sql` and a bucket sync with your storage provider's tooling.
 Restore by loading the dump into an empty database and restoring the bucket.
+
+## Error monitoring (Sentry, optional)
+
+Studio can report errors and performance traces to [Sentry](https://sentry.io), using the
+[`@sentry/nuxt`](https://docs.sentry.io/platforms/javascript/guides/nuxt/) SDK. It is **off by
+default**: with no DSN configured the SDK is disabled on both the server and in the browser, and
+nothing is sent anywhere.
+
+It is configured **only through environment variables, at runtime**. You do not change code or
+rebuild the image:
+
+| Variable                         | When it is read                | Purpose                                                                                                                   |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `NUXT_PUBLIC_SENTRY_DSN`         | runtime (container start)      | Your project's DSN. Empty (the default) disables Sentry. Browsers receive it too, which is normal: a DSN is not a secret. |
+| `NUXT_PUBLIC_SENTRY_ENVIRONMENT` | runtime (container start)      | The `environment` tag on events, for example `production` or `staging`.                                                   |
+| `SENTRY_AUTH_TOKEN`              | build time only, never runtime | Uploads source maps while building the image. Optional, and usually not needed; see below.                                |
+
+Enable it by adding the two runtime variables to the environment you already use:
+
+```bash
+# .env.production (read by docker-compose.production.yml)
+NUXT_PUBLIC_SENTRY_DSN=https://<public-key>@<your-sentry-host>/<project-id>
+NUXT_PUBLIC_SENTRY_ENVIRONMENT=production
+```
+
+```yaml
+# or directly under the app service in a compose file
+services:
+  app:
+    environment:
+      NUXT_PUBLIC_SENTRY_DSN: https://<public-key>@<your-sentry-host>/<project-id>
+      NUXT_PUBLIC_SENTRY_ENVIRONMENT: production
+```
+
+```bash
+# or with plain docker
+docker run -e NUXT_PUBLIC_SENTRY_DSN=... -e NUXT_PUBLIC_SENTRY_ENVIRONMENT=production ... <image>
+```
+
+Restart the container after changing them. For local development, put the same two lines in
+`apps/studio/.env`.
+
+### Use your own Sentry
+
+Events go only to the DSN you configure. Nothing is sent to the maintainers of this project.
+
+1. Use [sentry.io](https://sentry.io) or your own
+   [self-hosted Sentry](https://develop.sentry.dev/self-hosted/).
+2. Create a project with the platform **Nuxt** (JavaScript).
+3. Copy the DSN from **Project Settings → Client Keys (DSN)**.
+4. Set `NUXT_PUBLIC_SENTRY_DSN` as above and restart.
+5. Check that it works: load Studio in a browser and look in the Network tab for requests to your
+   Sentry host, then look for the first events in your project. Sentry's own project setup page also
+   waits for a first event.
+
+### What is captured
+
+- **Errors**, from the browser and from the server (Nitro).
+- **Performance tracing**, sampled at 100% outside production and **10% in production** (`NODE_ENV`
+  of the official image).
+- **Session Replay and profiling are not enabled.**
+
+Events include what the SDK normally records, such as stack traces, the request URL and browser
+information. Studio's CDN URLs contain the project key (`/k/<key>/...`), so if that matters to you,
+use Sentry's data-scrubbing rules for your project.
+
+### Source maps (build time, optional)
+
+The image is built without source-map upload by default, and source maps are never shipped in the
+image: they are deleted from the build output. If you build your own image and want readable stack
+traces, you can pass an auth token as a BuildKit **secret**, not as a build argument, so it never
+lands in an image layer:
+
+```bash
+docker build --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN -t grundtone-studio:local .
+```
+
+The upload target (`org` and `project`) is set in the `sentry` block of
+[`apps/studio/nuxt.config.ts`](./apps/studio/nuxt.config.ts). Change it to your own organisation and
+project before using a token, or leave `SENTRY_AUTH_TOKEN` unset.
 
 ## Development
 
