@@ -8,6 +8,8 @@ import { auditLog, orgMember } from '../db/schema'
 import { auditRow, type AuditEventInput } from './audit'
 import { canAssignRole, canManageMember, ORG_WRITE_CREDENTIAL_HEADER } from './org-membership-input'
 import { recordOrgWriteIncomplete } from './metrics'
+import { authMode } from './oidc/config'
+import * as local from './org-membership-local'
 import { ORG_ROLES, orgRoleHelpers, type OrgRole } from './project-access'
 
 // Studio's writes of org membership. Every change of who holds which org role
@@ -476,6 +478,7 @@ export async function createOrganization(
   actorId: string,
   input: { name: string; slug: string },
 ) {
+  if (authMode() === 'oidc') return local.createOrganizationLocal(deps.db, event, input)
   return grant<{ id?: string; name?: string }>(
     deps,
     'create',
@@ -501,6 +504,7 @@ export async function acceptInvitation(
   actorId: string,
   invitationId: string,
 ) {
+  if (authMode() === 'oidc') return local.acceptInvitationLocal(deps.db, event, invitationId)
   type Answer = { member?: { userId?: string; organizationId?: string; role?: string } }
   // The org is known only from the invitation; read it first so the accept runs
   // under that org's lock like every other write on its members.
@@ -555,6 +559,8 @@ export async function changeMemberRole(
   memberId: string,
   role: OrgRole,
 ) {
+  if (authMode() === 'oidc')
+    return local.changeMemberRoleLocal(deps.db, event, orgId, memberId, role)
   return withOrgLock(deps, orgId, async (deps) => {
     const m = await memberOf(deps, orgId, memberId)
     assertMayManage(actorRole, m.role)
@@ -608,6 +614,7 @@ export async function removeMember(
   orgId: string,
   memberId: string,
 ) {
+  if (authMode() === 'oidc') return local.removeMemberLocal(deps.db, event, orgId, memberId)
   return withOrgLock(deps, orgId, async (deps) => {
     const m = await memberOf(deps, orgId, memberId)
     assertMayManage(actorRole, m.role)
@@ -636,6 +643,7 @@ export async function leaveOrganization(
   actorId: string,
   orgId: string,
 ) {
+  if (authMode() === 'oidc') return local.leaveOrganizationLocal(deps.db, event, orgId)
   // Auth fires no hook on leave, so this route is the only thing that ends a
   // leaver's org role in studio. A caller who is not a member is refused
   // before any connection or lock is taken (Sikkerhed C2: leave has no role
@@ -664,6 +672,7 @@ export async function leaveOrganization(
 }
 
 export async function deleteOrganization(deps: MembershipDeps, event: H3Event, orgId: string) {
+  if (authMode() === 'oidc') return local.deleteOrganizationLocal(deps.db, event, orgId)
   return withOrgLock(deps, orgId, async (deps) => {
     return revoke(
       deps,
@@ -693,6 +702,7 @@ export async function inviteMember(
   orgId: string,
   input: { email: string; role: OrgRole; resend?: boolean },
 ) {
+  if (authMode() === 'oidc') return local.inviteMemberLocal(deps.db, event, orgId, input)
   if (!canAssignRole(actorRole, input.role))
     forbidden('Requires a higher org role than the one given')
   return grant<{ id?: string }>(
@@ -784,6 +794,15 @@ export function orgWriteTarget(env: NodeJS.ProcessEnv = process.env): OrgWriteTa
 
 /** The production wiring: the real database, auth as the signed-in user. */
 export async function membershipDeps(event: H3Event): Promise<MembershipDeps> {
+  // In oidc mode there is no auth service to call: the operations delegate to
+  // Studio's own tables and use only `db`, so the auth-facing members stay inert.
+  if (authMode() === 'oidc') {
+    const { db } = await import('../db')
+    const none = async (): Promise<never> => {
+      throw new Error('no auth service in oidc mode')
+    }
+    return { db, auth: none, invitationOrg: none, members: none }
+  }
   const target = orgWriteTarget()
   const [{ db }, { lookupOrgById }] = await Promise.all([import('../db'), import('./org-lookup')])
   return {

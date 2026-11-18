@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { getRequestHeader } from 'h3'
+import { authMode } from './oidc/config'
 import { DEV_BYPASS_ORG, DEV_BYPASS_USER, devAuthBypassEnabled } from './dev-auth-bypass'
 
 // Organization data now lives in the central auth service (Better Auth's
@@ -56,6 +57,8 @@ async function fetchFullOrg(
     const asked = query.organizationSlug ?? query.organizationId
     return asked === stub.slug || asked === stub.id ? stub : null
   }
+
+  if (authMode() === 'oidc') return localFullOrg(event, query)
 
   const cookie = getRequestHeader(event, 'cookie')
   if (!cookie) return null
@@ -121,6 +124,8 @@ export async function listCallerOrgs(event: H3Event): Promise<OrgListItem[]> {
   const stub = bypassOrg(event)
   if (stub) return [{ id: stub.id, name: stub.name, slug: stub.slug }]
 
+  if (authMode() === 'oidc') return localOrgList(event)
+
   const cookie = getRequestHeader(event, 'cookie')
   if (!cookie) return []
   try {
@@ -135,4 +140,50 @@ export async function listCallerOrgs(event: H3Event): Promise<OrgListItem[]> {
     if (status === 401 || status === 403) return []
     throw err
   }
+}
+
+// ─── oidc mode: Studio's own tables ───────────────────────────────────────
+// Same shapes as the auth service answers with. The member id is the user id
+// (Studio has no separate member row), and, as with the auth service's
+// cookie-scoped lookup, an org the caller is not a member of is simply null.
+// No tenant announcement: there is no account service behind a standalone
+// Studio.
+
+async function localFullOrg(
+  event: H3Event,
+  query: Record<string, string>,
+): Promise<FullOrg | null> {
+  const actor = event.context.auth
+  if (!actor || actor.sub.startsWith('machine:')) return null
+  const [{ db }, orgs] = await Promise.all([import('../db'), import('./local-orgs')])
+  const { organizationSlug, organizationId } = query
+  const by = organizationSlug
+    ? { slug: organizationSlug }
+    : organizationId
+      ? { id: organizationId }
+      : null
+  if (!by) return null
+  // A malformed id names nothing; it must not reach the database as a question.
+  if (organizationId && !organizationSlug && !/^[0-9a-f-]{36}$/i.test(organizationId)) return null
+  const org = await orgs.getOrganization(db, actor.sub, by)
+  if (!org) return null
+  const members = await orgs.listMembers(db, { id: actor.sub, email: actor.email ?? null }, org.id)
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    createdAt: org.createdAt.toISOString(),
+    members: members.map((m) => ({ id: m.userId, userId: m.userId, role: m.role })),
+  }
+}
+
+async function localOrgList(event: H3Event): Promise<OrgListItem[]> {
+  const actor = event.context.auth
+  if (!actor || actor.sub.startsWith('machine:')) return []
+  const [{ db }, orgs] = await Promise.all([import('../db'), import('./local-orgs')])
+  return (await orgs.listOrganizations(db, actor.sub)).map((o) => ({
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+  }))
 }

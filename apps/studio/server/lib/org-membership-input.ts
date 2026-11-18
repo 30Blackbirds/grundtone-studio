@@ -1,6 +1,7 @@
 import { createError, getRequestHeader, type H3Event } from 'h3'
 import type { z } from 'zod'
 import type { OrgRole } from './project-access'
+import { authMode } from './oidc/config'
 
 // The role rules the members page applies (composables/useOrgRoles.ts), applied
 // again on the server. The page hides what an actor may not do; until now
@@ -15,6 +16,17 @@ export const ASSIGNABLE = ['billing', 'member', 'admin', 'manager'] as const
 export const ORG_RANK: readonly OrgRole[] = ['billing', 'member', 'admin', 'manager', 'owner']
 
 const rank = (role: OrgRole) => ORG_RANK.indexOf(role)
+
+/**
+ * The roles a request may name. In oidc mode an owner may also promote or
+ * invite an owner (the store still refuses anyone who is not one); in
+ * better-auth mode owner stays a transfer outside this route.
+ */
+export function assignableRoles(): readonly [OrgRole, ...OrgRole[]] {
+  return authMode() === 'oidc'
+    ? ['billing', 'member', 'admin', 'manager', 'owner']
+    : [...ASSIGNABLE]
+}
 
 /** An actor may give only a role below its own; an owner may give any. */
 export function canAssignRole(actor: OrgRole, target: OrgRole): boolean {
