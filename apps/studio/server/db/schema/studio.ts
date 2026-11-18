@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  boolean,
   check,
   index,
   integer,
@@ -395,4 +396,58 @@ export const tenantEventOutbox = pgTable(
       .on(t.nextAttemptAt)
       .where(sql`${t.deliveredAt} IS NULL AND ${t.parkedAt} IS NULL`),
   ],
+)
+
+// ─── Standalone OIDC login (AUTH_MODE=oidc) ───────────────────────────────
+// See docs/design/standalone-oidc.md. These tables are only written in oidc
+// mode; better-auth mode never touches them.
+
+// A person known to Studio. `id` is Studio's own key. It is deliberately NOT the
+// IdP subject: the (issuer, subject) pair lives in user_identity, so one IdP
+// subject can never be confused with another IdP's.
+export const appUser = pgTable('app_user', {
+  id: text().primaryKey(),
+  email: text(),
+  emailVerified: boolean().notNull().default(false),
+  name: text(),
+  // Set by the instance operator. A disabled user is refused at login and (once
+  // sessions exist) at every request.
+  disabledAt: timestamp({ withTimezone: true }),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp({ withTimezone: true }),
+})
+
+// (issuer, subject) -> user. Two identities are never merged because their
+// e-mail addresses match.
+export const userIdentity = pgTable(
+  'user_identity',
+  {
+    issuer: text().notNull(),
+    subject: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('user_identity_unique_idx').on(t.issuer, t.subject),
+    index('user_identity_user_idx').on(t.userId),
+  ],
+)
+
+// One row per login attempt in flight. The browser holds only the random state
+// (in a cookie); the PKCE verifier and nonce stay here, and the row is deleted
+// when the callback consumes it, so a callback URL can be used once.
+export const oidcLogin = pgTable(
+  'oidc_login',
+  {
+    // SHA-256 of the state value.
+    stateHash: text().primaryKey(),
+    codeVerifier: text().notNull(),
+    nonce: text().notNull(),
+    // Same-origin relative path to return to after login.
+    next: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index('oidc_login_expires_idx').on(t.expiresAt)],
 )
