@@ -53,14 +53,14 @@ containers → migrate → seed → dev server.
 
 `apps/studio/.env` is created from `.env.example`; its dev defaults already point at these services.
 
-### Full authenticated E2E needs two external services
+### Full authenticated E2E needs an auth service
 
-Studio delegates auth + authz to two services that are **not in this repo**: a central Auth service
-(`AUTH_ISSUER`, dev default `http://localhost:3001`) and a Permissions PDP (`PERMISSIONS_URL`, dev
-default `http://localhost:8080`), from sibling repos `30Blackbirds/auth` and
-`30Blackbirds/permissions` (wired together via `docker-compose.tilt.yml` + the `30Blackbirds/infra`
-Tiltfile). Without them, only public pages (`/login`), `/api/healthz`, and the CDN routes
-(`/k/<key>/<file>`) work; any authenticated route fails on the first request.
+Studio delegates sign-in to an external auth service that is **not in this repo** (`AUTH_ISSUER`,
+dev default `http://localhost:3001`). Authorization is decided by Studio's own database with
+`AUTHORIZER=local`, or by an external permissions service with `AUTHORIZER=pdp` (`PERMISSIONS_URL`,
+dev default `http://localhost:8080`). Without an auth service, only public pages (`/login`),
+`/api/healthz`, and the CDN routes (`/k/<key>/<file>`) work; any authenticated route fails on the
+first request.
 
 ### Hooks
 

@@ -3,7 +3,7 @@
 # `node_modules` matcher kun context-roden i Docker, så de nested host-mapper
 # leaker ind via `COPY . .` og overskriver deps-stagens korrekte pnpm-symlinks
 # → ERR_MODULE_NOT_FOUND (fx vite) ved build. CI rammer det ikke (clean checkout
-# har ingen nested node_modules); lokal Tilt-build gør.
+# har ingen nested node_modules); en lokal build gør.
 **/node_modules
 **/.nuxt
 **/.nitro
