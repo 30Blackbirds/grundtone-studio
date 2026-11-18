@@ -10,17 +10,12 @@
 # floating node:24-alpine gave v24.18.1 from a local cache and v24.21.0 after a
 # pull, so the image's Node depended on when it was built.
 #
-# Dependabot bumpede denne til 26-alpine alene (#161) og brækkede builden:
-# **Node 26 har FJERNET corepack fra de officielle images** (deprecated i 25),
-# så `corepack enable pnpm` fejler med exit 127. Verificeret direkte:
-# node:24-alpine har corepack, node:26-alpine har ikke.
-#
-# Skal vi til Node 26, er det en koordineret ændring: bump .nvmrc + engines
-# SAMTIDIG, og erstat corepack med en eksplicit pnpm-installation
-# (`RUN npm i -g pnpm@<version>` eller pnpm/action-setup-ækvivalent).
-# Et ensidigt Dockerfile-bump er ikke nok.
+# Node 26 removed corepack from the official images (deprecated in 25), so pnpm is installed
+# explicitly below instead of with `corepack enable`. The pnpm version is the `packageManager`
+# field in package.json: bump both together. Node 26 itself is a coordinated change: bump
+# .nvmrc + engines together with the FROM lines.
 FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS base
-RUN corepack enable pnpm
+RUN npm install --global pnpm@10.14.0
 
 FROM base AS deps
 WORKDIR /app
