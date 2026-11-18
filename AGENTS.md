@@ -57,10 +57,10 @@ containers → migrate → seed → dev server.
 
 Studio delegates auth + authz to two services that are **not in this repo**: a central Auth service
 (`AUTH_ISSUER`, dev default `http://localhost:3001`) and a Permissions PDP (`PERMISSIONS_URL`, dev
-default `http://localhost:8080`), from sibling repos `KlangHaus/auth` and `KlangHaus/permissions`
-(wired together via `docker-compose.tilt.yml` + the `KlangHaus/infra` Tiltfile). Without them, only
-public pages (`/login`), `/api/healthz`, and the CDN routes (`/k/<key>/<file>`) work; any
-authenticated route fails on the first request.
+default `http://localhost:8080`), from sibling repos `30Blackbirds/auth` and
+`30Blackbirds/permissions` (wired together via `docker-compose.tilt.yml` + the `30Blackbirds/infra`
+Tiltfile). Without them, only public pages (`/login`), `/api/healthz`, and the CDN routes
+(`/k/<key>/<file>`) work; any authenticated route fails on the first request.
 
 ### Hooks
 

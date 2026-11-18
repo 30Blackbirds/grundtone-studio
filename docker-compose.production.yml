@@ -4,7 +4,7 @@ services:
     # gammelt image, da kommandoen blev kørt uden `--env-file .env.production`
     # ([infra], #221, målt på image-ID i prod). `latest` publiceres ikke af
     # release-flowet, så det er ALDRIG det rigtige svar — fail-fast i stedet.
-    image: ghcr.io/klanghaus/grundtone-studio:${IMAGE_TAG:?IMAGE_TAG mangler — kør med --env-file .env.production}
+    image: ghcr.io/30blackbirds/grundtone-studio:${IMAGE_TAG:?IMAGE_TAG mangler — kør med --env-file .env.production}
     env_file: .env.production
     restart: unless-stopped
     networks: [internal]

@@ -1,4 +1,4 @@
-// KlangHaus' egne tenants — undtaget beta-værnet. Kun SERVER-SIDE.
+// 30blackbirds' egne tenants — undtaget beta-værnet. Kun SERVER-SIDE.
 //
 // 🔴 Hvorfor en env-var og ikke en hardkodet liste: jeg kunne ikke fastslå de
 // kanoniske org-UUID'er. To par cirkulerer i repoerne
@@ -33,7 +33,7 @@ function internalOrgIds(): Set<string> {
 }
 
 /**
- * True når org'et er et af KlangHaus' egne.
+ * True når org'et er et af 30blackbirds' egne.
  *
  * Org-id'et kommer fra `lookupOrgBySlug` — altså fra auth, ikke fra
  * request-bodyen. En klient kan hverken sætte listen eller vælge hvilket org

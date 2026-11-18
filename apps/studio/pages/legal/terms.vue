@@ -1,6 +1,6 @@
 <script setup lang="ts">
   // Juras abonnementsvilkaar, version studio-tos-1.0 (Allan-godkendt 2026-08-04).
-  // Kilden er docs/legal/studio-abonnementsvilkaar.md i KlangHaus/docs — denne
+  // Kilden er docs/legal/studio-abonnementsvilkaar.md i 30Blackbirds/docs — denne
   // side er KUN rendering. Aendringer i teksten skal gaa gennem juras dokument
   // foerst; i18n-noeglerne er udledt af kilden, ikke skrevet af.
   //

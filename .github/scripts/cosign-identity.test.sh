@@ -24,8 +24,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SUT="$HERE/cosign-identity.py"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-IDENT="https://github.com/KlangHaus/grundtone-studio/.github/workflows/build.yml@refs/heads/main"
-PINNED='^https://github\.com/KlangHaus/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$'
+IDENT="https://github.com/30Blackbirds/grundtone-studio/.github/workflows/build.yml@refs/heads/main"
+PINNED='^https://github\.com/30Blackbirds/grundtone-studio/\.github/workflows/build\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$'
 REV=c755c16a2d68250a62a087718bf09c4ac4ac98b3
 fails=0
 
@@ -115,7 +115,7 @@ run "kaede-gren: fejl-retning ved intermediate paa [0]" \
 # bestaar hvis BARE ÉN matcher, saa laeste vi kun den foerste, kunne vi
 # rapportere en ANDEN identitet end den gaten accepterede. Vi kraever derfor
 # at hver enkelt holder. Latent i dag — begge vores images har 1 linje.
-FREMMED=$(IDENT="https://github.com/KlangHaus/grundtone-studio/.github/workflows/release.yml@refs/heads/main" \
+FREMMED=$(IDENT="https://github.com/30Blackbirds/grundtone-studio/.github/workflows/release.yml@refs/heads/main" \
   mkcert "https://token.actions.githubusercontent.com" "$REV" "refs/heads/main")
 run "to signaturer, begge gyldige" \
     "$(printf '{"Cert":{"Raw":"%s"}}\n{"Cert":{"Raw":"%s"}}' "$OK" "$OK")" \
@@ -126,7 +126,7 @@ run "to signaturer, nr. 2 er FREMMED -> afvises" \
 run "tom bundle"               ''                                  2 "tom bundle"
 
 # identitet der ikke matcher det pinnede moenster
-BAD_ID=$(IDENT="https://github.com/KlangHaus/grundtone-studio/.github/workflows/release.yml@refs/heads/main" \
+BAD_ID=$(IDENT="https://github.com/30Blackbirds/grundtone-studio/.github/workflows/release.yml@refs/heads/main" \
   mkcert "https://token.actions.githubusercontent.com" "$REV" "refs/heads/main")
 printf '{"Cert":{"Raw":"%s"}}' "$BAD_ID" > "$TMP/b.json"
 if python3 "$SUT" "$TMP/b.json" --expect-identity "$PINNED" >/dev/null 2>&1; then

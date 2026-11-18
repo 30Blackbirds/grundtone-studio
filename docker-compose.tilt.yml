@@ -1,16 +1,16 @@
 # Tilt compose-fragment for grundtone-studio (Nuxt 3, central auth + permissions).
-# Auto-loaded af KlangHaus/infra/tilt/Tiltfile når repoet ligger som sibling
-# (~/repos/klanghaus/grundtone-studio/). Studio er customer-facing men loades
+# Auto-loaded af 30Blackbirds/infra/tilt/Tiltfile når repoet ligger som sibling
+# (~/repos/30blackbirds/grundtone-studio/). Studio er customer-facing men loades
 # her for at give workers et samlet end-til-end-test-miljø.
 #
 # Auth: studio er nu ren consumer af central [auth] (JWT/JWKS) + [permissions]-PDP.
 # Port-kanon: studio=3000, auth host=3002→container=3000, permissions=3001.
 
-name: klanghaus-local
+name: 30blackbirds-local
 
 services:
   grundtone-studio:
-    image: ghcr.io/klanghaus/grundtone-studio:local
+    image: ghcr.io/30blackbirds/grundtone-studio:local
     build:
       context: ../../grundtone-studio
       dockerfile: ../../grundtone-studio/Dockerfile

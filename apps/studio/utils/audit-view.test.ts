@@ -11,7 +11,7 @@ import {
 } from './audit-view'
 
 const row = (over: Partial<Parameters<typeof auditObject>[0]> = {}) => ({
-  actorEmail: 'lars@klanghaus.dk',
+  actorEmail: 'lars@example.com',
   targetLabel: null,
   before: null,
   after: null,

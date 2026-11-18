@@ -11,7 +11,7 @@ export const JWT_CLAIM_ORG = 'org'
 
 // 🔴 THE PIN IS THE AUTH SERVICE'S SIGNING ALGORITHM, MEASURED, NOT ASSUMED.
 // auth's jwt() plugin is configured with `keyPairConfig: { alg: 'RS256' }`
-// (KlangHaus/auth src/auth/create-auth.ts), and its JWKS serves one RSA key
+// (30Blackbirds/auth src/auth/create-auth.ts), and its JWKS serves one RSA key
 // with `alg: RS256`. Without the pin, jose accepts any algorithm the key TYPE
 // allows: an RSA key whose JWK carries no `alg` also verifies RS384, RS512 and
 // PS256-512. If auth ever rotates to another algorithm, this list must change

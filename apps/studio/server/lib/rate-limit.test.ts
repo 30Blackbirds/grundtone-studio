@@ -71,7 +71,7 @@ describe("🔴 the limiter's PREMISE, which lives in an absence", () => {
   // this cell exists to convert into a red build.
   //
   // Measured 2026-10-03: `docker-compose.production.yml` declares the app as
-  // `ghcr.io/klanghaus/grundtone-studio:${IMAGE_TAG}` with no `deploy` block
+  // `ghcr.io/30blackbirds/grundtone-studio:${IMAGE_TAG}` with no `deploy` block
   // and no `replicas`, so Compose runs exactly one. The outside probe agreed —
   // six /api/healthz calls against prod returned a monotonic uptime (432898 ->
   // 432903 s, matching the 28/9 deploy), which is CONSISTENT with one instance
@@ -90,7 +90,7 @@ describe("🔴 the limiter's PREMISE, which lives in an absence", () => {
     // Positive control: the file we think we are reading is the one that
     // deploys studio. Without this, a moved or renamed file would make the
     // assertion below pass by reading nothing relevant.
-    expect(src).toContain('ghcr.io/klanghaus/grundtone-studio')
+    expect(src).toContain('ghcr.io/30blackbirds/grundtone-studio')
     expect(src).not.toMatch(/replicas/)
     // If this turns red: the limiter is now per-instance and the effective
     // limit is N x configured. Back it onto Redis (the class header names the

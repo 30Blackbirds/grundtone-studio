@@ -7,7 +7,7 @@ your global memory; everything here is repo-wide.
 
 Private monorepo for **Grundtone Studio**, a SaaS that lets organizations configure design tokens
 via a web UI and distributes them to customer apps via runtime CDN + SDK. Architecture in
-`klanghaus/docs/grundtone-studio/`.
+`30blackbirds/docs/grundtone-studio/`.
 
 - `apps/studio/` — Nuxt 3 SaaS app (Better Auth, Drizzle, Postgres, S3-compatible storage)
 - `packages/saas-client/` — runtime SDK published as CDN bundle + privat npm
@@ -35,7 +35,7 @@ Eat-your-own-dog-food is the whole point.
   not as a hardcoded hex.
 
 If a grundtone component is missing a feature you need, the right fix is usually **upstream** in
-`KlangHaus/grundtone`, not a workaround here. See the "design system must be self-contained"
+`30Blackbirds/grundtone`, not a workaround here. See the "design system must be self-contained"
 principle.
 
 ## Conventional commits — enforced
@@ -159,7 +159,7 @@ PR**. Don't leave parallel implementations, unused helpers, or stale UI gates be
 
 ## When in doubt
 
-- Read `klanghaus/docs/grundtone-studio/roadmap.md` for what's planned.
-- Read `klanghaus/docs/grundtone-studio/architecture.md` for how it all hangs together.
+- Read `30blackbirds/docs/grundtone-studio/roadmap.md` for what's planned.
+- Read `30blackbirds/docs/grundtone-studio/architecture.md` for how it all hangs together.
 - The codebase is the source of truth. If a doc and the code disagree, the code wins and the doc
   gets updated.
