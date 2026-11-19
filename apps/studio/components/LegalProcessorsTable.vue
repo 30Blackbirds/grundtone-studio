@@ -3,9 +3,12 @@
   // privatlivspolitik.{da,en}.md, infra-verificeret). Deles mellem /privacy
   // og /sub-processors så de to flader aldrig kan drifte fra hinanden —
   // juras prod-fund 2026-08-03 var netop to modstridende lister.
-  const { t } = useI18n()
+  // The list itself is a layer registry (app.config.ts, lib/extensions.ts), so
+  // a deployment lists the processors it actually uses.
+  import { legalProcessorKeys } from '~~/lib/extensions'
 
-  const vendors = ['upcloud', 'bunny', 'stripe', 'postmark', 'sentry', 'proton'] as const
+  const { t } = useI18n()
+  const vendors = computed(() => legalProcessorKeys(useAppConfig().studio.legalProcessors))
 </script>
 
 <template>

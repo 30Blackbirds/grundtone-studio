@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { getRequestHeader } from 'h3'
 import { authMode } from './oidc/config'
 import { DEV_BYPASS_ORG, DEV_BYPASS_USER, devAuthBypassEnabled } from './dev-auth-bypass'
+import { notifyOrgServed } from './org-hooks'
 
 // Organization data now lives in the central auth service (Better Auth's
 // organization plugin). Studio resolves orgs over HTTP against the auth org API
@@ -70,7 +71,10 @@ async function fetchFullOrg(
         headers: { cookie },
       },
     )
-    if (org) announceTenant(org)
+    // Every successful lookup is cookie-scoped by auth to the caller's own
+    // memberships, so reaching this line proves a signed-in member is using
+    // the org in Studio (server/lib/org-hooks.ts).
+    if (org) notifyOrgServed(org)
     return org ?? null
   } catch (err) {
     // Better Auth returns 4xx (often surfaced as a thrown FetchError) when the
@@ -84,19 +88,6 @@ async function fetchFullOrg(
     if (/not found/i.test(msg)) return null
     throw err
   }
-}
-
-// Every successful lookup is cookie-scoped by auth to the caller's own
-// memberships, so reaching this line proves a signed-in member is using the org
-// in Studio. That is the moment Studio announces the org to account
-// (server/lib/tenant-outbox.ts explains why first use, not creation). Not
-// awaited: the request does not wait on the outbox, and the hook never throws.
-// Imported lazily so this module, which most handlers load, does not pull the
-// database client in at import time.
-function announceTenant(org: FullOrg): void {
-  import('./tenant-outbox')
-    .then(({ ensureTenantProvisioned }) => ensureTenantProvisioned(org))
-    .catch((err: unknown) => console.error('[tenant-outbox] hook failed to load:', err))
 }
 
 export async function lookupOrgBySlug(
@@ -146,8 +137,8 @@ export async function listCallerOrgs(event: H3Event): Promise<OrgListItem[]> {
 // Same shapes as the auth service answers with. The member id is the user id
 // (Studio has no separate member row), and, as with the auth service's
 // cookie-scoped lookup, an org the caller is not a member of is simply null.
-// No tenant announcement: there is no account service behind a standalone
-// Studio.
+// Does not fire the org-served hook: its one listener announces the org to the
+// hosted service's account system, which a standalone Studio does not have.
 
 async function localFullOrg(
   event: H3Event,
