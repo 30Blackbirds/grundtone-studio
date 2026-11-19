@@ -78,7 +78,6 @@ Edit `apps/studio/.env` and set:
 
 ```bash
 AUTHORIZER=local
-FEATURE_BILLING=off
 STUDIO_DEV_AUTH_BYPASS=1
 ```
 
@@ -105,19 +104,20 @@ Studio is a Nuxt 3 (Nitro) app. It stores data in **PostgreSQL** (Drizzle ORM; m
 automatically when the container starts) and files in **S3-compatible object storage**. It is
 deliberately thin on identity and access:
 
-| Concern            | How Studio does it                                                                                                                                                                                                                                                                                                                             | Self-hoster's choice                                                                                                                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication** | Studio does not store users or passwords. It reads the auth service's session cookie (`better-auth.session_token`), exchanges it at `{AUTH_ISSUER}/api/auth/token` for a short-lived JWT, and verifies that JWT against `{AUTH_ISSUER}/.well-known/jwks.json`. The browser talks to the auth service through Studio's own `/api/auth/*` proxy. | You need a separate auth service with that contract (a [Better Auth](https://better-auth.com) server with the JWT plugin). **No reference implementation is bundled in this repository yet.** |
-| **Permissions**    | Every access decision goes through one interface (`server/lib/authorizer.ts`). `AUTHORIZER=local` decides from Studio's own database (`org_member`, `project_member`, `project_machine_grant`). `AUTHORIZER=pdp` asks an external permissions service over Connect-RPC (`PERMISSIONS_URL`, `PDP_S2S_TOKEN`).                                   | Use `AUTHORIZER=local`. It needs nothing beyond PostgreSQL.                                                                                                                                   |
-| **Notifications**  | Transactional e-mail (invitations, password reset, account deletion) is sent over SMTP with nodemailer. With `SMTP_HOST` empty, e-mails are printed to the server log instead of sent.                                                                                                                                                         | Point `SMTP_*` at any SMTP relay.                                                                                                                                                             |
-| **Billing**        | `FEATURE_BILLING=on` enables checkout, the billing page and brand-count reporting to an external account service (`ACCOUNT_URL`). `off` answers 404 and sends nothing.                                                                                                                                                                         | Use `FEATURE_BILLING=off`.                                                                                                                                                                    |
-| **CDN**            | Studio serves published tokens itself under `/k/...` and `/client/...`. If `BUNNY_PURGE_API_KEY` is set it purges a Bunny.net CDN on publish; empty disables this.                                                                                                                                                                             | Leave `BUNNY_PURGE_API_KEY` empty, or put your own CDN in front and set `NUXT_PUBLIC_CDN_BASE` to it.                                                                                         |
+| Concern              | How Studio does it                                                                                                                                                                                                                                                                                                                             | Self-hoster's choice                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Authentication**   | Studio does not store users or passwords. It reads the auth service's session cookie (`better-auth.session_token`), exchanges it at `{AUTH_ISSUER}/api/auth/token` for a short-lived JWT, and verifies that JWT against `{AUTH_ISSUER}/.well-known/jwks.json`. The browser talks to the auth service through Studio's own `/api/auth/*` proxy. | You need a separate auth service with that contract (a [Better Auth](https://better-auth.com) server with the JWT plugin). **No reference implementation is bundled in this repository yet.** |
+| **Permissions**      | Every access decision goes through one interface (`server/lib/authorizer.ts`). `AUTHORIZER=local` decides from Studio's own database (`org_member`, `project_member`, `project_machine_grant`). `AUTHORIZER=pdp` asks an external permissions service over Connect-RPC (`PERMISSIONS_URL`, `PDP_S2S_TOKEN`).                                   | Use `AUTHORIZER=local`. It needs nothing beyond PostgreSQL.                                                                                                                                   |
+| **Notifications**    | Transactional e-mail (invitations, password reset, account deletion) is sent over SMTP with nodemailer. With `SMTP_HOST` empty, e-mails are printed to the server log instead of sent.                                                                                                                                                         | Point `SMTP_*` at any SMTP relay.                                                                                                                                                             |
+| **Plans and limits** | Studio has no billing. Every organisation has every feature; `STUDIO_LIMIT_BRANDS` and `STUDIO_LIMIT_PROJECTS` cap active brands and projects per organisation (unset = unlimited). A Nuxt layer can install its own entitlements provider (`server/lib/entitlements.ts`).                                                                     | Leave the limits unset, or set them to cap usage.                                                                                                                                             |
+| **CDN**              | Studio serves published tokens itself under `/k/...` and `/client/...`. If `BUNNY_PURGE_API_KEY` is set it purges a Bunny.net CDN on publish; empty disables this.                                                                                                                                                                             | Leave `BUNNY_PURGE_API_KEY` empty, or put your own CDN in front and set `NUXT_PUBLIC_CDN_BASE` to it.                                                                                         |
 
-> **Status.** `AUTHORIZER=local`, `FEATURE_BILLING=off` and SMTP make permissions, billing and
-> e-mail fully self-contained. **Sign-in is the open gap:** until an open-source auth service that
-> speaks the contract above ships alongside Studio, a production self-host has to run a compatible
-> Better Auth service itself. See [`apps/studio/.env.example`](./apps/studio/.env.example) for the
-> settings that service must enable.
+> **Status.** `AUTHORIZER=local` and SMTP make permissions and e-mail fully self-contained, and
+> there is no billing to configure. **Sign-in is the open gap:** until an open-source auth service
+> that speaks the contract above ships alongside Studio, a production self-host has to run a
+> compatible Better Auth service itself. See
+> [`apps/studio/.env.example`](./apps/studio/.env.example) for the settings that service must
+> enable.
 
 ### 1. Build the image
 
@@ -142,28 +142,28 @@ DOMAIN=studio.example.com
 Environment variables (defaults and full commentary live in
 [`apps/studio/.env.example`](./apps/studio/.env.example)):
 
-| Variable                                   | Required              | Purpose                                                                                               |
-| ------------------------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------- |
-| `IMAGE_TAG`, `DOMAIN`                      | yes                   | Read by Compose: the image tag to run and the public hostname Caddy serves.                           |
-| `DATABASE_URL`                             | yes                   | PostgreSQL connection string. Use `?sslmode=require` for managed databases.                           |
-| `AUTHORIZER`                               | yes                   | `local` or `pdp`. No default; Studio refuses to start without it.                                     |
-| `FEATURE_BILLING`                          | yes                   | `on` or `off`. No default; Studio refuses to start without it.                                        |
-| `AUTH_ISSUER`                              | yes                   | Base URL of the auth service. Also the JWT issuer and JWKS source.                                    |
-| `AUTH_AUDIENCE`                            | yes                   | JWT audience Studio accepts. By convention equal to `AUTH_ISSUER`.                                    |
-| `AUTH_INTERNAL_URL`                        | no                    | Server-side address of the auth service when `AUTH_ISSUER` is not reachable from the container.       |
-| `NUXT_PUBLIC_AUTH_URL`                     | yes                   | Browser-facing base URL for auth requests (typically Studio's own origin).                            |
-| `ORG_WRITE_SERVICE_SECRET`                 | yes                   | Shared secret (at least 32 bytes) for organisation-membership writes; same value on the auth service. |
-| `NUXT_PUBLIC_APP_URL`                      | yes                   | Studio's public URL, used in invitation links.                                                        |
-| `NUXT_PUBLIC_CDN_BASE`                     | yes (prod)            | Base URL the install snippets point at. The app refuses to start in production without it.            |
-| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`    | yes                   | S3-compatible storage for logos, fonts and published tokens.                                          |
-| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | yes                   | Credentials for that bucket.                                                                          |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    | no                    | Outgoing e-mail. Empty `SMTP_HOST` logs e-mails instead of sending them.                              |
-| `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | no                    | SMTP credentials and the sender address.                                                              |
-| `PERMISSIONS_URL`, `PDP_S2S_TOKEN`         | with `AUTHORIZER=pdp` | External permissions service and its service token.                                                   |
-| `ACCOUNT_DELETED_WEBHOOK_SECRET`           | no                    | Secret for the account-deletion webhook the auth service calls (`POST /api/account/deleted`).         |
-| `IDENTITY_EXPORT_SERVICE_SECRET`           | no                    | Secret for the GDPR data-export call to the auth service.                                             |
-| `BUNNY_PURGE_API_KEY`                      | no                    | Bunny.net CDN purge on publish. Leave empty if you do not use Bunny.                                  |
-| `NUXT_PUBLIC_SENTRY_DSN`                   | no                    | Sentry error reporting. Empty disables it.                                                            |
+| Variable                                       | Required              | Purpose                                                                                               |
+| ---------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `IMAGE_TAG`, `DOMAIN`                          | yes                   | Read by Compose: the image tag to run and the public hostname Caddy serves.                           |
+| `DATABASE_URL`                                 | yes                   | PostgreSQL connection string. Use `?sslmode=require` for managed databases.                           |
+| `AUTHORIZER`                                   | yes                   | `local` or `pdp`. No default; Studio refuses to start without it.                                     |
+| `STUDIO_LIMIT_BRANDS`, `STUDIO_LIMIT_PROJECTS` | no                    | Per-organisation caps on active brands and projects. Unset means unlimited.                           |
+| `AUTH_ISSUER`                                  | yes                   | Base URL of the auth service. Also the JWT issuer and JWKS source.                                    |
+| `AUTH_AUDIENCE`                                | yes                   | JWT audience Studio accepts. By convention equal to `AUTH_ISSUER`.                                    |
+| `AUTH_INTERNAL_URL`                            | no                    | Server-side address of the auth service when `AUTH_ISSUER` is not reachable from the container.       |
+| `NUXT_PUBLIC_AUTH_URL`                         | yes                   | Browser-facing base URL for auth requests (typically Studio's own origin).                            |
+| `ORG_WRITE_SERVICE_SECRET`                     | yes                   | Shared secret (at least 32 bytes) for organisation-membership writes; same value on the auth service. |
+| `NUXT_PUBLIC_APP_URL`                          | yes                   | Studio's public URL, used in invitation links.                                                        |
+| `NUXT_PUBLIC_CDN_BASE`                         | yes (prod)            | Base URL the install snippets point at. The app refuses to start in production without it.            |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`        | yes                   | S3-compatible storage for logos, fonts and published tokens.                                          |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`     | yes                   | Credentials for that bucket.                                                                          |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`        | no                    | Outgoing e-mail. Empty `SMTP_HOST` logs e-mails instead of sending them.                              |
+| `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`     | no                    | SMTP credentials and the sender address.                                                              |
+| `PERMISSIONS_URL`, `PDP_S2S_TOKEN`             | with `AUTHORIZER=pdp` | External permissions service and its service token.                                                   |
+| `ACCOUNT_DELETED_WEBHOOK_SECRET`               | no                    | Secret for the account-deletion webhook the auth service calls (`POST /api/account/deleted`).         |
+| `IDENTITY_EXPORT_SERVICE_SECRET`               | no                    | Secret for the GDPR data-export call to the auth service.                                             |
+| `BUNNY_PURGE_API_KEY`                          | no                    | Bunny.net CDN purge on publish. Leave empty if you do not use Bunny.                                  |
+| `NUXT_PUBLIC_SENTRY_DSN`                       | no                    | Sentry error reporting. Empty disables it.                                                            |
 
 Create the S3 bucket before the first start. Studio does not create it.
 

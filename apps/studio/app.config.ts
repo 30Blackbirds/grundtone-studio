@@ -1,19 +1,12 @@
-import type { StudioExtensions } from './lib/extensions'
+import type { OrgNavItem, StudioExtensions } from './lib/extensions'
 
 // Studio's own entries in the layer registries (lib/extensions.ts says how a
-// layer adds to them). The billing link and the payment processor are still
-// registered here until the billing code moves to its own layer.
+// layer adds to them). A self-hosted Studio has no extra org links and no
+// upgrade page; the processors are the ones every deployment of this code uses.
 export default defineAppConfig({
   studio: {
-    orgNav: [
-      {
-        id: 'billing',
-        path: 'billing',
-        labelKey: 'billing.nav',
-        gate: 'billing',
-        feature: 'billing',
-      },
-    ],
-    legalProcessors: ['upcloud', 'bunny', 'stripe', 'postmark', 'sentry', 'proton'],
+    orgNav: [] as OrgNavItem[],
+    upgradePath: '',
+    legalProcessors: ['upcloud', 'bunny', 'postmark', 'sentry', 'proton'],
   } satisfies StudioExtensions,
 })

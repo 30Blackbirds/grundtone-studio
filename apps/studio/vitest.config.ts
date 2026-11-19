@@ -8,12 +8,11 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'node',
-    // server/lib/runtime-flags.ts refuses to run without these. The suite runs
-    // with today's production choices; cells that test the other value set it
+    // server/lib/runtime-flags.ts refuses to run without it. The suite runs
+    // with today's production choice; cells that test the other value set it
     // themselves.
     env: {
       AUTHORIZER: 'pdp',
-      FEATURE_BILLING: 'on',
     },
     setupFiles: ['./tests/setup-vue.ts'],
     server: {

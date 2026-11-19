@@ -2,14 +2,13 @@ import { createError } from 'h3'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { db, type Db } from '~~/server/db'
 import { activeVersion, project } from '~~/server/db/schema'
-import { planForAccountKey } from '~~/lib/plan-catalog'
 import {
+  currentEntitlementsProvider,
   evaluateBrandQuota,
   getStudioEntitlements,
   type BrandQuotaVerdict,
   type Entitlements,
 } from '~~/server/lib/entitlements'
-import { SELF_HOST_PLAN_KEY } from '~~/server/lib/entitlements-self-host'
 import { recordQuotaDenial, recordQuotaFailOpen } from '~~/server/lib/metrics'
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -38,8 +37,8 @@ export interface BrandClaim {
  *    either writes.
  *
  * - Entitlements unavailable → fail-open (contract §4, quotas), counted.
- * - Plan not marked `hardCap` in the catalog, or unknown → allowed; overage
- *   plans are billed, not blocked.
+ * - A limit the provider does not call a hard cap → allowed; going over it is
+ *   billed, not blocked.
  */
 export async function assertBrandCapacity(
   organizationId: string,
@@ -48,14 +47,13 @@ export async function assertBrandCapacity(
   if (await isActive(db, projectId)) return null
 
   const entitlements = await getStudioEntitlements(organizationId)
-  if (entitlements === null && process.env.ACCOUNT_URL) {
+  // Only an installed provider can answer null (self-host always answers), so
+  // null here is a provider that could not answer.
+  if (entitlements === null) {
     recordQuotaFailOpen('studio.brands', 'entitlements_unavailable')
   }
 
-  // A self-host limit is a cap: there is no overage plan to bill the excess to.
-  const hardCap =
-    planForAccountKey(entitlements?.planKey)?.hardCap ??
-    entitlements?.planKey === SELF_HOST_PLAN_KEY
+  const hardCap = currentEntitlementsProvider().brandLimitIsHardCap?.(entitlements) ?? false
   const claim: BrandClaim = { organizationId, entitlements, hardCap }
   assertAllowed(claim, needsCount(claim) ? await countActiveBrands(db, organizationId) : 0)
   return claim

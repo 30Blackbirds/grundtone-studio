@@ -142,7 +142,7 @@ jobs:
           # decide whether the image BOOTS: plugins run before the server
           # answers (a throw there is a refused start), and the entrypoint runs
           # the migrations first. Without them, the PR that added the
-          # AUTHORIZER/FEATURE_BILLING boot guard skipped the smoke on all 36
+          # AUTHORIZER boot guard skipped the smoke on all 36
           # of its files, and the guard never ran in an image before merge.
           PATTERN='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|Dockerfile|\.dockerignore|turbo\.json|\.npmrc|docker/.*|\.github/workflows/build\.yml|scripts/boot-smoke\.sh|(.*/)?package\.json|packages/saas-client/.*|apps/studio/server/routes/client/.*|apps/studio/utils/sdk-contract\.ts|apps/studio/sdk-contract/.*|apps/studio/pages/docs/install\.vue|apps/studio/utils/install-snippets\.ts|apps/studio/scripts/.*|apps/studio/nuxt\.config\.ts|apps/studio/server/plugins/.*|apps/studio/server/db/migrations/.*)$'
           # 🔴 Eksplicit status frem for at lade `bash -e` afgoere det. Maalt:

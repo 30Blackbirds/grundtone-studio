@@ -2,6 +2,9 @@
   import { organization } from '~~/lib/auth-client'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
+  // Set by a layer that sells higher limits (app.config.ts); empty on self-host.
+  const upgradePath = useAppConfig().studio.upgradePath
+
   definePageMeta({ layout: 'app' })
 
   const { t, d } = useI18n()
@@ -158,7 +161,11 @@
             {{ $t('quota.meter', { used: quotaLimit, limit: quotaLimit }) }}
           </p>
           <div class="flex gap-3 items-center">
-            <GTButton size="sm" @click="navigateTo(`/plans?org=${slug}`)">
+            <GTButton
+              v-if="upgradePath"
+              size="sm"
+              @click="navigateTo(`${upgradePath}?org=${slug}`)"
+            >
               {{ $t('quota.cta') }}
             </GTButton>
             <GTButton variant="unstyled" size="sm" @click="quotaLimit = null">

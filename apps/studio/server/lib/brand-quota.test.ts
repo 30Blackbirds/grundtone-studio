@@ -69,6 +69,17 @@ vi.mock('~~/server/lib/metrics', () => ({
 }))
 
 const { assertBrandCapacity, claimBrandSlot } = await import('./brand-quota')
+const { setEntitlementsProvider } = await import('./entitlements')
+
+// Whether a plan's brand limit is a hard cap is the provider's answer. This
+// stand-in gives the answers the hosted plans have (Solo blocks, Studio
+// bills overage, an unknown plan is not blocked); the real mapping is tested
+// with the provider that owns it.
+const HARD_CAP_PLANS = new Set(['studio_solo'])
+const standIn = {
+  get: (orgId: string) => getStudioEntitlements(orgId),
+  brandLimitIsHardCap: (e: { planKey: string } | null) => HARD_CAP_PLANS.has(e?.planKey ?? ''),
+}
 
 type Entitlements = import('./entitlements').Entitlements
 const ent = (
@@ -92,8 +103,8 @@ const ROW = {
 }
 const tx = fakeQueries as unknown as Parameters<typeof claimBrandSlot>[0]
 
-const savedAccountUrl = process.env.ACCOUNT_URL
 beforeEach(() => {
+  setEntitlementsProvider(standIn)
   state.alreadyActive = false
   state.activeBrands = 0
   state.countCalls = 0
@@ -102,11 +113,9 @@ beforeEach(() => {
   getStudioEntitlements.mockReset()
   recordQuotaDenial.mockReset()
   recordQuotaFailOpen.mockReset()
-  delete process.env.ACCOUNT_URL
 })
 afterEach(() => {
-  if (savedAccountUrl === undefined) delete process.env.ACCOUNT_URL
-  else process.env.ACCOUNT_URL = savedAccountUrl
+  setEntitlementsProvider(null)
 })
 
 describe('assertBrandCapacity', () => {
@@ -128,23 +137,13 @@ describe('assertBrandCapacity', () => {
     expect(recordQuotaDenial).toHaveBeenCalledWith('studio.brands')
   })
 
-  it('enforces a self-host brand limit as a hard cap (no catalog plan, no overage to bill)', async () => {
+  it('enforces a self-host brand limit as a hard cap (no overage to bill)', async () => {
+    setEntitlementsProvider(null)
     state.activeBrands = 5
     getStudioEntitlements.mockResolvedValue(ent('self-host', 5))
     await expect(assertBrandCapacity('org-1', 'p-new')).rejects.toMatchObject({
       statusCode: 403,
       data: { code: 'brand_quota_exceeded', limit: 5, planKey: 'self-host' },
-    })
-  })
-
-  // account returns the free plan as `studio-free` (hyphen). Studio once
-  // compared that to its own `studio_free` and found no hard cap.
-  it('🔴 refuses the 3rd brand on Free when account spells it studio-free', async () => {
-    state.activeBrands = 2
-    getStudioEntitlements.mockResolvedValue(ent('studio-free', 2))
-    await expect(assertBrandCapacity('org-1', 'p-new')).rejects.toMatchObject({
-      statusCode: 403,
-      data: { code: 'brand_quota_exceeded', limit: 2, planKey: 'studio-free' },
     })
   })
 
@@ -167,7 +166,6 @@ describe('assertBrandCapacity', () => {
   })
 
   it('fails open and counts it when entitlements are unavailable', async () => {
-    process.env.ACCOUNT_URL = 'http://account.test'
     state.activeBrands = 99
     getStudioEntitlements.mockResolvedValue(null)
     await expect(assertBrandCapacity('org-1', 'p-new')).resolves.toEqual({
@@ -187,7 +185,7 @@ describe('assertBrandCapacity', () => {
     expect(recordQuotaDenial).not.toHaveBeenCalled()
   })
 
-  it('does not block a plan key the catalog does not know (declared fail-open)', async () => {
+  it('does not block a plan the provider does not call a hard cap (declared fail-open)', async () => {
     state.activeBrands = 50
     getStudioEntitlements.mockResolvedValue(ent('studio-legacy', 3))
     await expect(assertBrandCapacity('org-1', 'p-new')).resolves.toMatchObject({ hardCap: false })

@@ -161,13 +161,23 @@ and no call to account.
 
 Use Nuxt's own layering, which exists for exactly this and requires no patching of public files.
 
-1. **Overlay is a Nuxt layer in a private repo** that `extends` Studio. Nuxt merges `pages/`,
-   `components/`, `server/api/`, `server/tasks/`, `i18n` messages and `nuxt.config` from layers,
-   with the extending layer winning on conflicts. The overlay therefore adds billing routes and
-   pages without touching a public file.
-2. **Studio is consumed as a pinned release, not copied.** The overlay's `nuxt.config.ts` has
-   `extends: ['github:30Blackbirds/grundtone-studio/apps/studio#vX.Y.Z']` (or a published package
-   once one exists). Bumping the pin is a normal PR in the overlay repo.
+1. **Overlay is a Nuxt layer in a private repo.** Nuxt merges `pages/`, `components/`,
+   `server/api/`, `server/tasks/`, `server/plugins/`, `i18n` messages, `app.config` and
+   `nuxt.config` from layers. The overlay therefore adds billing routes and pages without touching a
+   public file.
+2. **Studio is consumed at a pinned commit, not copied** (measured in B5, 2026-11-19). The build
+   checks out Studio at the commit in the overlay's `STUDIO_REF` file and places the overlay at
+   `apps/studio/layers/cloud`, where Nuxt registers it as a layer automatically. Studio's own
+   lockfile, Dockerfile and boot-smoke then build the hosted image unchanged. Bumping the pin is a
+   normal PR in the overlay repo.
+   - `extends: ['github:…/apps/studio#ref']`, the form first proposed here, does **not** work:
+     Studio depends on the private workspace package `@grundtone-studio/dtcg`, which a fetch of the
+     one folder cannot resolve, and Studio's pnpm overrides would not apply to an outside install.
+   - The overlay adds no dependencies of its own; everything it imports is already a Studio
+     dependency. Studio's `.gitignore` ignores `apps/studio/layers/`.
+   - Measured on a probe layer and then on the real one: routes, Nitro plugins and tasks, cron
+     entries, pages, i18n messages and `app.config` arrays all merge. Arrays are appended after
+     Studio's own entries, so the payment processor is now listed last on the legal pages.
 3. **Extension points the public core must expose** (this is the real work and the reason for
    slicing in section 4):
    - a Nitro plugin hook or `useRuntimeConfig` key selecting the `EntitlementsProvider` (default:
@@ -177,19 +187,19 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
    - a **legal-processors registry** so the sub-processor table is data a layer can extend;
    - the brand-count-changed hook called from publish and activate (today `reportBrandCount` is
      called inline in both routes).
-4. **Repository and skeleton.** `30Blackbirds/grundtone-studio-cloud`, private, created 2026-11-18.
-   It holds only a skeleton: `package.json`, a README, and `nuxt.config.ts` whose `extends` points
-   at Studio at a pinned ref (a `main` commit after B1 to B3, until a release tag contains them). B5
-   adds `server/` for the provider, billing routes and tasks, `pages/` for billing and plans, an
-   `i18n/` layer for provider copy, and its own CI. That Studio builds as a layer from a pinned
-   GitHub ref is not verified yet; B5 checks it.
+4. **Repository.** `30Blackbirds/grundtone-studio-cloud`, private, created 2026-11-18. B5 adds
+   `server/` for the provider, billing routes, plugins and tasks, `pages/` for billing and plans,
+   `i18n/` for provider copy, `app.config.ts` for its registry entries, and a verify workflow.
 5. **Unused features cost nothing.** Without the overlay, none of the billing code exists in the
    build, so the self-host image has no dormant billing path.
 
 ### 3c. CI and releases of the overlay
 
-- The overlay repo has its own CI: install, typecheck, test, build against the pinned Studio tag. A
-  scheduled job builds against Studio `main` to catch breakage of the extension points early.
+- The overlay repo has its own CI (`verify.yml`): Studio at `STUDIO_REF`, the overlay at
+  `apps/studio/layers/cloud`, then typecheck, lint, the overlay's tests, Studio's tests with the
+  overlay present, the image build, Studio's boot-smoke with `FEATURE_BILLING=on`, and a check that
+  the image refuses an invalid `FEATURE_BILLING`. A scheduled job against Studio `main` is still to
+  come.
 - Public repo CI never sees overlay code. It runs a contract test that the extension points still
   exist (a small fixture layer that registers a fake provider, nav item and processor).
 - Releases: overlay builds its own image `FROM` the public release or consumes the pinned tag at
@@ -198,7 +208,10 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
 - Public `build.yml` contains a `deploy-staging` job for the hosted service (see the publication
   findings note). That job belongs in the overlay or the operator's infra repo, not here. Out of
   scope for this note; flagged only.
-- This note does not create the overlay repository. That needs a decision (see decision 2).
+- **Hosted deployment moves with B5.** The hosted service must run an image built from the overlay
+  before the public removal reaches the branch it deploys from (`develop` for staging), or staging
+  loses billing. Building, signing and pushing that image, and deploying it, need secrets and an
+  owner decision; the overlay's `verify.yml` builds and smokes it but pushes nothing.
 
 ## 4. Migration order, slices, and sequencing with studio-oidc-roles
 
@@ -332,5 +345,13 @@ Decided by the project owner on 2026-11-18 (relayed by the PM session):
    core gets a small first-served extension point instead (B4, after studio-oidc-roles has changed
    `org-lookup.ts`).
 
-Sequencing: slices B1 to B3 are merged (PRs 417, 421, 420). B4 onward waits for the
-studio-oidc-roles routes slice.
+Sequencing: slices B1 to B4 are merged (PRs 417, 421, 420, 428). B5 is two PRs that land together:
+the public one that drops billing and the overlay's that adds it, after the hosted deployment builds
+from the overlay (section 3c).
+
+Left public by B5, on purpose:
+
+- `server/api/lifecycle/tenant-state.post.ts` (account suspends or reactivates an org). It is not in
+  the move list in 3a, it is dormant without `LIFECYCLE_S2S_TOKEN`, and suspension is enforced by
+  public code (`org_suspension`, the `/k` grace). Whether it moves is an open question.
+- Legal and help text that names the payment processor (terms, privacy). That is B6.

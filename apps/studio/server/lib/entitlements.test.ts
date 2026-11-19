@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   evaluateProjectQuota,
   getStudioEntitlements,
-  clearEntitlementsCache,
+  setEntitlementsProvider,
   type Entitlements,
   evaluateBrandQuota,
   evaluateProvisioningFeature,
@@ -118,49 +118,6 @@ describe('evaluateBrandQuota (riff bfxmm7xktk6xkfanh5eennva)', () => {
   })
 })
 
-describe('getStudioEntitlements (client)', () => {
-  const fetchMock = vi.fn()
-
-  beforeEach(() => {
-    clearEntitlementsCache()
-    vi.stubGlobal('fetch', fetchMock)
-    fetchMock.mockReset()
-  })
-
-  afterEach(() => {
-    vi.unstubAllEnvs()
-    vi.unstubAllGlobals()
-  })
-
-  it('is dormant without ACCOUNT_URL (returns null, never fetches)', async () => {
-    vi.stubEnv('ACCOUNT_URL', '')
-    expect(await getStudioEntitlements('org-1')).toBeNull()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('fetches, validates and caches a response', async () => {
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    const body = ent()
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify(body), { status: 200, headers: { etag: 'W/"1"' } }),
-    )
-    expect(await getStudioEntitlements('org-1')).toEqual(body)
-    expect(await getStudioEntitlements('org-1')).toEqual(body)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0]![0])).toBe(
-      'https://account.test/v1/entitlements/org-1?portal=grundtone-studio',
-    )
-  })
-
-  it('returns null on network failure (fail-open) and invalid payloads', async () => {
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    fetchMock.mockRejectedValueOnce(new Error('down'))
-    expect(await getStudioEntitlements('org-2')).toBeNull()
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ nope: true }), { status: 200 }))
-    expect(await getStudioEntitlements('org-3')).toBeNull()
-  })
-})
-
 describe('🔴 evaluateProvisioningFeature — a PAID bool feature fails CLOSED (KH-964 AC-E, §4)', () => {
   const paid = (o: Partial<Entitlements> = {}) =>
     ent({ planKey: 'studio_solo', features: [PROVISIONING_FEATURE], limits: {}, ...o })
@@ -237,103 +194,40 @@ describe('🔴 evaluateProvisioningFeature — a PAID bool feature fails CLOSED 
   })
 })
 
-describe('requireProvisioningFeature — the real client, both null branches', () => {
-  const fetchMock = vi.fn()
-
-  beforeEach(() => {
-    clearEntitlementsCache()
-    vi.stubGlobal('fetch', fetchMock)
-    fetchMock.mockReset()
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-  })
-
+// requireProvisioningFeature against the provider in force. The account
+// client's own cells live with it in the billing layer; these use a stand-in
+// provider so the gate's fail-closed rule is pinned here, where it lives.
+describe('requireProvisioningFeature — the provider in force', () => {
   afterEach(() => {
-    vi.unstubAllEnvs()
-    vi.unstubAllGlobals()
+    setEntitlementsProvider(null)
     vi.restoreAllMocks()
   })
 
-  const answer = (body: Entitlements) =>
-    fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }))
+  const install = (answer: Entitlements | null) =>
+    setEntitlementsProvider({ get: () => Promise.resolve(answer) })
 
-  it('ACCEPT: resolves for an org account says has the feature', async () => {
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent({ features: [PROVISIONING_FEATURE] }))
+  // D-E2: a self-hosted Studio has every feature, with no provider installed.
+  it('the default (self-host) provider allows it', async () => {
+    await expect(requireProvisioningFeature('org-any')).resolves.toBeUndefined()
+    expect((await getStudioEntitlements('org-any'))?.features).toContain(PROVISIONING_FEATURE)
+  })
+
+  it('ACCEPT: an installed provider that grants the feature', async () => {
+    install(ent({ features: [PROVISIONING_FEATURE] }))
     await expect(requireProvisioningFeature('org-ok')).resolves.toBeUndefined()
   })
 
-  it('🔴 AC-E2: configured but unreachable → 503 entitlements_unavailable', async () => {
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    fetchMock.mockRejectedValue(new Error('down'))
+  it('🔴 AC-E2: an installed provider that cannot answer → 503, not allowed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    install(null)
     await expect(requireProvisioningFeature('org-down')).rejects.toMatchObject({
       statusCode: 503,
       data: { code: 'entitlements_unavailable' },
     })
-    expect(fetchMock).toHaveBeenCalled()
   })
 
-  it('🔴 unconfigured (no ACCOUNT_URL) is ALSO a refusal — dormant must not mean open here', async () => {
-    vi.stubEnv('ACCOUNT_URL', '')
-    await expect(requireProvisioningFeature('org-dormant')).rejects.toMatchObject({
-      statusCode: 503,
-      data: { code: 'entitlements_unavailable' },
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  // D-E2 (Allan, 2026-11-10): billing off = every org has every feature, and
-  // account is not asked. The free org is the one that matters: with billing
-  // on it is refused (the next cells), with billing off it is not.
-  it('FEATURE_BILLING=off: a free org gets the feature, and account is not asked', async () => {
-    vi.stubEnv('FEATURE_BILLING', 'off')
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent())
-    await expect(requireProvisioningFeature('org-free')).resolves.toBeUndefined()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('FEATURE_BILLING=off: also with no account configured at all (self-host)', async () => {
-    vi.stubEnv('FEATURE_BILLING', 'off')
-    vi.stubEnv('ACCOUNT_URL', '')
-    await expect(requireProvisioningFeature('org-any')).resolves.toBeUndefined()
-  })
-
-  it('FEATURE_BILLING=off: quotas read no plan, so none applies', async () => {
-    vi.stubEnv('FEATURE_BILLING', 'off')
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent({ limits: { 'studio.projects': 0 } }))
-    const entitlements = await getStudioEntitlements('org-zero')
-    expect(entitlements).toBeNull()
-    expect(evaluateProjectQuota(entitlements, 99)).toEqual({ allowed: true })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  // 🔴 Billing ON must not inherit the billing-off rule: the same free org and
-  // the same zero quota are refused as before.
-  it('FEATURE_BILLING=on: the same free org is refused 403 feature_not_enabled', async () => {
-    vi.stubEnv('FEATURE_BILLING', 'on')
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent())
-    await expect(requireProvisioningFeature('org-free-on')).rejects.toMatchObject({
-      statusCode: 403,
-      data: { code: 'feature_not_enabled' },
-    })
-  })
-
-  it('FEATURE_BILLING=on: the same zero quota refuses', async () => {
-    vi.stubEnv('FEATURE_BILLING', 'on')
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent({ limits: { 'studio.projects': 0 } }))
-    const entitlements = await getStudioEntitlements('org-zero-on')
-    expect(evaluateProjectQuota(entitlements, 0)).toMatchObject({
-      allowed: false,
-      reason: 'quota_exceeded',
-    })
-  })
-
-  it('AC-E1 end to end: a free org → 403 feature_not_enabled', async () => {
-    vi.stubEnv('ACCOUNT_URL', 'https://account.test')
-    answer(ent())
+  it('AC-E1: a plan without the feature → 403 feature_not_enabled', async () => {
+    install(ent())
     await expect(requireProvisioningFeature('org-free')).rejects.toMatchObject({
       statusCode: 403,
       data: { code: 'feature_not_enabled' },
