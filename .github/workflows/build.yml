@@ -668,6 +668,62 @@ jobs:
           fi
           echo "✓ smoken kørte det image der blev bygget ($built)"
 
+  # The extension points a private Nuxt layer builds on, checked from the
+  # outside (apps/studio/contract/README.md). In this workflow, not ci.yml,
+  # because this one runs on pull requests: a fixture layer is placed where
+  # Nuxt registers layers, Studio is built and started, and contract/check.mjs
+  # asks the running server whether each registration took effect.
+  extension-contract:
+    name: Extension contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: postgresql://grundtone:contract@127.0.0.1:5432/grundtone_studio
+      TURBO_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # layers/ is gitignored, so a clean checkout does not have it.
+      - name: Place the fixture layer
+        run: |
+          mkdir -p apps/studio/layers
+          cp -R apps/studio/contract/layer apps/studio/layers/contract
+      - name: Build Studio with the fixture layer
+        run: pnpm --filter @grundtone-studio/studio build
+      # No database: nothing the check asks for reads one. CONTRACT_FLAG is the
+      # fixture's own required switch (it uses parseRuntimeFlag).
+      - name: Start the built server
+        working-directory: apps/studio
+        env:
+          PORT: '3000'
+          HOST: 127.0.0.1
+          NODE_ENV: production
+          AUTHORIZER: local
+          CONTRACT_FLAG: 'on'
+          AUTH_ISSUER: http://127.0.0.1:9
+          AUTH_AUDIENCE: http://127.0.0.1:9
+          NUXT_PUBLIC_AUTH_URL: http://127.0.0.1:3000
+          NUXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+          NUXT_PUBLIC_CDN_BASE: http://127.0.0.1:3000
+        run: |
+          node .output/server/index.mjs > server.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/api/healthz > /dev/null && exit 0
+            sleep 1
+          done
+          echo "::error::the server did not answer /api/healthz within 60 s"
+          cat server.log
+          exit 1
+      - name: Check the extension contract
+        working-directory: apps/studio
+        run: node contract/check.mjs http://127.0.0.1:3000
+      - name: Server log
+        if: failure()
+        working-directory: apps/studio
+        run: cat server.log 2>/dev/null || echo "no server log (the server was not started)"
+
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
   # Uses GitHub Environment `staging` — keep secrets scoped to it.
