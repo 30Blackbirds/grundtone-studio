@@ -634,7 +634,7 @@
     "keyTypeHelp": "Publishable keys are read-only and safe in client code. Secret keys grant write access to the project's tokens (e.g. via the tokens CLI) — treat them like a password and never put them in client code or URLs.",
     "secretBadge": "Secret",
     "whatIsItLabel": "What is an API key?",
-    "whatIsItTooltip": "An API key (pk_live_…) is a publishable token your customer app uses to fetch this project's design tokens. It's safe to ship in client code — like Stripe's pk_live keys. Lock it to specific origins below to limit who can use it.",
+    "whatIsItTooltip": "An API key (pk_live_…) is a publishable token your customer app uses to fetch this project's design tokens. It's safe to ship in client code, like any publishable key. Lock it to specific origins below to limit who can use it.",
     "active": "Active keys",
     "revoked": "Revoked keys",
     "empty": "No API keys yet.",

@@ -122,7 +122,7 @@ opposite of what it was:
 - **Storage paths:** `p/{projectId}/v{n}/tokens.{json,css}` are immutable;
   `p/{projectId}/current.{json,css}` is overwritten each publish.
 - **CDN endpoint path:** `/k/{plaintext_key}/{file}` — plaintext key lives in URL by design (full
-  rationale in `docs/api/cdn-keys.md`; same model as Stripe `pk_live_` keys).
+  rationale in `docs/api/cdn-keys.md`: a publishable key, safe in client code).
 
 ## i18n
 

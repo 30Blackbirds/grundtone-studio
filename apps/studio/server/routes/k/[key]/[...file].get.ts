@@ -34,7 +34,7 @@ function assetContentType(file: string): string | null {
 }
 
 // Plaintext API key in the URL is intentional — see docs/api/cdn-keys.md
-// for the full rationale (Stripe pk_live model: publishable keys with no
+// for the full rationale (the publishable-key model: keys with no
 // confidentiality value, scoped read-only access, hashed at rest).
 
 // In-memory caches scoped to this process. The CDN endpoint is on the hot

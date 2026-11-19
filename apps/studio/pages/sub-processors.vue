@@ -2,7 +2,8 @@
   // Listen er [jura]s privatlivspolitik §6 / DPA Bilag C (infra-verificeret,
   // 849ca2f) — samme delte tabel-komponent som /privacy §6, så de to flader
   // aldrig drifter. GitHub er bevidst UDE (bærer ingen kundedata, jura-
-  // verificeret 2026-08-02); Stripe + Proton er MED.
+  // verificeret 2026-08-02). Rækkerne er et layer-register (app.config.ts):
+  // en deployment med betaling tilføjer selv sin betalingsformidler.
   definePageMeta({ layout: 'auth' })
   const { t } = useI18n()
 </script>
