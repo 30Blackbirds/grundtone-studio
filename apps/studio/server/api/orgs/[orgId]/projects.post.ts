@@ -108,10 +108,9 @@ export default defineEventHandler(async (event) => {
     entitlements,
     await db.$count(project, eq(project.organizationId, orgId)),
   )
-  // Metrics-spec: fail_open counts only TRUE unavailability (configured but
-  // unreachable). The unconfigured state returns the same null and would
-  // false-alarm the series, so ACCOUNT_URL is what separates them.
-  if (entitlements === null && process.env.ACCOUNT_URL) {
+  // Metrics-spec: fail_open counts only TRUE unavailability. The self-host
+  // provider always answers, so null is an installed provider that could not.
+  if (entitlements === null) {
     recordQuotaFailOpen('studio.projects', 'entitlements_unavailable')
   }
   if (!verdict.allowed) {

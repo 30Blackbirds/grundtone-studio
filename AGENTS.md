@@ -22,11 +22,11 @@ Standard commands are already documented — see root `package.json` scripts, th
   (the update script already does this; interactive login shells get Node 24 automatically because
   the nvm `default` alias is pinned to `26.13.1`).
 - pnpm `10.14.0` is provided via corepack.
-- `engines.node` is `>=26.13.1` and `engine-strict=true`, so
-  `pnpm install` fails with `ERR_PNPM_UNSUPPORTED_ENGINE` on any older Node. That includes the Node
-  **pnpm itself runs on**, which can differ from `node -v`: a volta or corepack pnpm shim pinned to
-  an older runtime fails even when `node -v` prints 26.13.1 (measured 2026-09-17: volta's pnpm ran
-  on 24.16.0). Check with `pnpm exec node -v`.
+- `engines.node` is `>=26.13.1` and `engine-strict=true`, so `pnpm install` fails with
+  `ERR_PNPM_UNSUPPORTED_ENGINE` on any older Node. That includes the Node **pnpm itself runs on**,
+  which can differ from `node -v`: a volta or corepack pnpm shim pinned to an older runtime fails
+  even when `node -v` prints 26.13.1 (measured 2026-09-17: volta's pnpm ran on 24.16.0). Check with
+  `pnpm exec node -v`.
 
 ### Vendored `@klanghaus/*` packages — no registry token
 

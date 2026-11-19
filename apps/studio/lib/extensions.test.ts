@@ -58,19 +58,15 @@ describe('legal processors registry', () => {
 describe("Studio's own registrations", () => {
   const studio = appConfig.studio
 
-  it('registers the billing link with its feature and role gate', () => {
-    expect(studio.orgNav).toEqual([billing])
+  // A self-hosted Studio must show no billing link and no upgrade button.
+  it('registers no org links and no upgrade page', () => {
+    expect(studio.orgNav).toEqual([])
+    expect(studio.upgradePath).toBe('')
   })
 
-  it('keeps the processor list the legal pages showed before the registry', () => {
-    expect(studio.legalProcessors).toEqual([
-      'upcloud',
-      'bunny',
-      'stripe',
-      'postmark',
-      'sentry',
-      'proton',
-    ])
+  // The payment processor is registered by the layer that adds payments.
+  it('lists the processors without a payment provider', () => {
+    expect(studio.legalProcessors).toEqual(['upcloud', 'bunny', 'postmark', 'sentry', 'proton'])
   })
 
   it.each([

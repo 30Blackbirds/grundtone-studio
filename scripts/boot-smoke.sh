@@ -65,13 +65,17 @@ done
 # herunder værdiløs — så vi bevæbner den mod ingenting og ville ikke vide det.
 CDN_HOST=${BOOT_SMOKE_CDN_HOST:-cdn.grundtone.com}
 
-# AUTHORIZER and FEATURE_BILLING have no default: a missing or unknown value is a
-# refusal to start (server/plugins/assert-runtime-flags.ts). The smoke sets the
-# values vitest.config.ts sets, 'pdp' and 'on'. They are TEST values: which
-# FEATURE_BILLING a deployment runs with is Allan's decision (D-E2), not this
-# script's. Every run below that is not about one of the flags gets both, so a
-# refusal can only be the one the run is testing.
-FLAGS=(-e AUTHORIZER=pdp -e FEATURE_BILLING=on)
+# AUTHORIZER has no default: a missing or unknown value is a refusal to start
+# (server/plugins/assert-runtime-flags.ts). The smoke sets the value
+# vitest.config.ts sets, 'pdp'. Every run below that is not about the flag gets
+# it, so a refusal can only be the one the run is testing.
+#
+# BOOT_SMOKE_EXTRA_ENV: env a layer's image needs on every run (an image built
+# with a Nuxt layer that has its own required switch), e.g.
+#   BOOT_SMOKE_EXTRA_ENV='-e SOME_LAYER_FLAG=on'
+# Split on whitespace; values must not contain spaces.
+read -r -a EXTRA_ENV <<<"${BOOT_SMOKE_EXTRA_ENV:-}"
+FLAGS=(-e AUTHORIZER=pdp ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"})
 
 # expect_refusal <suffix> <name the log must contain> <env args…>
 # Starts the image with the given env and passes only if it EXITS, non-zero,
@@ -129,12 +133,10 @@ expect_refusal() {
 }
 
 expect_refusal nocdn NUXT_PUBLIC_CDN_BASE "${FLAGS[@]}"
-# The two runtime flags, one missing and one unknown, each with everything else
-# set: the boot guard must fire in the IMAGE, not only in the unit cells.
+# The runtime flag missing, with everything else set: the boot guard must fire
+# in the IMAGE, not only in the unit cells.
 expect_refusal noauthz AUTHORIZER \
-  -e FEATURE_BILLING=on -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST"
-expect_refusal badbilling FEATURE_BILLING \
-  -e AUTHORIZER=pdp -e FEATURE_BILLING=maybe -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST"
+  ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} -e NUXT_PUBLIC_CDN_BASE="https://$CDN_HOST"
 
 # …and now the real run, configured the way production is: the host is SET, not
 # fallen back to. That is the shape being measured.

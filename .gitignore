@@ -16,3 +16,8 @@ coverage
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Nuxt layers placed into a Studio checkout to build a deployment that adds to
+# Studio (apps/studio/layers/<name>, auto-registered by Nuxt). They are their
+# own repositories, never part of this one.
+apps/studio/layers/

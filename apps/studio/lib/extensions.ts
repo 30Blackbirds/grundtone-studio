@@ -30,6 +30,11 @@ export interface StudioExtensions {
    * transfer}` in every locale.
    */
   legalProcessors: string[]
+  /**
+   * Where a quota alert sends someone to raise the limit (gets `?org=<slug>`).
+   * Empty: the alert shows no upgrade button, as on a self-hosted install.
+   */
+  upgradePath: string
 }
 
 export interface OrgNavContext {

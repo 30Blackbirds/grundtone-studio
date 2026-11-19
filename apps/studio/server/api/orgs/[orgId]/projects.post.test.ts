@@ -125,7 +125,6 @@ beforeEach(() => {
   projectCount = 0
   entitlements = null
   metrics.length = 0
-  delete process.env.ACCOUNT_URL
 })
 
 describe('AC-B1: creating a project', () => {
@@ -276,18 +275,17 @@ describe('🔴 AC-E: the project quota applies to the machine path too (869fbg1x
     // prohibition wins. This cell exists so nobody "hardens" it into
     // fail-closed without reopening the contract. My own instinct was
     // fail-closed; this is what overruled it.
-    process.env.ACCOUNT_URL = 'http://account.invalid'
     entitlements = null
     projectCount = 99
     await expect(call()).resolves.toMatchObject({ id: 'p-1' })
     expect(metrics).toEqual(['failopen:studio.projects:entitlements_unavailable'])
   })
 
-  it('does not raise the fail-open alarm when entitlements are simply unconfigured', async () => {
-    // Both states return null. Only "configured but unreachable" is a true
-    // unavailability; counting the dormant state would false-alarm the series
-    // every single request in any deployment without billing.
-    entitlements = null
+  it('does not raise the fail-open alarm on a deployment without billing', async () => {
+    // Only a provider that could not answer is a true unavailability. A
+    // self-hosted Studio's provider always answers (no plan, no limits), so
+    // counting it would false-alarm the series on every request there.
+    entitlements = plan({ planKey: 'self-host', limits: {} })
     projectCount = 99
     await expect(call()).resolves.toMatchObject({ id: 'p-1' })
     expect(metrics).toEqual([])

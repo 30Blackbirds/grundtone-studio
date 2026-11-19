@@ -85,14 +85,9 @@ export default defineNuxtConfig({
     // hourly, so the 90-day and 12-month deadlines hold with a one-day margin
     // (server/lib/audit-retention.ts explains the cut-offs).
     experimental: { openAPI: true, tasks: true },
-    // `outbox:deliver` every minute: tenantProvisioned to account
-    // (server/lib/tenant-outbox.ts); checkout also delivers synchronously.
-    // `billing:brand-count-reconcile` daily: re-sends every org's active-brand
-    // count to account so a report lost at publish time is still billed.
+    // A layer adds its own entries here; Nuxt merges them with these.
     scheduledTasks: {
       '17 * * * *': ['audit:retention'],
-      '* * * * *': ['outbox:deliver'],
-      '43 3 * * *': ['billing:brand-count-reconcile'],
     },
     // Jura-fund 2026-08-03 (consent-spec §1a) + CTO-ruling: /_swagger +
     // /_scalar var OFFENTLIGE i prod (loadede cdn.jsdelivr.net = consent-

@@ -1,26 +1,21 @@
 import { createError } from 'h3'
 import { z } from 'zod'
-import { billingEnabled } from './runtime-flags'
 import { selfHostProvider } from './entitlements-self-host'
 
-// Studio-side client for account's entitlements-API, per the locked contract
-// .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md (2026-07-29):
-// - quota LIMITS live in account (FeatureCatalog); the COUNT lives here
+// Where an organization's plan, features and limits come from, and the pure
+// rules that turn them into allow or refuse (the locked entitlements contract,
+// .orchestration/STUDIO-KVOTE-ENTITLEMENTS-KONTRAKT.md, 2026-07-29):
+// - quota LIMITS come from the provider; the COUNT lives here
 // - absent limits key = unlimited; 0 = hard zero
-// - quota gates fail-OPEN on entitlements unavailability (Allan's lockout-forbud;
-//   paid plans have higher/no limits so there is no revenue leakage) — which also
-//   makes this client dormant-by-design: no ACCOUNT_URL configured → null →
-//   every caller allows, current behaviour preserved until account ships the API.
+// - quota gates fail OPEN when the provider cannot answer (Allan's lockout ban);
+//   the one paid feature, provisioning, fails CLOSED (see below)
 //
-// ACCOUNT_URL/ACCOUNT_S2S_TOKEN are read from bare process.env like the other
-// service endpoints (see runtimeConfig comment in nuxt.config.ts) so the env
-// contract matches what [infra] provisions verbatim. The static token is an
-// interim transport: swaps to an [auth]-minted S2S-JWT (aud=klanghaus-account)
-// once their client-credentials mint flow lands.
+// The default provider is self-host (entitlements-self-host.ts): no plan, every
+// feature, limits only from the environment, and it always answers. A layer
+// installs another provider with setEntitlementsProvider (the hosted service
+// asks its account system).
 
-export const PORTAL_KEY = 'grundtone-studio'
-
-const entitlementsSchema = z.object({
+export const entitlementsSchema = z.object({
   planKey: z.string(),
   planState: z.enum(['active', 'grace', 'suspended', 'canceled']),
   graceUntil: z.string().nullable(),
@@ -31,56 +26,17 @@ const entitlementsSchema = z.object({
 
 export type Entitlements = z.infer<typeof entitlementsSchema>
 
-interface CacheEntry {
-  etag: string | null
-  body: Entitlements
-  fetchedAt: number
-}
-
-const TTL_MS = 60_000
-// Contract §2 (v1.1): fresh ≤60s → background refresh → serve stale up to 24h.
-const STALE_MAX_MS = 24 * 60 * 60 * 1000
-const cache = new Map<string, CacheEntry>()
-const inflight = new Map<string, Promise<Entitlements | null>>()
-
-/** Test hook — the cache is module-level state. */
-export function clearEntitlementsCache() {
-  cache.clear()
-  inflight.clear()
-}
-
-/** Contract §2: explicit refetch on checkout-success — bust one org's entry. */
-export function clearEntitlementsCacheFor(orgId: string) {
-  cache.delete(orgId)
-}
-
 /**
- * Where an org's entitlements come from. `get` answers null for "no plan /
- * unknown"; callers keep their own fail-open (quotas) and fail-closed (paid
+ * Where an org's entitlements come from. `get` answers null for 'could not
+ * answer'; callers keep their own fail-open (quotas) and fail-closed (paid
  * feature) rules. `invalidate` drops any cached answer for one org.
+ * `brandLimitIsHardCap` says whether `studio.brands` blocks at the limit or is
+ * a billed allowance that may be exceeded; absent means it may be exceeded.
  */
 export interface EntitlementsProvider {
   get(orgId: string): Promise<Entitlements | null>
   invalidate?(orgId: string): void
-}
-
-/** Account-service provider: the HTTP client above, with its cache. */
-export const accountProvider: EntitlementsProvider = {
-  async get(orgId) {
-    const baseUrl = process.env.ACCOUNT_URL
-    if (!baseUrl) return null
-
-    const cached = cache.get(orgId)
-    const age = cached ? Date.now() - cached.fetchedAt : Infinity
-    if (cached && age < TTL_MS) return cached.body
-    if (cached && age < STALE_MAX_MS) {
-      // Stale-while-revalidate: answer from cache now, refresh in the background.
-      void refresh(baseUrl, orgId, cached)
-      return cached.body
-    }
-    return await refresh(baseUrl, orgId, cached)
-  },
-  invalidate: clearEntitlementsCacheFor,
+  brandLimitIsHardCap?(entitlements: Entitlements | null): boolean
 }
 
 let override: EntitlementsProvider | null = null
@@ -90,71 +46,13 @@ export function setEntitlementsProvider(provider: EntitlementsProvider | null): 
   override = provider
 }
 
-/** The provider in force: an installed one, else self-host (billing off) or account. */
+/** The provider in force: an installed one, else self-host. */
 export function currentEntitlementsProvider(): EntitlementsProvider {
-  if (override) return override
-  return billingEnabled() ? accountProvider : selfHostProvider
+  return override ?? selfHostProvider
 }
 
 export async function getStudioEntitlements(orgId: string): Promise<Entitlements | null> {
-  // D-E2 (Allan, 2026-11-10): with billing off there is no plan, and every org
-  // has every feature. Account is not asked; limits, if any, come from the
-  // environment (STUDIO_LIMIT_*). null is what every quota gate already reads
-  // as "allowed"; the one paid feature, provisioning, answers for billing off
-  // before it gets here (requireProvisioningFeature).
   return currentEntitlementsProvider().get(orgId)
-}
-
-async function refresh(
-  baseUrl: string,
-  orgId: string,
-  cached: CacheEntry | undefined,
-): Promise<Entitlements | null> {
-  const running = inflight.get(orgId)
-  if (running) return running
-  const p = doFetch(baseUrl, orgId, cached).finally(() => inflight.delete(orgId))
-  inflight.set(orgId, p)
-  return p
-}
-
-async function doFetch(
-  baseUrl: string,
-  orgId: string,
-  cached: CacheEntry | undefined,
-): Promise<Entitlements | null> {
-  try {
-    const headers: Record<string, string> = {}
-    const token = process.env.ACCOUNT_S2S_TOKEN
-    if (token) headers.Authorization = `Bearer ${token}`
-    if (cached?.etag) headers['If-None-Match'] = cached.etag
-
-    const res = await fetch(
-      `${baseUrl}/v1/entitlements/${encodeURIComponent(orgId)}?portal=${PORTAL_KEY}`,
-      { headers, signal: AbortSignal.timeout(3_000) },
-    )
-
-    if (res.status === 304 && cached) {
-      cached.fetchedAt = Date.now()
-      return cached.body
-    }
-    if (!res.ok) throw new Error(`entitlements responded ${res.status}`)
-
-    const parsed = entitlementsSchema.safeParse(await res.json())
-    if (!parsed.success) throw new Error(`entitlements response invalid: ${parsed.error.message}`)
-
-    cache.set(orgId, {
-      etag: res.headers.get('etag'),
-      body: parsed.data,
-      fetchedAt: Date.now(),
-    })
-    return parsed.data
-  } catch (err) {
-    console.error(`[entitlements] fetch failed for org ${orgId} — quota gates fail open:`, err)
-    // Stale beats nothing within the contract's 24h window; beyond it → null
-    // (fail-open for quotas either way, per §4).
-    if (cached && Date.now() - cached.fetchedAt < STALE_MAX_MS) return cached.body
-    return null
-  }
 }
 
 export type QuotaVerdict =
@@ -217,10 +115,9 @@ export type BrandQuotaVerdict =
  * with an active version, so this is evaluated only when a project is about to
  * get its FIRST active version.
  *
- * The limit comes from account (`studio.brands`), but only plans whose catalog
- * entry is a hard cap are blocked at the limit: plans with overage (Studio,
- * Scale) may exceed it and are billed per extra brand (tier doc, Allan-locked
- * 2026-08-02). `hardCap` is therefore an input, not derived here.
+ * The limit is `studio.brands`, but it only blocks when the provider says it is
+ * a hard cap (`brandLimitIsHardCap`): a plan may instead allow going over it and
+ * bill per extra brand. `hardCap` is therefore an input, not derived here.
  */
 export function evaluateBrandQuota(
   entitlements: Entitlements | null,
@@ -258,10 +155,9 @@ export type FeatureVerdict =
  * Three refusals, each with its own code so a caller can tell them apart
  * (AC-E2 requires unavailable to be distinguishable from not-enabled):
  *
- *   - `entitlements_unavailable` (503): no answer from account. That includes
- *     an UNCONFIGURED client (no ACCOUNT_URL) — `getStudioEntitlements` returns
- *     null for both, and for a paid feature both mean "we do not know", which
- *     is not "yes". A stale answer inside the 24 h window is an answer.
+ *   - `entitlements_unavailable` (503): the provider gave no answer, whether it
+ *     is unreachable or unconfigured. For a paid feature both mean "we do not
+ *     know", which is not "yes". The self-host provider never answers null.
  *   - `suspended` (403): suspended, an expired grace, or `canceled` (§4: a
  *     portal without a default plan is treated as suspended for paid features).
  *     Checked before the feature, so a suspended org on a paid plan hears
@@ -289,9 +185,8 @@ const FEATURE_MESSAGES: Record<Exclude<FeatureVerdict, { allowed: true }>['code'
 
 /** Throws the verdict as an H3 error; returns when the org may use provisioning. */
 export async function requireProvisioningFeature(orgId: string): Promise<void> {
-  // D-E2: billing off means every org has every feature, so this paid feature
-  // is allowed without asking account. Billing on is unchanged below.
-  if (!billingEnabled()) return
+  // No early return for self-host: its provider always answers and carries
+  // every feature (D-E2, entitlements-self-host.ts), so it passes the same gate.
   const verdict = evaluateProvisioningFeature(await getStudioEntitlements(orgId))
   if (verdict.allowed) return
   if (verdict.code === 'entitlements_unavailable') {
