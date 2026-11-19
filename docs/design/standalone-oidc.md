@@ -1,9 +1,9 @@
 # Design note: standalone Studio with generic OIDC login and in-product roles
 
 Status: accepted, largely built. Login, sessions, Studio-owned organisations and invitations, the
-first-owner command, owner transfer and the isolation tests are on `main`. Where the build differs
-from the proposal, the section says so under **As built**. The optional claim mapping is not on
-`main` yet, and there is no operator command to disable a user yet.
+first-owner command, owner transfer, the optional claim mapping and the isolation tests are on
+`main`. Where the build differs from the proposal, the section says so under **As built**. There is
+no operator command to disable a user yet.
 
 ## Goal
 
@@ -309,8 +309,26 @@ Configured with `OIDC_ROLE_CLAIM` (e.g. `groups`) and an explicit map `OIDC_ROLE
    source.
 5. A disabled user gets nothing from claims.
 
-**Status:** under review, not on `main`. The proposed variables and storage above will be updated
-here when it lands.
+**As built** (`server/lib/oidc/claim-roles.ts`; tests: `server/lib/oidc/claim-roles.pg.test.ts`):
+
+- Configuration: `OIDC_ROLE_CLAIM=groups` and `OIDC_ROLE_MAP=studio-admins=acme:admin,…`, a
+  comma-separated list of `value=org-slug:role`, not JSON. Both or neither must be set, or Studio
+  refuses to start. Roles are `billing`, `member`, `admin` or `manager`; `owner` is refused.
+- Storage: `org_member` is unchanged. A row the claim created is marked in a separate table,
+  `org_member_claim`, instead of a `source` column. Only marked rows are changed or withdrawn by the
+  claim.
+- At every login the claim is read again. A value grants its role where the person has no row; a
+  marked row is raised or lowered to the highest role any value names for that organisation, and
+  withdrawn when no value names it any more. An owner row is never touched. A slug that names no
+  organisation is skipped. Changes are audited with the actor `idp-claim`.
+- Any change made in Studio removes the mark: a role change, removal, leaving, or an accepted
+  invitation. The row is then Studio's and the claim no longer affects it.
+- **Removal does not outlast the claim.** Someone removed from an organisation in Studio who still
+  carries the claim value gets the role back at their next login, because the removal also removed
+  the row the claim checks for. To keep them out, take the value away at the IdP, or remove the
+  mapping entry.
+- **Between logins a grant stands.** Taking the value away at the IdP withdraws the role only at the
+  person's next login. To cut access at once, disable the user in Studio (see "Disabled users").
 
 ### Disabled users
 
