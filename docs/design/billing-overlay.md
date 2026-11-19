@@ -356,4 +356,7 @@ Left public by B5, on purpose:
 - `server/api/lifecycle/tenant-state.post.ts` (account suspends or reactivates an org). It is not in
   the move list in 3a, it is dormant without `LIFECYCLE_S2S_TOKEN`, and suspension is enforced by
   public code (`org_suspension`, the `/k` grace). Whether it moves is an open question.
-- Legal and help text that names the payment processor (terms, privacy). That is B6.
+- Legal text that names the payment processor: privacy `s23data` and `s5p`, terms `s5p3`. B6
+  (2026-11-19) neutralised the rest of the public copy and comments but left these three on the
+  owner's decision: legal is parked, and changing them is legal work. They are taken up when legal
+  is, either reworded in the public tree or overridden by the overlay's locale files.

@@ -5,7 +5,7 @@
 // file lean.
 
 // ─── API key environment ─────────────────────────────────────────────────
-// Mirrors Stripe's pk_live_ / pk_test_ convention. Live keys belong on
+// The common publishable-key convention, pk_live_ / pk_test_. Live keys belong on
 // production frontends; test keys are intended for dev / staging surfaces
 // that need a working CDN flow without burning real customer quotas.
 //
