@@ -26,7 +26,11 @@ repository is the code you can run yourself.
 
 ## Features
 
-- **Projects per organisation**, with roles (viewer, editor, admin) and invitations.
+- **Sign in with any OpenID Connect provider** (Keycloak, Authentik, Zitadel, Entra ID, Google, …)
+  or connect a central [Better Auth](https://better-auth.com) service instead.
+- **Roles owned by Studio**: organisation roles (owner, manager, admin, member, billing) and project
+  roles (admin, editor, viewer) are stored and assigned in Studio, with invitations. The identity
+  provider proves who someone is; it decides nothing about access unless you opt in.
 - **Token editor** for colours, typography, spacing and logos, with draft, publish and activate.
 - **CDN-style delivery**: published tokens are served at `/k/<key>/tokens.json` and
   `/k/<key>/tokens.css`, and the runtime SDK at `/client/v1.js`. Put any CDN in front.
@@ -43,6 +47,8 @@ repository is the code you can run yourself.
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
 - [Self-hosting](#self-hosting)
+- [Authentication](#authentication)
+- [Permissions](#permissions)
 - [Error monitoring (Sentry, optional)](#error-monitoring-sentry-optional)
 - [Development](#development)
 - [Repository layout](#repository-layout)
@@ -105,19 +111,16 @@ Studio is a Nuxt 3 (Nitro) app. It stores data in **PostgreSQL** (Drizzle ORM; m
 automatically when the container starts) and files in **S3-compatible object storage**. It is
 deliberately thin on identity and access:
 
-| Concern            | How Studio does it                                                                                                                                                                                                                                                                                                                             | Self-hoster's choice                                                                                                                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication** | Studio does not store users or passwords. It reads the auth service's session cookie (`better-auth.session_token`), exchanges it at `{AUTH_ISSUER}/api/auth/token` for a short-lived JWT, and verifies that JWT against `{AUTH_ISSUER}/.well-known/jwks.json`. The browser talks to the auth service through Studio's own `/api/auth/*` proxy. | You need a separate auth service with that contract (a [Better Auth](https://better-auth.com) server with the JWT plugin). **No reference implementation is bundled in this repository yet.** |
-| **Permissions**    | Every access decision goes through one interface (`server/lib/authorizer.ts`). `AUTHORIZER=local` decides from Studio's own database (`org_member`, `project_member`, `project_machine_grant`). `AUTHORIZER=pdp` asks an external permissions service over Connect-RPC (`PERMISSIONS_URL`, `PDP_S2S_TOKEN`).                                   | Use `AUTHORIZER=local`. It needs nothing beyond PostgreSQL.                                                                                                                                   |
-| **Notifications**  | Transactional e-mail (invitations, password reset, account deletion) is sent over SMTP with nodemailer. With `SMTP_HOST` empty, e-mails are printed to the server log instead of sent.                                                                                                                                                         | Point `SMTP_*` at any SMTP relay.                                                                                                                                                             |
-| **Billing**        | `FEATURE_BILLING=on` enables checkout, the billing page and brand-count reporting to an external account service (`ACCOUNT_URL`). `off` answers 404 and sends nothing.                                                                                                                                                                         | Use `FEATURE_BILLING=off`.                                                                                                                                                                    |
-| **CDN**            | Studio serves published tokens itself under `/k/...` and `/client/...`. If `BUNNY_PURGE_API_KEY` is set it purges a Bunny.net CDN on publish; empty disables this.                                                                                                                                                                             | Leave `BUNNY_PURGE_API_KEY` empty, or put your own CDN in front and set `NUXT_PUBLIC_CDN_BASE` to it.                                                                                         |
+| Concern            | How Studio does it                                                                                                                                                                                                                                                                                                                                       | Self-hoster's choice                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Authentication** | Two modes, chosen with `AUTH_MODE`. `oidc`: Studio signs people in with any OpenID Connect provider and keeps its own users, sessions and organisations. `better-auth` (the default): a separate Better Auth service owns users and organisations, and Studio verifies its tokens. Studio never stores passwords. See [Authentication](#authentication). | Use `AUTH_MODE=oidc` with the identity provider you already run.                                      |
+| **Permissions**    | Every access decision goes through one interface (`server/lib/authorizer.ts`). `AUTHORIZER=local` decides from Studio's own database (`org_member`, `project_member`, `project_machine_grant`). `AUTHORIZER=pdp` asks an external permissions service over Connect-RPC (`PERMISSIONS_URL`, `PDP_S2S_TOKEN`). See [Permissions](#permissions).            | Use `AUTHORIZER=local`. It needs nothing beyond PostgreSQL, and `AUTH_MODE=oidc` requires it.         |
+| **Notifications**  | Studio sends one kind of e-mail: invitations to organisations and projects, over SMTP with nodemailer. With `SMTP_HOST` empty, they are printed to the server log instead of sent. Signing in never needs e-mail from Studio; account e-mails (verification, password reset) are the identity provider's or auth service's job.                          | Point `SMTP_*` at any SMTP relay, or leave it empty and copy invitation links from the log.           |
+| **Billing**        | `FEATURE_BILLING=on` enables checkout, the billing page and brand-count reporting to an external account service (`ACCOUNT_URL`). `off` answers 404 and sends nothing.                                                                                                                                                                                   | Use `FEATURE_BILLING=off`.                                                                            |
+| **CDN**            | Studio serves published tokens itself under `/k/...` and `/client/...`. If `BUNNY_PURGE_API_KEY` is set it purges a Bunny.net CDN on publish; empty disables this.                                                                                                                                                                                       | Leave `BUNNY_PURGE_API_KEY` empty, or put your own CDN in front and set `NUXT_PUBLIC_CDN_BASE` to it. |
 
-> **Status.** `AUTHORIZER=local`, `FEATURE_BILLING=off` and SMTP make permissions, billing and
-> e-mail fully self-contained. **Sign-in is the open gap:** until an open-source auth service that
-> speaks the contract above ships alongside Studio, a production self-host has to run a compatible
-> Better Auth service itself. See [`apps/studio/.env.example`](./apps/studio/.env.example) for the
-> settings that service must enable.
+> **Fully self-contained:** `AUTH_MODE=oidc`, `AUTHORIZER=local` and `FEATURE_BILLING=off` need
+> nothing beyond PostgreSQL, S3-compatible storage and an OpenID Connect provider. SMTP is optional.
 
 ### 1. Build the image
 
@@ -142,28 +145,31 @@ DOMAIN=studio.example.com
 Environment variables (defaults and full commentary live in
 [`apps/studio/.env.example`](./apps/studio/.env.example)):
 
-| Variable                                   | Required              | Purpose                                                                                               |
-| ------------------------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------- |
-| `IMAGE_TAG`, `DOMAIN`                      | yes                   | Read by Compose: the image tag to run and the public hostname Caddy serves.                           |
-| `DATABASE_URL`                             | yes                   | PostgreSQL connection string. Use `?sslmode=require` for managed databases.                           |
-| `AUTHORIZER`                               | yes                   | `local` or `pdp`. No default; Studio refuses to start without it.                                     |
-| `FEATURE_BILLING`                          | yes                   | `on` or `off`. No default; Studio refuses to start without it.                                        |
-| `AUTH_ISSUER`                              | yes                   | Base URL of the auth service. Also the JWT issuer and JWKS source.                                    |
-| `AUTH_AUDIENCE`                            | yes                   | JWT audience Studio accepts. By convention equal to `AUTH_ISSUER`.                                    |
-| `AUTH_INTERNAL_URL`                        | no                    | Server-side address of the auth service when `AUTH_ISSUER` is not reachable from the container.       |
-| `NUXT_PUBLIC_AUTH_URL`                     | yes                   | Browser-facing base URL for auth requests (typically Studio's own origin).                            |
-| `ORG_WRITE_SERVICE_SECRET`                 | yes                   | Shared secret (at least 32 bytes) for organisation-membership writes; same value on the auth service. |
-| `NUXT_PUBLIC_APP_URL`                      | yes                   | Studio's public URL, used in invitation links.                                                        |
-| `NUXT_PUBLIC_CDN_BASE`                     | yes (prod)            | Base URL the install snippets point at. The app refuses to start in production without it.            |
-| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`    | yes                   | S3-compatible storage for logos, fonts and published tokens.                                          |
-| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | yes                   | Credentials for that bucket.                                                                          |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    | no                    | Outgoing e-mail. Empty `SMTP_HOST` logs e-mails instead of sending them.                              |
-| `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | no                    | SMTP credentials and the sender address.                                                              |
-| `PERMISSIONS_URL`, `PDP_S2S_TOKEN`         | with `AUTHORIZER=pdp` | External permissions service and its service token.                                                   |
-| `ACCOUNT_DELETED_WEBHOOK_SECRET`           | no                    | Secret for the account-deletion webhook the auth service calls (`POST /api/account/deleted`).         |
-| `IDENTITY_EXPORT_SERVICE_SECRET`           | no                    | Secret for the GDPR data-export call to the auth service.                                             |
-| `BUNNY_PURGE_API_KEY`                      | no                    | Bunny.net CDN purge on publish. Leave empty if you do not use Bunny.                                  |
-| `NUXT_PUBLIC_SENTRY_DSN`                   | no                    | Sentry error reporting. Empty disables it.                                                            |
+| Variable                                   | Required              | Purpose                                                                                                  |
+| ------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `IMAGE_TAG`, `DOMAIN`                      | yes                   | Read by Compose: the image tag to run and the public hostname Caddy serves.                              |
+| `DATABASE_URL`                             | yes                   | PostgreSQL connection string. Use `?sslmode=require` for managed databases.                              |
+| `AUTHORIZER`                               | yes                   | `local` or `pdp`. No default; Studio refuses to start without it.                                        |
+| `FEATURE_BILLING`                          | yes                   | `on` or `off`. No default; Studio refuses to start without it.                                           |
+| `AUTH_MODE`                                | no                    | `oidc` or `better-auth` (default). See [Authentication](#authentication).                                |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`            | with `oidc`           | Your identity provider and the client registered there.                                                  |
+| `OIDC_CLIENT_SECRET`, other `OIDC_*`       | no                    | Client secret (omit for a public client) and the options listed under [Authentication](#authentication). |
+| `AUTH_ISSUER`                              | with `better-auth`    | Base URL of the auth service. Also the JWT issuer and JWKS source.                                       |
+| `AUTH_AUDIENCE`                            | with `better-auth`    | JWT audience Studio accepts. By convention equal to `AUTH_ISSUER`.                                       |
+| `AUTH_INTERNAL_URL`                        | no                    | Server-side address of the auth service when `AUTH_ISSUER` is not reachable from the container.          |
+| `NUXT_PUBLIC_AUTH_URL`                     | with `better-auth`    | Browser-facing base URL for auth requests (typically Studio's own origin).                               |
+| `ORG_WRITE_SERVICE_SECRET`                 | with `better-auth`    | Shared secret (at least 32 bytes) for organisation-membership writes; same value on the auth service.    |
+| `NUXT_PUBLIC_APP_URL`                      | yes                   | Studio's public URL, used in invitation links and, in `oidc` mode, for the callback URL.                 |
+| `NUXT_PUBLIC_CDN_BASE`                     | yes (prod)            | Base URL the install snippets point at. The app refuses to start in production without it.               |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`    | yes                   | S3-compatible storage for logos, fonts and published tokens.                                             |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | yes                   | Credentials for that bucket.                                                                             |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    | no                    | Outgoing e-mail. Empty `SMTP_HOST` logs e-mails instead of sending them.                                 |
+| `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | no                    | SMTP credentials and the sender address.                                                                 |
+| `PERMISSIONS_URL`, `PDP_S2S_TOKEN`         | with `AUTHORIZER=pdp` | External permissions service and its service token.                                                      |
+| `ACCOUNT_DELETED_WEBHOOK_SECRET`           | no                    | `better-auth` mode: secret for the account-deletion webhook the auth service calls.                      |
+| `IDENTITY_EXPORT_SERVICE_SECRET`           | no                    | `better-auth` mode: secret for the GDPR data-export call to the auth service.                            |
+| `BUNNY_PURGE_API_KEY`                      | no                    | Bunny.net CDN purge on publish. Leave empty if you do not use Bunny.                                     |
+| `NUXT_PUBLIC_SENTRY_DSN`                   | no                    | Sentry error reporting. Empty disables it.                                                               |
 
 Create the S3 bucket before the first start. Studio does not create it.
 
@@ -191,6 +197,165 @@ pending database migrations before the server starts. Read [`CHANGELOG.md`](./CH
 State lives in two places: the PostgreSQL database and the S3 bucket. Back up both, for example
 `pg_dump "$DATABASE_URL" > studio.sql` and a bucket sync with your storage provider's tooling.
 Restore by loading the dump into an empty database and restoring the bucket.
+
+## Authentication
+
+`AUTH_MODE` picks where people sign in. In `oidc` mode Studio checks its settings at startup and
+refuses to start when one is missing or invalid.
+
+### Standalone: any OpenID Connect provider (`AUTH_MODE=oidc`)
+
+Studio signs people in with the authorization code flow and PKCE, and keeps its own users, sessions,
+organisations and roles in PostgreSQL. The identity provider (IdP) only proves who someone is.
+
+1. **Register a client at your IdP.** Redirect URI: `https://studio.example.com/api/oidc/callback`.
+   Post-logout redirect URI: `https://studio.example.com/`. Scopes: `openid email profile`. A
+   confidential client (with a secret) and a public client (PKCE only) both work.
+2. **Configure Studio** in `.env.production`:
+
+   ```bash
+   AUTH_MODE=oidc
+   AUTHORIZER=local
+   NUXT_PUBLIC_APP_URL=https://studio.example.com
+   OIDC_ISSUER=https://idp.example.com/realms/main
+   OIDC_CLIENT_ID=grundtone-studio
+   OIDC_CLIENT_SECRET=...
+   ```
+
+   `OIDC_ISSUER` must be exactly the `issuer` your IdP publishes at
+   `{OIDC_ISSUER}/.well-known/openid-configuration`, and must be `https` (plain `http` is accepted
+   for `localhost` only).
+
+3. **Sign in once.** The first sign-in creates a Studio user with **no access**: nobody gets a role
+   by signing in, and there is no "first user becomes admin" window.
+4. **Make the first owner** with the operator command, which needs database access and nothing else:
+
+   ```bash
+   docker compose -f docker-compose.production.yml --env-file .env.production exec app \
+     node --import tsx server/db/bootstrap-owner.ts --sub <subject> --org acme --name "Acme"
+   ```
+
+   `<subject>` is the person's `sub` at the IdP (shown in most IdPs' user details, or afterwards by
+   `select issuer, subject from user_identity;`). `--name` creates the organisation when it does not
+   exist. The person does not have to have signed in yet. The command is idempotent and is also the
+   way back in when every owner is gone. `--email <address>` instead of `--sub` works too: an
+   existing user with that address becomes owner, otherwise a one-use invitation link is printed.
+   Prefer `--sub`, because it does not depend on who controls an e-mail address.
+
+5. **Invite everyone else** from the organisation's member page. The owner assigns roles in Studio.
+
+| Variable                           | Default                                   | Notes                                                                                                 |
+| ---------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `OIDC_ISSUER`                      | required                                  | Issuer URL, compared exactly.                                                                         |
+| `OIDC_CLIENT_ID`                   | required                                  |                                                                                                       |
+| `OIDC_CLIENT_SECRET`               | none                                      | Omit for a public client.                                                                             |
+| `OIDC_SCOPES`                      | `openid email profile`                    |                                                                                                       |
+| `OIDC_REDIRECT_URI`                | `{NUXT_PUBLIC_APP_URL}/api/oidc/callback` | Must be registered at the IdP. The route stays `/api/oidc/callback`.                                  |
+| `OIDC_ID_TOKEN_ALG`                | `RS256`                                   | The one ID-token signing algorithm accepted.                                                          |
+| `OIDC_REQUIRE_EMAIL_VERIFIED`      | `true`                                    | See below before changing it.                                                                         |
+| `OIDC_ALLOWED_EMAIL_DOMAINS`       | none                                      | Comma-separated allowlist; empty means no restriction.                                                |
+| `OIDC_JIT`                         | `on`                                      | `off`: only users created beforehand (for example with `bootstrap-owner --sub`) may sign in.          |
+| `OIDC_SESSION_IDLE_HOURS`          | `8`                                       | A session ends after this long without a request.                                                     |
+| `OIDC_SESSION_MAX_DAYS`            | `7`                                       | A session ends after this long, however active.                                                       |
+| `ORG_CREATION`                     | `operator`                                | `operator`: organisations come from the command above only. `users`: anyone signed in may create one. |
+| `OIDC_ROLE_CLAIM`, `OIDC_ROLE_MAP` | none                                      | Optional roles from the IdP; see below.                                                               |
+
+**E-mail verification.** Studio sends no verification e-mail; it trusts the IdP's `email_verified`
+claim. Studio uses an address for two things: matching an invitation to the person accepting it, and
+`OIDC_ALLOWED_EMAIL_DOMAINS`. With `OIDC_REQUIRE_EMAIL_VERIFIED=true`, an unverified address never
+matches an invitation. Setting it to `false` means that **anyone who can register an address at your
+IdP can accept a pending invitation sent to that address.** Do that only with an IdP whose sign-up
+is closed or controlled. Studio never links two sign-ins because their e-mail addresses match: a
+person is identified by issuer and subject.
+
+**Signing out.** The sign-out in Studio's menu ends Studio's session only. Your IdP's own session
+stays, so the IdP may sign the person straight back in. Studio's logout route,
+`POST /api/oidc/logout`, also sends the browser to the IdP's end-session endpoint when the IdP
+publishes one, but the menu does not use it yet.
+
+**Removing access at once.** Removing someone from an organisation takes effect on their next
+request. To lock a person out of Studio entirely, disable the user: sessions are checked against
+`app_user.disabled_at` on every request. There is no operator command for this yet; until there is,
+do it in the database, and delete the user's sessions in the same go:
+
+```sql
+update app_user set disabled_at = now() where id = '<user id>';
+delete from app_session where user_id = '<user id>';
+```
+
+That direct update skips one safeguard, so first make sure the user is not the last owner of an
+organisation. To enable them again, clear `disabled_at`; they then sign in anew.
+
+**Roles from the IdP (optional, off by default).** Set both `OIDC_ROLE_CLAIM` (for example `groups`)
+and `OIDC_ROLE_MAP`, a comma-separated list of `value=org-slug:role`:
+
+```bash
+OIDC_ROLE_CLAIM=groups
+OIDC_ROLE_MAP=studio-admins=acme:admin,acme-billing=acme:billing
+```
+
+At every sign-in, each value the person carries grants its role in that organisation where they have
+no role yet, and roles granted this way follow the claim: raised, lowered, or withdrawn when the
+value is gone. The limits:
+
+- `owner` can never be mapped; Studio refuses to start if the map names it.
+- **A role assigned in Studio wins.** Any change in Studio (role change, removal, leaving, accepting
+  an invitation) takes the membership out of the claim's hands for good.
+- **A removal does not outlast the claim.** Someone removed in Studio who still carries the value
+  gets the role back at their next sign-in. Take the value away at the IdP or remove the map entry.
+- **Between sign-ins a granted role stands.** Taking a value away at the IdP withdraws the role at
+  the next sign-in, not before. To cut access at once, disable the user (above).
+
+### Central auth service (`AUTH_MODE=better-auth`, the default)
+
+Studio can instead use a separate [Better Auth](https://better-auth.com) service with the JWT and
+organization plugins, for example one shared by several products. Studio then stores no users: it
+reads the service's session cookie (`better-auth.session_token`), exchanges it at
+`{AUTH_ISSUER}/api/auth/token` for a short-lived JWT, and verifies that JWT against
+`{AUTH_ISSUER}/.well-known/jwks.json`. The browser reaches the service through Studio's own
+`/api/auth/*` proxy. Organisations, members and invitations live in the auth service; Studio mirrors
+each organisation role into `org_member` for its access checks, writing through the service with
+`ORG_WRITE_SERVICE_SECRET`.
+
+Set `AUTH_ISSUER`, `AUTH_AUDIENCE`, `NUXT_PUBLIC_AUTH_URL` and `ORG_WRITE_SERVICE_SECRET` (and
+`AUTH_INTERNAL_URL` when the issuer URL is not reachable from the container).
+[`apps/studio/.env.example`](./apps/studio/.env.example) lists what the service must enable. No
+reference auth service ships in this repository. Owners cannot be assigned inside Studio in this
+mode.
+
+## Permissions
+
+Roles live in Studio's database and are assigned in Studio. With `AUTHORIZER=local` every decision
+is read from them on each request, so a change applies to the next one.
+
+**Organisation roles**, from lowest to highest:
+
+| Role      | May                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------- |
+| `billing` | Manage billing. **No access to projects.**                                                                |
+| `member`  | View every project in the organisation.                                                                   |
+| `admin`   | Create projects, and view every project.                                                                  |
+| `manager` | Manage members and invitations, create projects, and administer every project.                            |
+| `owner`   | Everything, including changing other owners and handing ownership over. An organisation can have several. |
+
+- You can assign or change only roles below your own. Only an owner can make or change an owner, and
+  only in `oidc` mode.
+- **Owner transfer** (`oidc` mode): an owner can make another member owner and step down in one
+  action, from the member's page (`POST /api/orgs/:orgId/ownership-transfer`).
+- **Last owner**: demoting, removing or leaving as the last owner is refused. A disabled owner does
+  not count as an owner.
+- **Isolation**: a role in one organisation never answers a question about another. To someone who
+  is not a member, an organisation looks as if it does not exist.
+
+**Project roles**: `viewer` < `editor` (edit tokens, publish, activate) < `admin` (API keys and
+members). A person's role on a project is the highest of their direct project role and what their
+organisation role gives: owner and manager give `admin`, admin and member give `viewer`, billing
+gives nothing.
+
+**Machine keys** (`sk_…`) belong to one project and are at most `editor`. They never hold an
+organisation role and cannot raise their own rights.
+
+Unknown role values grant nothing, and a database error is answered with 503, never with access.
 
 ## Error monitoring (Sentry, optional)
 
