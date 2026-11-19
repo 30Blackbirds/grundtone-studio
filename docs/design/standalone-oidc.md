@@ -2,8 +2,7 @@
 
 Status: accepted, largely built. Login, sessions, Studio-owned organisations and invitations, the
 first-owner command, owner transfer, the optional claim mapping and the isolation tests are on
-`main`. Where the build differs from the proposal, the section says so under **As built**. There is
-no operator command to disable a user yet.
+`main`. Where the build differs from the proposal, the section says so under **As built**.
 
 ## Goal
 
@@ -343,10 +342,12 @@ organisation stays an organisation action.
 
 **As built:** `disableUser` and `enableUser` in `server/lib/oidc/sessions.ts` do the above: the
 sessions go at once, a session issued afterwards is refused too, and the only enabled owner of an
-organisation cannot be disabled. **Not built yet:** the operator command that calls them. Until it
-exists, disabling needs code or a direct database update of `app_user.disabled_at`. A direct update
-skips the session deletion and the last-owner check, but the next request is still refused, because
-every request reads `disabled_at`.
+organisation cannot be disabled. The operator command is `server/db/user-access.ts`
+(`pnpm user:disable` / `pnpm user:enable`), naming the user by `--sub`, `--id` or `--email` (an
+address several users share is refused). Both directions delete every session of the user, so a
+session left open by a disable done directly in the database cannot come back on enable. Each change
+writes `member.disabled` / `member.enabled` with the actor `operator` to the audit log of every
+organisation the user belongs to. Tests: `server/lib/oidc/user-access.pg.test.ts`.
 
 ## Implementation size and slicing
 

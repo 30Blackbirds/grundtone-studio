@@ -808,7 +808,9 @@
       "organization.deleted": "Slettede organisation",
       "member.left": "Forlod organisation",
       "member.sync_removed": "Fjernet ved afstemning med auth",
-      "member.backfilled": "Indlæst fra auth"
+      "member.backfilled": "Indlæst fra auth",
+      "member.disabled": "Deaktiveret af driftsansvarlig",
+      "member.enabled": "Genaktiveret af driftsansvarlig"
     },
     "loadOlder": "Indlæs ældre",
     "exportCsv": "Eksportér CSV",

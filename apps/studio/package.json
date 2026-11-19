@@ -22,6 +22,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "bootstrap:owner": "tsx --env-file=.env server/db/bootstrap-owner.ts",
+    "user:disable": "tsx --env-file=.env server/db/user-access.ts disable",
+    "user:enable": "tsx --env-file=.env server/db/user-access.ts enable",
     "db:seed": "tsx --env-file=.env server/db/seed.ts",
     "bundle:size": "node scripts/bundle-size.mjs"
   },

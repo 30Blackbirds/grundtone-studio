@@ -274,17 +274,20 @@ stays, so the IdP may sign the person straight back in. Studio's logout route,
 publishes one, but the menu does not use it yet.
 
 **Removing access at once.** Removing someone from an organisation takes effect on their next
-request. To lock a person out of Studio entirely, disable the user: sessions are checked against
-`app_user.disabled_at` on every request. There is no operator command for this yet; until there is,
-do it in the database, and delete the user's sessions in the same go:
+request. To lock a person out of Studio entirely, in every organisation, disable the user with the
+operator command:
 
-```sql
-update app_user set disabled_at = now() where id = '<user id>';
-delete from app_session where user_id = '<user id>';
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production exec app \
+  node --import tsx server/db/user-access.ts disable --sub <subject>
 ```
 
-That direct update skips one safeguard, so first make sure the user is not the last owner of an
-organisation. To enable them again, clear `disabled_at`; they then sign in anew.
+Their sessions end at once, and they are refused at every request and sign-in from then on. Their
+roles are kept. Name the user by `--sub` (the IdP subject, as for the first owner), `--id` (Studio's
+user id), or `--email` (refused when several users share the address). The last enabled owner of an
+organisation cannot be disabled: make someone else owner first. `enable` with the same options lets
+them back in; they sign in anew to get their roles back. Each change is recorded in the audit log of
+every organisation the user belongs to.
 
 **Roles from the IdP (optional, off by default).** Set both `OIDC_ROLE_CLAIM` (for example `groups`)
 and `OIDC_ROLE_MAP`, a comma-separated list of `value=org-slug:role`:

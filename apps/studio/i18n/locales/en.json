@@ -808,7 +808,9 @@
       "organization.deleted": "Deleted organization",
       "member.left": "Left organization",
       "member.sync_removed": "Removed by sync with auth",
-      "member.backfilled": "Loaded from auth"
+      "member.backfilled": "Loaded from auth",
+      "member.disabled": "Disabled by the operator",
+      "member.enabled": "Enabled by the operator"
     },
     "loadOlder": "Load older",
     "exportCsv": "Export CSV",

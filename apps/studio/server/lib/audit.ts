@@ -35,6 +35,8 @@ export type AuditAction =
   | 'member.left'
   | 'member.sync_removed'
   | 'member.backfilled'
+  | 'member.disabled'
+  | 'member.enabled'
 
 export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'member.invited',
@@ -66,6 +68,8 @@ export const AUDIT_ACTIONS: readonly AuditAction[] = [
   'member.left',
   'member.sync_removed',
   'member.backfilled',
+  'member.disabled',
+  'member.enabled',
 ]
 
 export interface AuditEventInput {
