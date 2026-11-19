@@ -5,7 +5,8 @@ checked from the outside. `layer/` is a fixture layer that uses every one of the
 layer does. It is **not** part of any normal build: Nuxt registers layers only from
 `apps/studio/layers/`, and this folder is elsewhere.
 
-The `Extension contract` job in `.github/workflows/ci.yml`:
+The `Extension contract` job in `.github/workflows/build.yml` (the workflow that runs on pull
+requests):
 
 1. copies `layer/` to `apps/studio/layers/contract`;
 2. builds Studio and starts the built server;
