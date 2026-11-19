@@ -55,7 +55,7 @@ repository is the code you can run yourself.
 
 | Tool                | Version                                                               |
 | ------------------- | --------------------------------------------------------------------- |
-| Node.js             | `24.21.0` (see [`.nvmrc`](./.nvmrc)); `engines` requires >=24.18.1    |
+| Node.js             | `26.13.1` (see [`.nvmrc`](./.nvmrc)); `engines` requires >=26.13.1    |
 | pnpm                | `10.14.0` (the `packageManager` field; `corepack enable` installs it) |
 | Docker with Compose | for PostgreSQL and MinIO locally, and for the production image        |
 | GNU Make (optional) | for the `make` shortcuts                                              |

@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# ⚠️ The Node version here MUST match .nvmrc (24.21.0) and engines.node
-# (>=24.18.1), otherwise CI tests one runtime and production runs another.
+# ⚠️ The Node version here MUST match .nvmrc (26.13.1) and engines.node
+# (>=26.13.1), otherwise CI tests one runtime and production runs another.
 # Both FROM lines pin the multi-arch index digest (linux/amd64 + linux/arm64),
-# measured with `docker buildx imagetools inspect node:24.21.0-alpine`, so a
+# measured with `docker buildx imagetools inspect node:26.13.1-alpine`, so a
 # re-pushed tag cannot change the runtime under the same version. Bump the
 # version and the digest together.
 # The tag is pinned to the full version for that reason: on 2026-09-15 the
@@ -12,8 +12,7 @@
 #
 # Node 26 removed corepack from the official images (deprecated in 25), so pnpm is installed
 # explicitly below instead of with `corepack enable`. The pnpm version is the `packageManager`
-# field in package.json: bump both together. Node 26 itself is a coordinated change: bump
-# .nvmrc + engines together with the FROM lines.
+# field in package.json: bump both together. Bump .nvmrc + engines together with the FROM lines.
 FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS base
 RUN npm install --global pnpm@10.14.0
 
