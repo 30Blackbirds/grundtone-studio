@@ -1,6 +1,9 @@
 # Design note: standalone Studio with generic OIDC login and in-product roles
 
-Status: proposal, for review. No code changes in this PR.
+Status: accepted, largely built. Login, sessions, Studio-owned organisations and invitations, the
+first-owner command, owner transfer, the optional claim mapping and the isolation tests are on
+`main`. Where the build differs from the proposal, the section says so under **As built**. There is
+no operator command to disable a user yet.
 
 ## Goal
 
@@ -94,6 +97,11 @@ Flow:
 All failures return a generic error page and log a stable reason code (never tokens, codes or claim
 values).
 
+**As built:** the ID token is accepted with exactly one signing algorithm, `OIDC_ID_TOKEN_ALG`
+(default `RS256`), rather than any asymmetric algorithm discovery lists. Code:
+`server/lib/oidc/flow.ts`, `server/api/oidc/{login,callback}.get.ts`; tests:
+`server/lib/oidc/flow.pg.test.ts`.
+
 ### 3. Sessions and cookies
 
 Studio-owned, server-side sessions, so a disabled user or a role change takes effect on the next
@@ -110,6 +118,11 @@ request:
   defence in depth, not the only CSRF control.
 - The active organisation is a session attribute chosen in Studio, not a JWT claim.
 
+**As built:** the table is `app_session`. Lifetimes are `OIDC_SESSION_IDLE_HOURS` (default 8) and
+`OIDC_SESSION_MAX_DAYS` (default 7). Expired rows are purged whenever a new session is created, not
+by a scheduled task. The active organisation is a preference only: no access check reads it, and a
+test sets it to a foreign organisation to prove that grants nothing.
+
 ### 4. Logout
 
 `POST /api/oidc/logout` (same-origin checked): deletes the session row, clears the cookie, then if
@@ -117,6 +130,10 @@ discovery lists `end_session_endpoint` redirects there (RP-initiated logout) wit
 `client_id` and `post_logout_redirect_uri` (a fixed, operator-registered `{origin}/`). If the IdP
 has no end-session endpoint, logout is local only and the docs say so. Back-channel/front-channel
 logout is out of scope for the first iteration.
+
+**As built:** `POST /api/oidc/logout` does the above. The sign-out in Studio's sidebar goes through
+the Better Auth client and is answered by `server/lib/oidc/auth-compat.ts`, which ends only Studio's
+session. The IdP's own session stays, so the IdP may sign the person straight back in.
 
 ### 5. User mapping
 
@@ -146,6 +163,11 @@ expiry, invited_by) become Studio tables. In `oidc` mode, org create / list / lo
 accept / remove / role change write **only** to Studio's database (single transaction with the audit
 row); the "write auth first / revoke first" ordering in `org-membership.ts` is not used there. In
 `better-auth` mode nothing changes.
+
+**As built:** the store is `server/lib/local-orgs.ts`; `org-membership.ts` dispatches to it in
+`oidc` mode. The UI keeps the Better Auth client: in `oidc` mode `/api/auth/**` answers the session
+and organisation reads it needs from Studio's tables (`server/lib/oidc/auth-compat.ts`) and refuses
+everything else with 501. Only owners and managers manage members.
 
 ### E-mail verification and outgoing e-mail
 
@@ -178,7 +200,7 @@ owner does not _imply_ manager in the authorizer; `requireOrgRole` compares rank
 
 | Role      | May                                                                                                               |
 | --------- | ----------------------------------------------------------------------------------------------------------------- |
-| `owner`   | Everything below, plus change other owners (today: only via an out-of-band path; not assignable in the UI).       |
+| `owner`   | Everything below, plus change other owners (in `oidc` mode in Studio; in `better-auth` mode out of band only).    |
 | `manager` | Manage org members (`canManageOrgMembers`), create projects, project **admin** on every project in the org.       |
 | `admin`   | Create projects (`canCreateProjects`), **view** every project in the org. Not project admin/editor by role alone. |
 | `member`  | **View** every project in the org.                                                                                |
@@ -208,6 +230,32 @@ constraint), a malformed project id is denied, a database error is `unavailable`
 - **Tenant isolation**: every role read/write is scoped by `organization_id`; an actor's role in org
   A never answers a question about org B. Covered by tests before the code (see Slicing).
 
+**As built:**
+
+- An owner promotes another member to owner by changing their role. **Owner transfer** is one step:
+  `POST /api/orgs/:orgId/ownership-transfer` with `{ userId, stepDownTo? }` makes the target owner
+  and steps the caller down (default `manager`). Only an owner may do it, the target must be an
+  enabled member of the same organisation, and both changes are audited. The member page offers it.
+  `GET /api/orgs/:orgId/my-roles` tells the UI which roles the caller may assign.
+- Last-owner protection is in the store and in `disableUser`, which refuses to disable the only
+  enabled owner of any organisation.
+- Isolation is tested at each layer and along the whole request chain (all under `server/lib/`):
+  - `oidc/isolation.pg.test.ts`: a real session cookie through the real auth middleware to the
+    project and organisation guards. An owner of A reaches nothing of B; the active-organisation
+    field grants nothing; removal, a pending invitation and disabling take effect on the next
+    request of an open session; no other cookie gives an actor.
+  - `local-orgs.pg.test.ts`: the store. Outsiders get "not found", members cannot manage, last
+    owner, concurrent changes, invitations.
+  - `org-membership-local.pg.test.ts`: the routes' entry points and the statuses they return.
+  - `local-authorizer.pg.test.ts`: project access from org and project roles, machine keys.
+  - `oidc/auth-compat.pg.test.ts`: what `/api/auth/**` answers in `oidc` mode.
+  - `ownership-transfer.pg.test.ts`: owner transfer and `my-roles`.
+  - `oidc/sessions.pg.test.ts`: expiry, disabled users, logout.
+  - `oidc/identity.pg.test.ts`: `(issuer, sub)`, no merge by e-mail, JIT grants nothing.
+
+  The `*.pg.test.ts` files need `DATABASE_URL`; they are skipped without it locally and fail in CI
+  if it is missing.
+
 ### First owner on a fresh self-host (no IdP groups, no open window)
 
 There is deliberately **no** "first user to sign in becomes owner" window.
@@ -223,6 +271,22 @@ There is deliberately **no** "first user to sign in becomes owner" window.
    create the same pending grant at boot **only if that organisation has no owner**. Once an owner
    exists the variables are ignored (and a warning is logged so they can be removed).
 4. Recovery (all owners lost/disabled): the same CLI, `admin grant-owner`, run by the operator.
+
+**As built:** one command, `server/db/bootstrap-owner.ts` (`pnpm bootstrap:owner`, or
+`node --import tsx server/db/bootstrap-owner.ts` in the container), in two forms:
+
+- `--sub <subject> [--issuer <url>] --org <slug> [--name <name>]` (preferred). Makes that IdP
+  identity owner at once. If the person has not signed in yet, their user and identity are created
+  now, without an e-mail address, and they are owner at first login. Nothing depends on e-mail, so
+  nobody can claim it by registering an address. `--issuer` defaults to `OIDC_ISSUER`.
+- `--email <address> --org <slug> [--name <name>]`. An existing user with that address becomes owner
+  at once. Otherwise the command creates a one-use owner invitation (hashed, 7 days) and prints the
+  link once. Accepting it needs a verified address unless `OIDC_REQUIRE_EMAIL_VERIFIED=false`.
+
+`--name` creates the organisation when it does not exist. The command is idempotent, audits its
+changes with the actor `operator`, and is also the recovery path. There are no `STUDIO_BOOTSTRAP_*`
+variables: an environment grant evaluated at boot would be a window, and the command covers the
+container case. Tests: `server/lib/oidc/bootstrap.pg.test.ts`.
 
 Organisation creation by ordinary users is governed by `ORG_CREATION=operator|users`. Proposed
 default in `oidc` mode: `operator`, because a public or multi-tenant IdP would otherwise let any
@@ -245,6 +309,27 @@ Configured with `OIDC_ROLE_CLAIM` (e.g. `groups`) and an explicit map `OIDC_ROLE
    source.
 5. A disabled user gets nothing from claims.
 
+**As built** (`server/lib/oidc/claim-roles.ts`; tests: `server/lib/oidc/claim-roles.pg.test.ts`):
+
+- Configuration: `OIDC_ROLE_CLAIM=groups` and `OIDC_ROLE_MAP=studio-admins=acme:admin,…`, a
+  comma-separated list of `value=org-slug:role`, not JSON. Both or neither must be set, or Studio
+  refuses to start. Roles are `billing`, `member`, `admin` or `manager`; `owner` is refused.
+- Storage: `org_member` is unchanged. A row the claim created is marked in a separate table,
+  `org_member_claim`, instead of a `source` column. Only marked rows are changed or withdrawn by the
+  claim.
+- At every login the claim is read again. A value grants its role where the person has no row; a
+  marked row is raised or lowered to the highest role any value names for that organisation, and
+  withdrawn when no value names it any more. An owner row is never touched. A slug that names no
+  organisation is skipped. Changes are audited with the actor `idp-claim`.
+- Any change made in Studio removes the mark: a role change, removal, leaving, or an accepted
+  invitation. The row is then Studio's and the claim no longer affects it.
+- **Removal does not outlast the claim.** Someone removed from an organisation in Studio who still
+  carries the claim value gets the role back at their next login, because the removal also removed
+  the row the claim checks for. To keep them out, take the value away at the IdP, or remove the
+  mapping entry.
+- **Between logins a grant stands.** Taking the value away at the IdP withdraws the role only at the
+  person's next login. To cut access at once, disable the user in Studio (see "Disabled users").
+
 ### Disabled users
 
 `app_user.disabled_at` is checked **on every request** (fresh read, not cached in the session): a
@@ -256,10 +341,18 @@ user can belong to several organisations, so an organisation owner cannot disabl
 Disabling is an **instance-operator** action (CLI `admin disable-user`); removing a member from one
 organisation stays an organisation action.
 
+**As built:** `disableUser` and `enableUser` in `server/lib/oidc/sessions.ts` do the above: the
+sessions go at once, a session issued afterwards is refused too, and the only enabled owner of an
+organisation cannot be disabled. **Not built yet:** the operator command that calls them. Until it
+exists, disabling needs code or a direct database update of `app_user.disabled_at`. A direct update
+skips the session deletion and the last-owner check, but the next request is still refused, because
+every request reads `disabled_at`.
+
 ## Implementation size and slicing
 
 Honest estimate: **about 3.5–4.5k lines including tests**, 7 PRs, each independently mergeable and
-green; `better-auth` mode is untouched by all of them.
+green; `better-auth` mode is untouched by all of them. (The original plan; the build split PRs 4 and
+6 further to stay reviewable.)
 
 | PR  | Content                                                                                                                                                | Size (approx.) |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |

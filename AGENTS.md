@@ -16,17 +16,17 @@ Standard commands are already documented — see root `package.json` scripts, th
 
 ### Node / pnpm
 
-- Node **24** is required (`.nvmrc` → `24.21.0`, `engine-strict=true`). The image's default
+- Node **26** is required (`.nvmrc` → `26.13.1`, `engine-strict=true`). The image's default
   `/exec-daemon/node` is **v22** and wins in non-interactive shells, which makes `pnpm install` fail
   the engine check. Activate nvm first: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use`
   (the update script already does this; interactive login shells get Node 24 automatically because
-  the nvm `default` alias is pinned to `24.21.0`).
+  the nvm `default` alias is pinned to `26.13.1`).
 - pnpm `10.14.0` is provided via corepack.
-- `engines.node` is `>=24.18.1` (the Node 24 security release) and `engine-strict=true`, so
-  `pnpm install` fails with `ERR_PNPM_UNSUPPORTED_ENGINE` on any older Node. That includes the Node
-  **pnpm itself runs on**, which can differ from `node -v`: a volta or corepack pnpm shim pinned to
-  an older runtime fails even when `node -v` prints 24.21.0 (measured 2026-09-17: volta's pnpm ran
-  on 24.16.0). Check with `pnpm exec node -v`.
+- `engines.node` is `>=26.13.1` and `engine-strict=true`, so `pnpm install` fails with
+  `ERR_PNPM_UNSUPPORTED_ENGINE` on any older Node. That includes the Node **pnpm itself runs on**,
+  which can differ from `node -v`: a volta or corepack pnpm shim pinned to an older runtime fails
+  even when `node -v` prints 26.13.1 (measured 2026-09-17: volta's pnpm ran on 24.16.0). Check with
+  `pnpm exec node -v`.
 
 ### Vendored `@klanghaus/*` packages — no registry token
 
