@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { signOut, useSession } from '~~/lib/auth-client'
+  import { visibleOrgNavItems } from '~~/lib/extensions'
 
   const {
     orgs,
@@ -13,6 +14,18 @@
   const route = useRoute()
   const { billingEnabled } = useFeatures()
   const session = useSession()
+  const appConfig = useAppConfig()
+
+  // Org links a layer registered (lib/extensions.ts), e.g. billing. Each has
+  // its own gate: the billing role must see Billing WITHOUT seeing Settings or
+  // the audit log (wireframe-nav-ia §3).
+  const extraOrgLinks = computed(() =>
+    visibleOrgNavItems(appConfig.studio.orgNav, {
+      canManageBilling: canManageBilling.value,
+      canManageOrgMembers: canManageOrgMembers.value,
+      features: { billing: billingEnabled.value },
+    }),
+  )
 
   const userName = computed(
     () => session.value?.data?.user?.name || session.value?.data?.user?.email || '',
@@ -58,7 +71,6 @@
 
   const isDashboardActive = computed(() => route.path === '/dashboard')
   const isMembersActive = computed(() => route.path.startsWith(`/orgs/${activeSlug.value}/members`))
-  const isBillingActive = computed(() => route.path === `/orgs/${activeSlug.value}/billing`)
   const isAuditActive = computed(() => route.path === `/orgs/${activeSlug.value}/audit`)
   const isSettingsActive = computed(() => route.path === `/orgs/${activeSlug.value}/settings`)
 
@@ -118,14 +130,15 @@
               {{ $t('members.title') }}
             </NuxtLink>
           </li>
-          <!-- Egen gate (wireframe-nav-ia §3): den rene billing-rolle skal se
-               Fakturering UDEN at kunne se Indstillinger/Revisionslog. -->
-          <li v-if="canManageBilling && billingEnabled">
+          <li v-for="item in extraOrgLinks" :key="item.id">
             <NuxtLink
-              :to="`/orgs/${activeSlug}/billing`"
-              :class="[linkClass, { [activeClass]: isBillingActive }]"
+              :to="`/orgs/${activeSlug}/${item.path}`"
+              :class="[
+                linkClass,
+                { [activeClass]: route.path === `/orgs/${activeSlug}/${item.path}` },
+              ]"
             >
-              {{ $t('billing.nav') }}
+              {{ $t(item.labelKey) }}
             </NuxtLink>
           </li>
           <li v-if="canManageOrgMembers">

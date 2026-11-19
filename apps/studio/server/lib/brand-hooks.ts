@@ -1,3 +1,5 @@
+import { createHook } from './hook'
+
 // Extension point: something that must hear when an organization's number of
 // active brands may have changed (a first publish or an activation created a
 // brand). Studio itself does not care who listens; a deployment that bills
@@ -10,21 +12,7 @@
 
 export type BrandCountListener = (organizationId: string) => void | Promise<void>
 
-const listeners = new Set<BrandCountListener>()
+const hook = createHook<string>('brand-hooks', (organizationId) => `org ${organizationId}`)
 
-/** Registers a listener; returns a function that removes it. */
-export function onBrandCountChanged(listener: BrandCountListener): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
-
-/** Tells every listener, without waiting for them. Never throws. */
-export function notifyBrandCountChanged(organizationId: string): void {
-  for (const listener of listeners) {
-    void Promise.resolve()
-      .then(() => listener(organizationId))
-      .catch((err: unknown) => {
-        console.error(`[brand-hooks] listener failed for org ${organizationId}:`, err)
-      })
-  }
-}
+export const onBrandCountChanged: (listener: BrandCountListener) => () => void = hook.on
+export const notifyBrandCountChanged: (organizationId: string) => void = hook.notify
