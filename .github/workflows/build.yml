@@ -685,8 +685,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
+      # layers/ is gitignored, so a clean checkout does not have it.
       - name: Place the fixture layer
-        run: cp -R apps/studio/contract/layer apps/studio/layers/contract
+        run: |
+          mkdir -p apps/studio/layers
+          cp -R apps/studio/contract/layer apps/studio/layers/contract
       - name: Build Studio with the fixture layer
         run: pnpm --filter @grundtone-studio/studio build
       # No database: nothing the check asks for reads one. CONTRACT_FLAG is the
@@ -719,7 +722,7 @@ jobs:
       - name: Server log
         if: failure()
         working-directory: apps/studio
-        run: cat server.log
+        run: cat server.log 2>/dev/null || echo "no server log (the server was not started)"
 
   # ─────────────────────────────────────────────────────────────────────────
   # Auto-deploy to staging on every successful develop build.
