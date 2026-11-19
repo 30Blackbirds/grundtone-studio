@@ -32,9 +32,12 @@ export interface StudioExtensions {
   legalProcessors: string[]
   /**
    * Where a quota alert sends someone to raise the limit (gets `?org=<slug>`).
-   * Empty: the alert shows no upgrade button, as on a self-hosted install.
+   * Unset or empty: the alert shows no upgrade button, as on a self-hosted
+   * install. Studio leaves it undefined, never '': Nuxt lets the project's own
+   * app.config win over a layer's, and skips only undefined values, so a ''
+   * here would silently override every layer (contract/check.mjs guards it).
    */
-  upgradePath: string
+  upgradePath?: string
 }
 
 export interface OrgNavContext {

@@ -2,7 +2,7 @@
   import { organization } from '~~/lib/auth-client'
   import type { DashboardPayload } from '~~/server/lib/dashboard'
 
-  // Set by a layer that sells higher limits (app.config.ts); empty on self-host.
+  // Set by a layer that sells higher limits (app.config.ts); unset on self-host.
   const upgradePath = useAppConfig().studio.upgradePath
 
   definePageMeta({ layout: 'app' })

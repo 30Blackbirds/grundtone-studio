@@ -61,7 +61,8 @@ describe("Studio's own registrations", () => {
   // A self-hosted Studio must show no billing link and no upgrade button.
   it('registers no org links and no upgrade page', () => {
     expect(studio.orgNav).toEqual([])
-    expect(studio.upgradePath).toBe('')
+    // undefined, not '': a defined value here would override every layer's.
+    expect(studio.upgradePath).toBeUndefined()
   })
 
   // The payment processor is registered by the layer that adds payments.
