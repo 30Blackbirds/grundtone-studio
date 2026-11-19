@@ -208,10 +208,11 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
 - Public `build.yml` contains a `deploy-staging` job for the hosted service (see the publication
   findings note). That job belongs in the overlay or the operator's infra repo, not here. Out of
   scope for this note; flagged only.
-- **Hosted deployment moves with B5.** The hosted service must run an image built from the overlay
-  before the public removal reaches the branch it deploys from (`develop` for staging), or staging
-  loses billing. Building, signing and pushing that image, and deploying it, need secrets and an
-  owner decision; the overlay's `verify.yml` builds and smokes it but pushes nothing.
+- **No hosted deployment exists today** (owner, 2026-11-19): Studio runs only locally, through Tilt,
+  with `FEATURE_BILLING=off`. So B5 has no deployment order to respect, and the public half can
+  merge on its own. When a hosted service is set up, it builds its image from the overlay
+  (`verify.yml` already builds and smokes that image, but pushes nothing); signing, pushing and
+  deploying it are decided then.
 
 ## 4. Migration order, slices, and sequencing with studio-oidc-roles
 
@@ -345,9 +346,10 @@ Decided by the project owner on 2026-11-18 (relayed by the PM session):
    core gets a small first-served extension point instead (B4, after studio-oidc-roles has changed
    `org-lookup.ts`).
 
-Sequencing: slices B1 to B4 are merged (PRs 417, 421, 420, 428). B5 is two PRs that land together:
-the public one that drops billing and the overlay's that adds it, after the hosted deployment builds
-from the overlay (section 3c).
+Sequencing: slices B1 to B4 are merged (PRs 417, 421, 420, 428). B5 is two PRs: the public one that
+drops billing and the overlay's that adds it. With no hosted deployment (section 3c), they need not
+land in a particular order; after the public one merges, the overlay's `STUDIO_REF` moves to its
+merge commit.
 
 Left public by B5, on purpose:
 
