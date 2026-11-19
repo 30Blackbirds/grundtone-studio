@@ -495,6 +495,24 @@ export const organization = pgTable(
   (t) => [uniqueIndex('organization_slug_unique_idx').on(t.slug)],
 )
 
+// Marks an org_member row as granted by the IdP role claim (OIDC_ROLE_MAP), so
+// the next login can update or withdraw it. A row WITHOUT a marker was assigned
+// in Studio and the claim never touches it; any change made in Studio removes
+// the marker. org_member itself keeps its shape.
+export const orgMemberClaim = pgTable(
+  'org_member_claim',
+  {
+    organizationId: text()
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('org_member_claim_unique_idx').on(t.organizationId, t.userId)],
+)
+
 // An invitation changes no role until it is accepted. Only the SHA-256 of the
 // token is stored; the plaintext goes out once, in the link.
 export const orgInvitation = pgTable(

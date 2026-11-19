@@ -35,6 +35,11 @@ export default defineEventHandler(async (event) => {
       cookieState,
     )
     const user = await resolveUser(db, cfg, claims)
+    // Optional and off by default: org roles from an IdP claim (claim-roles.ts).
+    if (cfg.roleMapping) {
+      const { syncClaimRoles } = await import('~~/server/lib/oidc/claim-roles')
+      await syncClaimRoles(db, cfg.roleMapping, user.id, claims.roleValues ?? [])
+    }
     // A fresh token at every login: no session id survives from before it.
     const session = await createSession(db, cfg, { userId: user.id, idToken })
     const sessionCookie = oidcSessionCookie(cfg)

@@ -1,7 +1,15 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, count, eq, gt, isNull } from 'drizzle-orm'
 import type { Db } from '../db'
-import { appUser, auditLog, orgInvitation, orgMember, organization, project } from '../db/schema'
+import {
+  appUser,
+  auditLog,
+  orgInvitation,
+  orgMember,
+  orgMemberClaim,
+  organization,
+  project,
+} from '../db/schema'
 import { auditRow, type AuditEventInput } from './audit'
 import { canAssignRole, canManageMember, ORG_RANK } from './org-membership-input'
 import type { OrgRole } from './project-access'
@@ -81,6 +89,16 @@ async function lockOrg(tx: Tx, orgId: string) {
   const [org] = await tx.select().from(organization).where(eq(organization.id, orgId)).for('update')
   if (!org) throw new LocalOrgError('not_found')
   return org
+}
+
+/**
+ * Any change to a member made in Studio makes that row Studio's: the IdP role
+ * claim (oidc/claim-roles.ts) stops managing it.
+ */
+async function unmarkClaim(tx: Tx, orgId: string, userId: string) {
+  await tx
+    .delete(orgMemberClaim)
+    .where(and(eq(orgMemberClaim.organizationId, orgId), eq(orgMemberClaim.userId, userId)))
 }
 
 const mayManage = (role: OrgRole) => role === 'owner' || role === 'manager'
@@ -258,6 +276,7 @@ export async function changeMemberRole(
       .update(orgMember)
       .set({ role })
       .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, targetUserId)))
+    await unmarkClaim(tx, orgId, targetUserId)
     await tx.insert(auditLog).values(
       audit(actor, {
         organizationId: orgId,
@@ -292,6 +311,7 @@ export async function removeMember(
     await tx
       .delete(orgMember)
       .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, targetUserId)))
+    await unmarkClaim(tx, orgId, targetUserId)
     await tx.insert(auditLog).values(
       audit(actor, {
         organizationId: orgId,
@@ -370,6 +390,7 @@ export async function leaveOrganization(db: Db, actor: Actor, orgId: string): Pr
     await tx
       .delete(orgMember)
       .where(and(eq(orgMember.organizationId, orgId), eq(orgMember.userId, actor.id)))
+    await unmarkClaim(tx, orgId, actor.id)
     await tx.insert(auditLog).values(
       audit(actor, {
         organizationId: orgId,
@@ -606,6 +627,8 @@ export async function acceptInvitation(
         .set({ role })
         .where(and(eq(orgMember.organizationId, inv.organizationId), eq(orgMember.userId, user.id)))
     }
+    // An accepted invitation is Studio's decision, even when it kept a higher role.
+    await unmarkClaim(tx, inv.organizationId, user.id)
     await tx.insert(auditLog).values(
       audit(
         { id: user.id, email: user.email },
