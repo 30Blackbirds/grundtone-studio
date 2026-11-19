@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import type { Tokens } from '~~/server/lib/tokens'
 
-  // Set by a layer that sells higher limits (app.config.ts); empty on self-host.
+  // Set by a layer that sells higher limits (app.config.ts); unset on self-host.
   const upgradePath = useAppConfig().studio.upgradePath
 
   definePageMeta({ layout: 'app' })

@@ -6,7 +6,7 @@ import type { OrgNavItem, StudioExtensions } from './lib/extensions'
 export default defineAppConfig({
   studio: {
     orgNav: [] as OrgNavItem[],
-    upgradePath: '',
+    upgradePath: undefined as string | undefined,
     legalProcessors: ['upcloud', 'bunny', 'postmark', 'sentry', 'proton'],
   } satisfies StudioExtensions,
 })

@@ -1,0 +1,17 @@
+{
+  "contract": {
+    "nav": "Contract fixture link",
+    "page": "Contract fixture page"
+  },
+  "processors": {
+    "rows": {
+      "contractVendor": {
+        "name": "Contract Fixture Vendor",
+        "service": "Contract check",
+        "established": "Nowhere",
+        "location": "Nowhere",
+        "transfer": "None"
+      }
+    }
+  }
+}

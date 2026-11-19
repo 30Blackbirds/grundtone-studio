@@ -201,7 +201,14 @@ Use Nuxt's own layering, which exists for exactly this and requires no patching 
   the image refuses an invalid `FEATURE_BILLING`. A scheduled job against Studio `main` is still to
   come.
 - Public repo CI never sees overlay code. It runs a contract test that the extension points still
-  exist (a small fixture layer that registers a fake provider, nav item and processor).
+  work (B7, `apps/studio/contract/`): the `Extension contract` job places a fixture layer at
+  `apps/studio/layers/contract`, builds and starts Studio, and asks the running server whether each
+  registration took effect (provider, feature, both hooks, the three `app.config` registries, layer
+  i18n, a Nitro task, a page). Studio's typecheck also covers the fixture on every PR.
+  - Found by B7 on its first run: Studio's own `app.config` set `upgradePath: ''`, and Nuxt lets the
+    project's own value win over a layer's (only `undefined` is skipped), so the billing layer's
+    `/plans` never took effect and the hosted build hid the quota alerts' upgrade button. Studio now
+    leaves it undefined.
 - Releases: overlay builds its own image `FROM` the public release or consumes the pinned tag at
   build time, then deploys. Public release tags (`v*`, signed by cosign in `build.yml`) stay
   unchanged; the overlay image is signed by the overlay repo's own workflow.
@@ -346,10 +353,9 @@ Decided by the project owner on 2026-11-18 (relayed by the PM session):
    core gets a small first-served extension point instead (B4, after studio-oidc-roles has changed
    `org-lookup.ts`).
 
-Sequencing: slices B1 to B4 are merged (PRs 417, 421, 420, 428). B5 is two PRs: the public one that
-drops billing and the overlay's that adds it. With no hosted deployment (section 3c), they need not
-land in a particular order; after the public one merges, the overlay's `STUDIO_REF` moves to its
-merge commit.
+Sequencing: slices B1 to B6 are merged (PRs 417, 421, 420, 428, 431 with the overlay's #1, 433). B7
+adds the contract job. After it merges, the overlay's `STUDIO_REF` moves to that commit so the
+hosted build picks up the `upgradePath` fix.
 
 Left public by B5, on purpose:
 
