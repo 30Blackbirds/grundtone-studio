@@ -14,7 +14,7 @@
 # explicitly below instead of with `corepack enable`. The pnpm version is the `packageManager`
 # field in package.json: bump both together. Node 26 itself is a coordinated change: bump
 # .nvmrc + engines together with the FROM lines.
-FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS base
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS base
 RUN npm install --global pnpm@10.14.0
 
 FROM base AS deps
@@ -94,7 +94,7 @@ RUN HOOKABLE_SRC="$(find /deploy/node_modules/.pnpm -maxdepth 3 -type d -path '*
  && cp -r "$HOOKABLE_SRC" /deploy/.output/server/node_modules/hookable \
  && test -f /deploy/.output/server/node_modules/hookable/package.json
 
-FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS runner
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runner
 
 # 🔴 Revision ind i IMAGET, ikke kun i workflowet. /api/healthz laeste allerede
 # NUXT_PUBLIC_APP_VERSION men ingen satte den — prod svarede "dev", og den
