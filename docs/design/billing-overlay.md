@@ -357,11 +357,15 @@ Sequencing: slices B1 to B6 are merged (PRs 417, 421, 420, 428, 431 with the ove
 adds the contract job. After it merges, the overlay's `STUDIO_REF` moves to that commit so the
 hosted build picks up the `upgradePath` fix.
 
+Moved after B7 (2026-11-20): `server/api/lifecycle/tenant-state.post.ts`, the callback through which
+account suspends or reactivates an org, now lives in the overlay at the same URL. Its writes land in
+`org_suspension`, which stays public with its migrations, because Studio enforces it: the `/k` route
+answers 410 once `cdnGraceUntil` has passed. Studio itself has no writer of that table. Studio's
+removal lands first, then the overlay adds the endpoint together with a `STUDIO_REF` on the Studio
+commit without it, so Studio and the layer never serve the same route.
+
 Left public by B5, on purpose:
 
-- `server/api/lifecycle/tenant-state.post.ts` (account suspends or reactivates an org). It is not in
-  the move list in 3a, it is dormant without `LIFECYCLE_S2S_TOKEN`, and suspension is enforced by
-  public code (`org_suspension`, the `/k` grace). Whether it moves is an open question.
 - Legal text that names the payment processor: privacy `s23data` and `s5p`, terms `s5p3`. B6
   (2026-11-19) neutralised the rest of the public copy and comments but left these three on the
   owner's decision: legal is parked, and changing them is legal work. They are taken up when legal
