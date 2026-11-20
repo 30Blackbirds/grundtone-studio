@@ -56,18 +56,15 @@ export const project = pgTable(
   ],
 )
 
-// Org suspension mirror (kontrakt §8a/§9 + ToS §10.2): account's
-// TenantLifecycleCallbackService writes this via POST /api/lifecycle/
-// tenant-state on suspend/reactivate. cdnGraceUntil comes FROM account
-// (single source for the 14-day grace, Allan-approved 2026-08-02) — the
-// /k CDN route serves normally until it passes, then 410s. Reactivation
-// deletes the row → delivery resumes immediately.
+// Org suspension mirror. Studio enforces it: the /k CDN route serves normally
+// until cdnGraceUntil passes, then answers 410, and deleting the row resumes
+// delivery at once. Studio has no writer of its own; a deployment that
+// suspends orgs writes it from a layer.
 export const orgSuspension = pgTable('org_suspension', {
   organizationId: text().primaryKey(),
   suspendedAt: timestamp({ withTimezone: true }).notNull(),
   cdnGraceUntil: timestamp({ withTimezone: true }).notNull(),
-  // §9a: audit-kæden fra accounts kanoniske TenantLifecycleCallbackService —
-  // fx actor=system:dunning m/ reason der bærer grace-udløbstidspunktet.
+  // Who suspended the org and why, kept with the row for the audit trail.
   reason: text().notNull(),
   actor: text().notNull(),
 })
